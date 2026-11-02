@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   COLS,
+  CONFETTI_DURATION,
+  CONFETTI_PIECES,
   PIECE_TYPES,
   ROWS,
   blur,
   cellsOf,
   clearPoints,
+  confettiPieces,
+  createConfetti,
   createState,
   ghostY,
   gravityInterval,
@@ -15,6 +19,7 @@ import {
   release,
   spawnPiece,
   step,
+  stepConfetti,
   type Action,
   type Piece,
   type PieceType,
@@ -792,6 +797,93 @@ describe('carnival stack', () => {
       press(state, 'newRound');
       expect(state.held.left).toBe(false);
       expect(state.repeatDir).toBeNull();
+    });
+  });
+
+  describe('clear count and confetti', () => {
+    function clearRow(state: StackState) {
+      fillRow(state, ROWS - 1, [9]);
+      setPiece(state, { type: 'I', rotation: 1, x: 7, y: ROWS - 4 });
+      press(state, 'hardDrop');
+    }
+
+    it('counts each lock that clears rows, once however many rows it clears', () => {
+      const state = newState();
+      expect(state.clears).toBe(0);
+      clearRow(state);
+      expect(state.clears).toBe(1);
+      for (let y = ROWS - 4; y < ROWS; y++) fillRow(state, y, [0]);
+      setPiece(state, { type: 'I', rotation: 1, x: -2, y: ROWS - 4 });
+      press(state, 'hardDrop');
+      expect(state.lines).toBe(5);
+      expect(state.clears).toBe(2);
+      spawnNext(state, 'O');
+      expect(state.clears).toBe(2);
+    });
+
+    it('resets the clear count on a new round', () => {
+      const state = newState();
+      clearRow(state);
+      state.phase = 'over';
+      press(state, 'newRound');
+      expect(state.clears).toBe(0);
+    });
+
+    it('starts a burst on a clear, lasts 1.6 seconds, and restarts on the next clear', () => {
+      const confetti = createConfetti();
+      stepConfetti(confetti, 0, 16);
+      expect(confetti.age).toBeNull();
+      stepConfetti(confetti, 1, 16);
+      expect(confetti.age).toBe(0);
+      stepConfetti(confetti, 1, 1000);
+      expect(confetti.age).toBe(1000);
+      stepConfetti(confetti, 2, 16);
+      expect(confetti.age).toBe(0);
+      stepConfetti(confetti, 2, CONFETTI_DURATION - 1);
+      expect(confetti.age).toBe(CONFETTI_DURATION - 1);
+      stepConfetti(confetti, 2, 1);
+      expect(confetti.age).toBeNull();
+    });
+
+    it('clears the burst on a new round', () => {
+      const confetti = createConfetti();
+      stepConfetti(confetti, 3, 16);
+      stepConfetti(confetti, 0, 16);
+      expect(confetti.age).toBeNull();
+      expect(confetti.clears).toBe(0);
+    });
+
+    it('never starts with reduced motion', () => {
+      const confetti = createConfetti();
+      stepConfetti(confetti, 1, 16, true);
+      expect(confetti.age).toBeNull();
+      expect(confetti.clears).toBe(1);
+    });
+
+    it('has up to 90 pieces in the five confetti colours', () => {
+      const pieces = confettiPieces(400);
+      expect(pieces).toHaveLength(CONFETTI_PIECES);
+      expect(CONFETTI_PIECES).toBeLessThanOrEqual(90);
+      expect(new Set(pieces.map((p) => p.color)).size).toBe(5);
+    });
+
+    it('has no effect on play', () => {
+      const run = (withConfetti: boolean) => {
+        const state = newState();
+        const confetti = createConfetti(state.clears);
+        const actions: Action[] = ['left', 'rotateCw', 'hardDrop', 'right', 'hardDrop', 'hold'];
+        clearRow(state);
+        for (const action of actions) {
+          tap(state, action);
+          step(state, 120);
+          if (withConfetti) {
+            stepConfetti(confetti, state.clears, 120);
+            confettiPieces(confetti.age ?? 0);
+          }
+        }
+        return { ...state, random: undefined, onGameOver: undefined };
+      };
+      expect(run(true)).toEqual(run(false));
     });
   });
 });

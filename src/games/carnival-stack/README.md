@@ -54,9 +54,17 @@ A round starts as soon as the game opens.
 Your final score is saved to the carnival's score board when the round ends, and
 the game over screen shows it beside your best.
 
+## Look
+
+The game is drawn as the inside of a circus tent, the Big Top. Each piece has
+its own pattern as well as its colour, so all seven can be told apart by pattern
+alone. Every clear throws a 1.6 second burst of confetti behind the pieces; it
+is skipped when the system asks for reduced motion, and it never affects play.
+
 ## Files
 
 - `game.ts`: the game logic (`createState`, `press`, `release`, `step`, `blur`
-  and helpers such as `ghostY` and `gravityInterval`) and the `carnivalStack`
+  and helpers such as `ghostY` and `gravityInterval`), the confetti burst
+  (`createConfetti`, `stepConfetti`, `confettiPieces`) and the `carnivalStack`
   entry, the default export the midway finds.
 - `game.test.ts`: tests for the game logic.

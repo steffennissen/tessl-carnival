@@ -16,6 +16,8 @@ export const NEXT_COUNT = 3;
 
 const WELL_X = (WIDTH - COLS * CELL) / 2;
 const WELL_Y = (HEIGHT - (ROWS - HIDDEN_ROWS) * CELL) / 2;
+const WELL_W = COLS * CELL;
+const WELL_H = (ROWS - HIDDEN_ROWS) * CELL;
 
 export type PieceType = 'I' | 'O' | 'T' | 'S' | 'Z' | 'J' | 'L';
 export const PIECE_TYPES: readonly PieceType[] = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
@@ -50,6 +52,8 @@ export interface StackState {
   holdUsed: boolean;
   score: number;
   lines: number;
+  /** How many locks this round cleared at least one row. Drawing uses it to start confetti. */
+  clears: number;
   phase: 'playing' | 'paused' | 'over';
   fallTimer: number;
   lockTimer: number;
@@ -440,6 +444,7 @@ function lock(state: StackState) {
   if (cleared > 0) {
     state.score += clearPoints(cleared, level(state));
     state.lines += cleared;
+    state.clears += 1;
     state.board = [...emptyBoard().slice(0, cleared), ...kept];
   }
 
@@ -481,6 +486,7 @@ function freshRound(state: StackState) {
   state.holdUsed = false;
   state.score = 0;
   state.lines = 0;
+  state.clears = 0;
   state.phase = 'playing';
   state.repeatTimer = 0;
   state.repeating = false;
@@ -499,6 +505,7 @@ export function createState(options: StackOptions = {}): StackState {
     holdUsed: false,
     score: 0,
     lines: 0,
+    clears: 0,
     phase: 'playing',
     fallTimer: 0,
     lockTimer: 0,
@@ -626,6 +633,65 @@ export function step(state: StackState, dtMs: number): void {
   }
 }
 
+export const CONFETTI_PIECES = 90;
+export const CONFETTI_DURATION = 1600;
+
+/** The confetti burst. It lives beside the game state and never feeds back into play. */
+export interface Confetti {
+  /** The clear count the burst last saw. */
+  clears: number;
+  /** Milliseconds since the burst started, or null when there is none. */
+  age: number | null;
+}
+
+export function createConfetti(clears = 0): Confetti {
+  return { clears, age: null };
+}
+
+/**
+ * Advances the burst by `dtMs`. A higher clear count starts it again, a lower one
+ * (a new round) clears it, and with reduced motion it never starts.
+ */
+export function stepConfetti(
+  confetti: Confetti,
+  clears: number,
+  dtMs: number,
+  reducedMotion = false,
+): void {
+  if (confetti.age !== null) {
+    confetti.age += dtMs;
+    if (confetti.age >= CONFETTI_DURATION) confetti.age = null;
+  }
+  if (clears < confetti.clears) confetti.age = null;
+  else if (clears > confetti.clears && !reducedMotion) confetti.age = 0;
+  confetti.clears = clears;
+}
+
+const CONFETTI_COLORS = [
+  theme.colors.accent,
+  theme.colors.water,
+  theme.colors.danger,
+  theme.colors.text,
+  theme.colors.muted,
+];
+
+/** A repeatable number in [0, 1) for confetti piece `i`. */
+function scatter(i: number): number {
+  const value = Math.sin(i * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+/** Where each confetti piece is `ageMs` into a burst: thrown up from the well, then falling. */
+export function confettiPieces(ageMs: number) {
+  const t = ageMs / 1000;
+  return Array.from({ length: CONFETTI_PIECES }, (_, i) => ({
+    x: WELL_X - 30 + scatter(i) * (WELL_W + 60) + Math.sin(t * 4 + i) * 12,
+    y: 300 - (1 + scatter(i + 200)) * 330 * t * Math.max(0, 1.1 - t) * 1.7 + 330 * t * t * 0.9,
+    angle: t * 7 + i,
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+  }));
+}
+
 const COLORS: Record<PieceType, string> = {
   I: theme.colors.water,
   O: theme.colors.accent,
@@ -636,9 +702,85 @@ const COLORS: Record<PieceType, string> = {
   L: theme.colors.wood,
 };
 
+const PATTERN_COLORS: Record<PieceType, string> = {
+  I: theme.colors.text,
+  O: theme.colors.stripeA,
+  T: theme.colors.text,
+  S: theme.colors.stripeA,
+  Z: theme.colors.text,
+  J: theme.colors.text,
+  L: theme.colors.text,
+};
+
+const PANEL_LEFT = 36;
+const PANEL_RIGHT = WELL_X + WELL_W + 36;
+const PANEL_WIDTH = 208;
+
+const STRIPE = 54;
+const STRIPE_COLORS = [theme.colors.stripeA, theme.colors.text];
+
+/** Draws a cell in its piece's colour with its pattern, clipped to the cell. */
 function drawCell(ctx: CanvasRenderingContext2D, x: number, y: number, type: PieceType) {
+  const size = CELL - 1;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, size, size);
+  ctx.clip();
   ctx.fillStyle = COLORS[type];
-  ctx.fillRect(x, y, CELL - 1, CELL - 1);
+  ctx.fillRect(x, y, size, size);
+  ctx.fillStyle = ctx.strokeStyle = PATTERN_COLORS[type];
+  ctx.lineWidth = 3;
+  switch (type) {
+    case 'I':
+      ctx.fillRect(x, y + 6, CELL, 4);
+      ctx.fillRect(x, y + 15, CELL, 4);
+      break;
+    case 'O':
+      for (const [dx, dy] of [
+        [6, 6],
+        [17, 6],
+        [11.5, 12],
+        [6, 18],
+        [17, 18],
+      ]) {
+        ctx.beginPath();
+        ctx.arc(x + dx, y + dy, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    case 'T':
+      ctx.beginPath();
+      ctx.moveTo(x + 12, y + 3);
+      ctx.lineTo(x + 20, y + 12);
+      ctx.lineTo(x + 12, y + 21);
+      ctx.lineTo(x + 4, y + 12);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 'S':
+      ctx.fillRect(x, y, 12, 12);
+      ctx.fillRect(x + 12, y + 12, 12, 12);
+      break;
+    case 'Z':
+      for (let k = -CELL; k < CELL; k += 9) {
+        ctx.beginPath();
+        ctx.moveTo(x + k, y + CELL);
+        ctx.lineTo(x + k + CELL, y);
+        ctx.stroke();
+      }
+      break;
+    case 'J':
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(x + 11.5, y + 11.5, 6.5, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    case 'L':
+      ctx.fillRect(x + 9.5, y + 3, 4, 18);
+      ctx.fillRect(x + 3, y + 9.5, 18, 4);
+      break;
+  }
+  ctx.restore();
 }
 
 /** Draws a piece in spawn orientation with its box's top-left at (x, y). */
@@ -646,21 +788,75 @@ function drawPreview(ctx: CanvasRenderingContext2D, type: PieceType, x: number, 
   for (const [cx, cy] of SHAPES[type].cells) drawCell(ctx, x + cx * CELL, y + cy * CELL, type);
 }
 
-function draw(ctx: CanvasRenderingContext2D, state: StackState, best: number) {
+/** The striped tent, its poles, the scalloped trim beside the well, and the side panels. */
+function drawTent(ctx: CanvasRenderingContext2D) {
+  const { colors } = theme;
+  const stripes = Math.ceil(WIDTH / STRIPE);
+  for (let i = 0; i < stripes; i++) {
+    ctx.fillStyle = STRIPE_COLORS[i % 2];
+    ctx.fillRect(i * STRIPE, 0, STRIPE, HEIGHT);
+  }
+  ctx.fillStyle = colors.background;
+  ctx.globalAlpha = 0.72;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = colors.wood;
+  ctx.fillRect(WELL_X - 10, 0, 6, HEIGHT);
+  ctx.fillRect(WELL_X + WELL_W + 4, 0, 6, HEIGHT);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, WELL_X, HEIGHT);
+  ctx.rect(WELL_X + WELL_W, 0, WIDTH - WELL_X - WELL_W, HEIGHT);
+  ctx.clip();
+  for (let i = 0; i < stripes; i++) {
+    const x = i * STRIPE;
+    ctx.fillStyle = STRIPE_COLORS[i % 2];
+    ctx.fillRect(x, 0, STRIPE, 12);
+    ctx.beginPath();
+    ctx.arc(x + STRIPE / 2, 12, STRIPE / 2, 0, Math.PI);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.fillStyle = colors.background;
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.roundRect(PANEL_LEFT, 62, PANEL_WIDTH, 124, theme.radius);
+  ctx.roundRect(PANEL_LEFT, 200, PANEL_WIDTH, 144, theme.radius);
+  ctx.roundRect(PANEL_RIGHT, 62, PANEL_WIDTH, 250, theme.radius);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawConfetti(ctx: CanvasRenderingContext2D, ageMs: number) {
+  for (const piece of confettiPieces(ageMs)) {
+    ctx.save();
+    ctx.translate(piece.x, piece.y);
+    ctx.rotate(piece.angle);
+    ctx.fillStyle = piece.color;
+    ctx.fillRect(-4, -2.5, 8, 5);
+    ctx.restore();
+  }
+}
+
+function draw(ctx: CanvasRenderingContext2D, state: StackState, best: number, confetti: Confetti) {
   const { colors } = theme;
   const paused = state.phase === 'paused';
   const cellX = (col: number) => WELL_X + col * CELL;
   const cellY = (row: number) => WELL_Y + (row - HIDDEN_ROWS) * CELL;
 
-  ctx.fillStyle = colors.background;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  drawTent(ctx);
+
+  ctx.fillStyle = colors.surface;
+  ctx.fillRect(WELL_X, WELL_Y, WELL_W, WELL_H);
+  if (!paused && confetti.age !== null) drawConfetti(ctx, confetti.age);
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(WELL_X, WELL_Y, COLS * CELL, (ROWS - HIDDEN_ROWS) * CELL);
+  ctx.rect(WELL_X, WELL_Y, WELL_W, WELL_H);
   ctx.clip();
-  ctx.fillStyle = colors.surface;
-  ctx.fillRect(WELL_X, WELL_Y, COLS * CELL, (ROWS - HIDDEN_ROWS) * CELL);
   if (!paused) {
     state.board.forEach((row, y) =>
       row.forEach((type, x) => {
@@ -680,19 +876,19 @@ function draw(ctx: CanvasRenderingContext2D, state: StackState, best: number) {
   }
   ctx.restore();
 
-  const leftX = WELL_X - 150;
-  const rightX = WELL_X + COLS * CELL + 40;
+  const leftX = PANEL_LEFT + 24;
+  const rightX = PANEL_RIGHT + 24;
   ctx.fillStyle = colors.text;
   ctx.font = canvasFont('body', 'bold');
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('Hold', leftX, WELL_Y + 20);
-  ctx.fillText('Next', rightX, WELL_Y + 20);
+  ctx.fillText('Hold', leftX, 92);
+  ctx.fillText('Next', rightX, 92);
   if (!paused) {
-    if (state.hold) drawPreview(ctx, state.hold, leftX, WELL_Y + 40);
+    if (state.hold) drawPreview(ctx, state.hold, leftX, 108);
     state.queue
       .slice(0, NEXT_COUNT)
-      .forEach((type, i) => drawPreview(ctx, type, rightX, WELL_Y + 40 + i * 3 * CELL));
+      .forEach((type, i) => drawPreview(ctx, type, rightX, 108 + i * 3 * CELL));
   }
 
   const stats = [
@@ -701,8 +897,9 @@ function draw(ctx: CanvasRenderingContext2D, state: StackState, best: number) {
     `Level ${level(state)}`,
     `Lines ${state.lines}`,
   ];
+  ctx.fillStyle = colors.text;
   ctx.font = canvasFont('body');
-  stats.forEach((line, i) => ctx.fillText(line, leftX, WELL_Y + 200 + i * 30));
+  stats.forEach((line, i) => ctx.fillText(line, leftX, 234 + i * 30));
 
   if (paused) {
     ctx.textAlign = 'center';
@@ -793,12 +990,17 @@ export const carnivalStack: CarnivalGame = {
     window.addEventListener('blur', onBlur);
     document.addEventListener('visibilitychange', onVisibility);
 
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const confetti = createConfetti(state.clears);
+
     let frame = 0;
     let last = performance.now();
     const loop = (time: number) => {
-      step(state, Math.max(time - last, 0));
+      const dt = Math.max(time - last, 0);
+      step(state, dt);
+      stepConfetti(confetti, state.clears, state.phase === 'paused' ? 0 : dt, reducedMotion);
       last = time;
-      draw(ctx, state, best);
+      draw(ctx, state, best, confetti);
       frame = requestAnimationFrame(loop);
     };
     frame = requestAnimationFrame(loop);
