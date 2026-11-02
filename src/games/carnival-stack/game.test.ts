@@ -9,14 +9,19 @@ import {
   cellsOf,
   clearPoints,
   confettiPieces,
+  createClock,
   createConfetti,
   createState,
+  frameAt,
   ghostY,
   gravityInterval,
   isGrounded,
   level,
   press,
+  pressActionFor,
+  pressAt,
   release,
+  releaseActionFor,
   spawnPiece,
   step,
   stepConfetti,
@@ -711,6 +716,92 @@ describe('carnival stack', () => {
       const before = structuredClone({ ...state, random: undefined, onGameOver: undefined });
       for (const action of actions) press(state, action);
       expect({ ...state, random: undefined, onGameOver: undefined }).toEqual(before);
+    });
+  });
+
+  describe('play clock', () => {
+    it('never counts a hidden pause as play when P comes before the next frame', () => {
+      const state = newState();
+      spawned(state, 'T');
+      const clock = createClock(0);
+      frameAt(state, clock, 100);
+      const before = { piece: state.piece, fallTimer: state.fallTimer };
+      blur(state);
+      // No frames run while the page is hidden, then P is handled first.
+      pressAt(state, clock, 'pause', 60_000);
+      expect(state.phase).toBe('playing');
+      frameAt(state, clock, 60_016);
+      expect(state.piece).toEqual(before.piece);
+      expect(state.fallTimer).toBe(before.fallTimer + 16);
+      expect(state.recorded).toBe(false);
+    });
+
+    it('counts the time between frames while playing', () => {
+      const state = newState();
+      spawned(state, 'T');
+      const clock = createClock(0);
+      expect(frameAt(state, clock, 1000)).toBe(1000);
+      expect(state.piece!.y).toBe(2);
+    });
+
+    it('counts nothing for frames while paused', () => {
+      const state = newState();
+      spawned(state, 'T');
+      const clock = createClock(0);
+      press(state, 'pause');
+      frameAt(state, clock, 5000);
+      pressAt(state, clock, 'pause', 5000);
+      frameAt(state, clock, 5010);
+      expect(state.piece!.y).toBe(1);
+      expect(state.fallTimer).toBe(10);
+    });
+
+    it('starts a new round from the moment Enter is pressed', () => {
+      const state = newState();
+      state.phase = 'over';
+      const clock = createClock(0);
+      pressAt(state, clock, 'newRound', 60_000);
+      expect(state.phase).toBe('playing');
+      frameAt(state, clock, 60_010);
+      expect(state.fallTimer).toBe(10);
+    });
+  });
+
+  describe('keyboard', () => {
+    const key = (
+      code: string,
+      mods: { metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean } = {},
+    ) => ({
+      code,
+      metaKey: false,
+      ctrlKey: false,
+      altKey: false,
+      ...mods,
+    });
+
+    it('ignores presses with Meta, Control or Alt held', () => {
+      expect(pressActionFor(key('ArrowDown'))).toBe('down');
+      for (const mod of ['metaKey', 'ctrlKey', 'altKey'] as const) {
+        expect(pressActionFor(key('ArrowDown', { [mod]: true }))).toBeUndefined();
+      }
+    });
+
+    it.each(['metaKey', 'ctrlKey', 'altKey'] as const)(
+      'clears a held key released with %s held',
+      (mod) => {
+        const state = newState();
+        spawned(state, 'T');
+        press(state, pressActionFor(key('ArrowDown'))!);
+        press(state, pressActionFor(key('ArrowRight'))!);
+        release(state, releaseActionFor(key('ArrowDown', { [mod]: true }))!);
+        release(state, releaseActionFor(key('ArrowRight', { [mod]: true }))!);
+        expect(state.held).toEqual({ left: false, right: false, down: false });
+        expect(state.repeatDir).toBeNull();
+      },
+    );
+
+    it('maps no action for keys the game does not use', () => {
+      expect(releaseActionFor(key('KeyQ', { ctrlKey: true }))).toBeUndefined();
     });
   });
 
