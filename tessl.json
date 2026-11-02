@@ -144,6 +144,30 @@
         }
       }
     },
+    "shepherd-pr-review-by-reviewer": {
+      "on": [
+        "github:pull_request_review.submitted"
+      ],
+      "when": {
+        "event.sender.id": "{{ github.tesslReviewerApp.userId }}",
+        "event.pull_request.state": "open",
+        "event.pull_request.head.ref": {
+          "matches": "^tessl/"
+        },
+        "event.pull_request.head.repo.id": 1443186373,
+        "event.pull_request.labels.*.name": {
+          "any": {
+            "equals": "tessl"
+          }
+        }
+      },
+      "action": {
+        "use": "shepherd",
+        "inputs": {
+          "GITHUB_PR_NUMBER": "{{ event.pull_request.number }}"
+        }
+      }
+    },
     "follow-ticket-changes-issue-unlabelled": {
       "on": [
         "github:issues.unlabeled"
