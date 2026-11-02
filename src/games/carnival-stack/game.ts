@@ -598,6 +598,67 @@ export function blur(state: StackState): void {
   clearHeld(state);
 }
 
+const KEYS: Record<string, Action> = {
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  ArrowDown: 'down',
+  ArrowUp: 'rotateCw',
+  KeyX: 'rotateCw',
+  KeyZ: 'rotateCcw',
+  Space: 'hardDrop',
+  KeyC: 'hold',
+  ShiftLeft: 'hold',
+  ShiftRight: 'hold',
+  KeyP: 'pause',
+  Enter: 'newRound',
+};
+
+/** Where gameplay time last counted from, in the same units as animation frame times. */
+export interface PlayClock {
+  last: number;
+}
+
+export function createClock(now: number): PlayClock {
+  return { last: now };
+}
+
+/**
+ * A key went down at `now`. Resuming or starting a new round restarts the clock
+ * there, so time out of play never counts, even when no frames ran meanwhile.
+ */
+export function pressAt(state: StackState, clock: PlayClock, action: Action, now: number): void {
+  const wasPlaying = state.phase === 'playing';
+  press(state, action);
+  if (!wasPlaying && state.phase === 'playing') clock.last = now;
+}
+
+/** An animation frame at `time`. Steps the game and returns the milliseconds it covered. */
+export function frameAt(state: StackState, clock: PlayClock, time: number): number {
+  const dt = Math.max(time - clock.last, 0);
+  clock.last = time;
+  step(state, dt);
+  return dt;
+}
+
+/** The modifier flags and physical key of a keyboard event. */
+export interface KeyInput {
+  code: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+}
+
+/** The action a key press starts. Presses with Meta, Control or Alt are left to the browser. */
+export function pressActionFor(key: KeyInput): Action | undefined {
+  if (key.metaKey || key.ctrlKey || key.altKey) return undefined;
+  return KEYS[key.code];
+}
+
+/** The action a key release ends. A release always counts, whichever modifiers are held. */
+export function releaseActionFor(key: KeyInput): Action | undefined {
+  return KEYS[key.code];
+}
+
 const EPSILON = 1e-9;
 
 /** Advances the game by `dtMs` milliseconds, handling every interval that elapses. */
@@ -927,21 +988,6 @@ function draw(ctx: CanvasRenderingContext2D, state: StackState, best: number, co
   }
 }
 
-const KEYS: Record<string, Action> = {
-  ArrowLeft: 'left',
-  ArrowRight: 'right',
-  ArrowDown: 'down',
-  ArrowUp: 'rotateCw',
-  KeyX: 'rotateCw',
-  KeyZ: 'rotateCcw',
-  Space: 'hardDrop',
-  KeyC: 'hold',
-  ShiftLeft: 'hold',
-  ShiftRight: 'hold',
-  KeyP: 'pause',
-  Enter: 'newRound',
-};
-
 export const carnivalStack: CarnivalGame = {
   id: 'carnival-stack',
   name: 'Carnival Stack',
@@ -961,24 +1007,21 @@ export const carnivalStack: CarnivalGame = {
         best = readBest();
       },
     });
+    const clock = createClock(performance.now());
 
-    const actionFor = (event: KeyboardEvent): Action | undefined => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return undefined;
-      return KEYS[event.code];
-    };
     const onKeyDown = (event: KeyboardEvent) => {
-      const action = actionFor(event);
+      const action = pressActionFor(event);
       if (!action) return;
       event.preventDefault();
       if (event.repeat) return;
       const wasOver = state.phase === 'over';
-      press(state, action);
+      pressAt(state, clock, action, performance.now());
       if (wasOver && state.phase === 'playing') best = readBest();
     };
     const onKeyUp = (event: KeyboardEvent) => {
-      const action = actionFor(event);
+      const action = releaseActionFor(event);
       if (!action) return;
-      event.preventDefault();
+      if (pressActionFor(event)) event.preventDefault();
       release(state, action);
     };
     const onBlur = () => blur(state);
@@ -994,12 +1037,9 @@ export const carnivalStack: CarnivalGame = {
     const confetti = createConfetti(state.clears);
 
     let frame = 0;
-    let last = performance.now();
     const loop = (time: number) => {
-      const dt = Math.max(time - last, 0);
-      step(state, dt);
+      const dt = frameAt(state, clock, time);
       stepConfetti(confetti, state.clears, state.phase === 'paused' ? 0 : dt, reducedMotion);
-      last = time;
       draw(ctx, state, best, confetti);
       frame = requestAnimationFrame(loop);
     };

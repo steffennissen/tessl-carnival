@@ -31,7 +31,10 @@ A round starts as soon as the game opens.
 - Hold swaps the current piece with the held one, or takes the next piece if
   hold is empty. You can hold once per piece, until it locks.
 - P, switching to another window or hiding the page pauses. Only P resumes, and
-  keys held through the pause need pressing again.
+  keys held through the pause need pressing again. Time spent paused never
+  counts as play.
+- Keys pressed with Meta, Control or Alt held are left to the browser, but
+  letting go of a key always stops its action, whichever of those are held.
 - The round ends when a new piece spawns on top of locked cells, or a piece locks
   entirely in the hidden rows without clearing a row. Leaving mid-round abandons
   it, and no score is recorded.
@@ -64,7 +67,9 @@ is skipped when the system asks for reduced motion, and it never affects play.
 ## Files
 
 - `game.ts`: the game logic (`createState`, `press`, `release`, `step`, `blur`
-  and helpers such as `ghostY` and `gravityInterval`), the confetti burst
+  and helpers such as `ghostY` and `gravityInterval`), the play clock and key
+  mapping the browser loop uses (`createClock`, `pressAt`, `frameAt`,
+  `pressActionFor`, `releaseActionFor`), the confetti burst
   (`createConfetti`, `stepConfetti`, `confettiPieces`) and the `carnivalStack`
   entry, the default export the midway finds.
 - `game.test.ts`: tests for the game logic.
