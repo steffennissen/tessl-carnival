@@ -233,26 +233,281 @@ export function step(state: BalloonHopState, dt: number): void {
   state.poles = state.poles.filter((pole) => pole.x + OBSTACLE_W >= 0);
 }
 
-const STRIPE_H = 16;
-const CAP_H = 12;
+const POLE_BAND_H = 10;
+const POLE_BAND_GAP = 26;
+const TRIM_H = 12;
+const SCALLOPS = 4;
 const BALLOON_R = 13;
+
+const SHADOW_ALPHA = 0.25;
+/** Every card's shadow falls this far right and up, as if lit from below. */
+const SHADOW_DX = 3;
+const SHADOW_DY = -4;
+/** A pole's card leaves room for its shadow inside the collision rectangle. */
+const POLE_CARD_W = OBSTACLE_W - SHADOW_DX;
+const SCALLOP_R = POLE_CARD_W / SCALLOPS / 2;
+
+const CLOUD_PARALLAX = 0.06;
+const HILL_PARALLAX = 0.12;
+const TENT_PARALLAX = 0.25;
+const BUNTING_PARALLAX = 0.5;
+const HILL_Y = 300;
+const CLOUD_SPACING = 340;
+const TENT_SPACING = 270;
+const BUNTING_SPAN = 160;
+const FLAGS_PER_SPAN = 5;
+
+/**
+ * How far the course has scrolled since the round began, worked out from the
+ * poles: pole k always sits at FIRST_POLE_X + k * SPACING minus the scroll,
+ * and every pole that has left the screen was scored first. It changes only
+ * when the poles move, so the scenery is still in `ready` and `over`.
+ */
+export function scrolled(state: BalloonHopState): number {
+  const first = state.poles[0];
+  const gone = state.score - state.poles.filter((pole) => pole.scored).length;
+  return FIRST_POLE_X + gone * SPACING - first.x;
+}
+
+/** Fills a sheet of card: its shadow first, offset by (dx, dy), then the card itself. */
+function paper(
+  ctx: CanvasRenderingContext2D,
+  color: string,
+  trace: () => void,
+  dx = SHADOW_DX,
+  dy = SHADOW_DY,
+) {
+  ctx.save();
+  ctx.translate(dx, dy);
+  ctx.globalAlpha = SHADOW_ALPHA;
+  ctx.fillStyle = theme.colors.background;
+  ctx.beginPath();
+  trace();
+  ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  trace();
+  ctx.fill();
+}
+
+/** Calls `draw` for every repeat of a pattern `spacing` apart that shows on screen, `offset` scrolled. */
+function repeat(
+  offset: number,
+  spacing: number,
+  margin: number,
+  draw: (x: number, k: number) => void,
+) {
+  for (
+    let k = Math.floor((offset - margin) / spacing);
+    k * spacing - offset < WIDTH + margin;
+    k++
+  ) {
+    draw(k * spacing - offset, k);
+  }
+}
+
+/** Which of `n` variants the k-th repeat uses, for negative k too. */
+function variant(k: number, n: number) {
+  return ((k % n) + n) % n;
+}
+
+const CLOUDS: readonly { y: number; puffs: readonly [number, number, number][] }[] = [
+  {
+    y: 95,
+    puffs: [
+      [0, 0, 18],
+      [22, -10, 24],
+      [48, -2, 20],
+      [68, 4, 14],
+    ],
+  },
+  {
+    y: 150,
+    puffs: [
+      [0, 0, 14],
+      [18, -8, 19],
+      [40, 0, 15],
+    ],
+  },
+  {
+    y: 115,
+    puffs: [
+      [0, 2, 16],
+      [24, -12, 26],
+      [54, -6, 22],
+      [80, 2, 15],
+      [34, 6, 16],
+    ],
+  },
+];
+
+function drawClouds(ctx: CanvasRenderingContext2D, scroll: number) {
+  repeat(scroll * CLOUD_PARALLAX, CLOUD_SPACING, 120, (x, k) => {
+    const cloud = CLOUDS[variant(k, CLOUDS.length)];
+    paper(ctx, theme.colors.text, () => {
+      for (const [dx, dy, r] of cloud.puffs) {
+        ctx.moveTo(x + dx + r, cloud.y + dy);
+        ctx.arc(x + dx, cloud.y + dy, r, 0, Math.PI * 2);
+      }
+    });
+  });
+}
+
+function drawHills(ctx: CanvasRenderingContext2D, scroll: number) {
+  const offset = scroll * HILL_PARALLAX;
+  paper(ctx, theme.colors.surface, () => {
+    ctx.moveTo(-10, HEIGHT);
+    for (let x = -10; x <= WIDTH + 10; x += 10) {
+      const wx = x + offset;
+      ctx.lineTo(x, HILL_Y + 16 * Math.sin(wx / 70) + 7 * Math.sin(wx / 29 + 1));
+    }
+    ctx.lineTo(WIDTH + 10, HEIGHT);
+    ctx.closePath();
+  });
+}
+
+/** Fills `trace` with stripeB, then paints `stripes` in stripeA clipped to it. */
+function stripedCard(ctx: CanvasRenderingContext2D, trace: () => void, stripes: () => void) {
+  paper(ctx, theme.colors.stripeB, trace);
+  ctx.save();
+  ctx.beginPath();
+  trace();
+  ctx.clip();
+  ctx.fillStyle = theme.colors.stripeA;
+  ctx.beginPath();
+  stripes();
+  ctx.fill();
+  ctx.restore();
+}
+
+const TENT_SIZES = [1, 0.75, 1.2] as const;
+
+function drawTent(ctx: CanvasRenderingContext2D, x: number, size: number) {
+  const { colors } = theme;
+  const w = 96 * size;
+  const bodyTop = GROUND_Y - 44 * size;
+  const peakX = x + w / 2;
+  const peakY = bodyTop - 46 * size;
+  const eave = 8 * size;
+  const stripe = w / 8;
+
+  ctx.fillStyle = colors.background;
+  ctx.fillRect(peakX - 1, peakY - 16 * size, 2, 16 * size);
+  paper(ctx, colors.accent, () => {
+    ctx.moveTo(peakX + 1, peakY - 16 * size);
+    ctx.lineTo(peakX + 15 * size, peakY - 12 * size);
+    ctx.lineTo(peakX + 1, peakY - 8 * size);
+    ctx.closePath();
+  });
+
+  stripedCard(
+    ctx,
+    () => ctx.rect(x, bodyTop, w, GROUND_Y + 4 - bodyTop),
+    () => {
+      for (let i = 0; i < 8; i += 2) ctx.rect(x + i * stripe, bodyTop, stripe, GROUND_Y);
+    },
+  );
+  stripedCard(
+    ctx,
+    () => {
+      ctx.moveTo(x - eave, bodyTop);
+      ctx.lineTo(peakX, peakY);
+      ctx.lineTo(x + w + eave, bodyTop);
+      ctx.closePath();
+    },
+    () => {
+      const base = (w + 2 * eave) / 8;
+      for (let i = 0; i < 8; i += 2) {
+        ctx.moveTo(peakX, peakY);
+        ctx.lineTo(x - eave + i * base, bodyTop);
+        ctx.lineTo(x - eave + (i + 1) * base, bodyTop);
+        ctx.closePath();
+      }
+    },
+  );
+}
+
+function drawTents(ctx: CanvasRenderingContext2D, scroll: number) {
+  repeat(scroll * TENT_PARALLAX, TENT_SPACING, 140, (x, k) =>
+    drawTent(ctx, x, TENT_SIZES[variant(k, TENT_SIZES.length)]),
+  );
+}
+
+function drawBunting(ctx: CanvasRenderingContext2D, scroll: number) {
+  const { colors } = theme;
+  const flagColors = [colors.accent, colors.water, colors.danger];
+  const sag = (t: number) => 16 + 18 * 4 * t * (1 - t);
+  repeat(scroll * BUNTING_PARALLAX, BUNTING_SPAN, BUNTING_SPAN, (x, k) => {
+    ctx.strokeStyle = colors.background;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, sag(0));
+    ctx.quadraticCurveTo(x + BUNTING_SPAN / 2, sag(0.5) * 2 - sag(0), x + BUNTING_SPAN, sag(1));
+    ctx.stroke();
+    for (let i = 0; i < FLAGS_PER_SPAN; i++) {
+      const t = (i + 0.5) / FLAGS_PER_SPAN;
+      const fx = x + t * BUNTING_SPAN;
+      const fy = sag(t);
+      paper(ctx, flagColors[variant(k * FLAGS_PER_SPAN + i, flagColors.length)], () => {
+        ctx.moveTo(fx - 10, fy);
+        ctx.lineTo(fx + 10, fy);
+        ctx.lineTo(fx, fy + 20);
+        ctx.closePath();
+      });
+    }
+  });
+}
+
+/** The scalloped trim along one gap edge: the scallops reach exactly to `edge` and no further. */
+function traceTrim(x: number, edge: number, dir: 1 | -1) {
+  return (ctx: CanvasRenderingContext2D) => {
+    const back = edge - dir * TRIM_H;
+    const mid = edge - dir * SCALLOP_R;
+    ctx.rect(x, Math.min(back, mid), POLE_CARD_W, TRIM_H - SCALLOP_R);
+    for (let i = 0; i < SCALLOPS; i++) {
+      const cx = x + SCALLOP_R * (2 * i + 1);
+      ctx.moveTo(cx + SCALLOP_R, mid);
+      ctx.arc(cx, mid, SCALLOP_R, 0, Math.PI, dir === -1);
+    }
+  };
+}
 
 function drawPole(ctx: CanvasRenderingContext2D, pole: Pole, x: number) {
   const { colors } = theme;
   const top = pole.gapY - GAP / 2;
   const bottom = pole.gapY + GAP / 2;
-  const stripes = (from: number, to: number) => {
-    for (let y = from, i = 0; y < to; y += STRIPE_H, i++) {
-      ctx.fillStyle = i % 2 === 0 ? colors.stripeA : colors.stripeB;
-      ctx.fillRect(x, y, OBSTACLE_W, Math.min(STRIPE_H, to - y));
+  // The shaft, trim and their shadows stay inside the collision rectangles, so what you see
+  // is what you hit. The shadow falls only sideways, so it never reaches into the gap.
+  const shaft = (from: number, to: number) => {
+    paper(ctx, colors.stripeB, () => ctx.rect(x, from, POLE_CARD_W, to - from), SHADOW_DX, 0);
+    ctx.fillStyle = colors.stripeA;
+    for (let y = from + POLE_BAND_GAP; y < to; y += POLE_BAND_GAP + POLE_BAND_H) {
+      ctx.fillRect(x, y, POLE_CARD_W, Math.min(POLE_BAND_H, to - y));
     }
   };
-  stripes(0, top);
-  stripes(bottom, GROUND_Y);
-  // The caps are exactly as wide as the collision rectangle, so what you see is what you hit.
-  ctx.fillStyle = colors.wood;
-  ctx.fillRect(x, top - CAP_H, OBSTACLE_W, CAP_H);
-  ctx.fillRect(x, bottom, OBSTACLE_W, CAP_H);
+  shaft(0, top);
+  shaft(bottom, GROUND_Y);
+  const upper = traceTrim(x, top, 1);
+  const lower = traceTrim(x, bottom, -1);
+  paper(ctx, colors.accent, () => upper(ctx), SHADOW_DX, 0);
+  paper(ctx, colors.accent, () => lower(ctx), SHADOW_DX, 0);
+}
+
+function drawGround(ctx: CanvasRenderingContext2D, scroll: number) {
+  const { colors } = theme;
+  paper(ctx, colors.wood, () => {
+    ctx.moveTo(-10, HEIGHT);
+    for (let x = -10; x <= WIDTH + 10; x += 8) {
+      ctx.lineTo(x, GROUND_Y + 2 * Math.sin((x + scroll) / 18));
+    }
+    ctx.lineTo(WIDTH + 10, HEIGHT);
+    ctx.closePath();
+  });
+  ctx.fillStyle = colors.background;
+  ctx.globalAlpha = 0.35;
+  repeat(scroll, PLANK_W, PLANK_W, (x) => ctx.fillRect(x, GROUND_Y + 4, 2, GROUND_H));
+  ctx.globalAlpha = 1;
 }
 
 function drawBalloon(ctx: CanvasRenderingContext2D, y: number, vy: number) {
@@ -262,46 +517,44 @@ function drawBalloon(ctx: CanvasRenderingContext2D, y: number, vy: number) {
   ctx.translate(PLAYER_X, y);
   ctx.rotate(tilt);
 
-  ctx.strokeStyle = colors.text;
+  ctx.strokeStyle = colors.background;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(0, BALLOON_R + 3);
   ctx.quadraticCurveTo(-7, BALLOON_R + 14, 0, BALLOON_R + 28);
   ctx.stroke();
 
-  ctx.fillStyle = colors.danger;
-  ctx.beginPath();
-  ctx.moveTo(-3, BALLOON_R + 4);
-  ctx.lineTo(3, BALLOON_R + 4);
-  ctx.lineTo(0, BALLOON_R - 1);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(0, 0, BALLOON_R, 0, Math.PI * 2);
-  ctx.fill();
+  paper(ctx, colors.danger, () => {
+    ctx.moveTo(-3, BALLOON_R + 4);
+    ctx.lineTo(3, BALLOON_R + 4);
+    ctx.lineTo(0, BALLOON_R - 1);
+    ctx.closePath();
+    ctx.moveTo(BALLOON_R, 0);
+    ctx.arc(0, 0, BALLOON_R, 0, Math.PI * 2);
+  });
 
   ctx.fillStyle = colors.text;
-  ctx.globalAlpha = 0.4;
   ctx.beginPath();
-  ctx.arc(-4, -5, 3.5, 0, Math.PI * 2);
+  ctx.ellipse(-5, -5, 2.5, 4, 0.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
-function drawGround(ctx: CanvasRenderingContext2D, groundX: number) {
+function drawScore(ctx: CanvasRenderingContext2D, score: number) {
   const { colors } = theme;
-  ctx.fillStyle = colors.wood;
-  ctx.fillRect(0, GROUND_Y, WIDTH, GROUND_H);
-  ctx.fillStyle = colors.background;
-  ctx.globalAlpha = 0.35;
-  ctx.fillRect(0, GROUND_Y, WIDTH, 3);
-  for (let x = -groundX; x < WIDTH; x += PLANK_W) ctx.fillRect(x, GROUND_Y, 2, GROUND_H);
-  ctx.globalAlpha = 1;
+  const text = String(score);
+  ctx.font = canvasFont('title', 'bold');
+  const w = Math.max(ctx.measureText(text).width + 32, 64);
+  paper(ctx, colors.background, () => ctx.rect(WIDTH / 2 - w / 2, 14, w, 48));
+  ctx.fillStyle = colors.text;
+  ctx.textAlign = 'center';
+  ctx.fillText(text, WIDTH / 2, 50);
 }
 
 function drawCaption(ctx: CanvasRenderingContext2D, lines: [string, string?, string?]) {
   const { colors } = theme;
   ctx.fillStyle = colors.background;
-  ctx.globalAlpha = 0.75;
+  ctx.globalAlpha = 0.85;
   ctx.fillRect(0, HEIGHT / 2 - 70, WIDTH, 140);
   ctx.globalAlpha = 1;
   ctx.textAlign = 'center';
@@ -323,19 +576,20 @@ function draw(
   paused: boolean,
 ) {
   const { colors } = theme;
-  ctx.fillStyle = colors.background;
+  ctx.fillStyle = colors.muted;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  // Poles are drawn where they were between steps too, so they keep pace with the balloon.
+  // Everything is drawn where it was between steps too, so it keeps pace with the balloon.
   const lag = state.phase === 'playing' ? (1 - alpha) * SCROLL_SPEED * STEP : 0;
+  const scroll = scrolled(state) - lag;
+  drawClouds(ctx, scroll);
+  drawHills(ctx, scroll);
+  drawTents(ctx, scroll);
+  drawBunting(ctx, scroll);
   for (const pole of state.poles) drawPole(ctx, pole, pole.x + lag);
-  drawGround(ctx, (state.groundX - lag + PLANK_W) % PLANK_W);
+  drawGround(ctx, scroll);
   drawBalloon(ctx, state.prevY + (state.y - state.prevY) * alpha, state.vy);
-
-  ctx.fillStyle = colors.text;
-  ctx.font = canvasFont('title', 'bold');
-  ctx.textAlign = 'center';
-  ctx.fillText(String(state.score), WIDTH / 2, 50);
+  drawScore(ctx, state.score);
 
   if (paused) {
     drawCaption(ctx, ['Paused', 'Press to carry on']);
