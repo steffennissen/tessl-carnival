@@ -2,6 +2,10 @@
 
 Hop a balloon on a string through the gaps in the striped carnival poles.
 
+The booth is drawn as a cut-paper carnival: flat card layers of clouds, hills,
+big top tents and bunting, each with a soft offset shadow, drifting past at
+their own speeds behind the poles.
+
 ## How to play
 
 - Click or tap the game, or press Space or ArrowUp, to hop. Holding a key down
@@ -40,5 +44,6 @@ and you win a prize at these scores:
 - `game.ts`: the game logic (`createState`, `hop`, `step`, `pump`, `nextRandom`,
   `nextGapY`, `circleHitsRect` and the constants) and the `balloonHop` entry, the
   default export the midway finds. The simulation runs in fixed steps of 1/120 s,
-  so it plays the same at any frame rate.
+  so it plays the same at 10 frames a second or faster. Each frame feeds it at
+  most 0.1 s, so below 10 frames a second the game runs slower.
 - `game.test.ts`: tests for the game logic.
