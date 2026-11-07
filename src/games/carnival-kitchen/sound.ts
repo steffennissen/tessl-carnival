@@ -16,6 +16,10 @@ export interface Sound {
   shake(): void;
   whoosh(): void;
   pop(): void;
+  /** The oven crackling while the pizza bakes. */
+  sizzle(): void;
+  /** The oven's bell when the pizza comes out. */
+  ding(): void;
   /** A soft "not yet" for a tap that came too early. */
   boop(): void;
   banner(): void;
@@ -199,6 +203,14 @@ export function createSound(): Sound {
     },
     pop() {
       tone(500, 0.1, { volume: 0.2, slideTo: 1100 });
+    },
+    sizzle() {
+      hiss(0.18, { volume: 0.07, from: 1400, filter: 'lowpass' });
+      if (Math.random() < 0.4) hiss(0.03, { volume: 0.12, from: 5000, delay: Math.random() * 0.1 });
+    },
+    ding() {
+      tone(NOTE.C7, 0.9, { volume: 0.18 });
+      tone(NOTE.G6, 0.9, { volume: 0.1, type: 'triangle' });
     },
     boop() {
       tone(330, 0.16, { type: 'triangle', volume: 0.16, slideTo: 250 });

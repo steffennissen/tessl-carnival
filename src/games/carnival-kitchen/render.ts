@@ -1,7 +1,12 @@
 import { theme } from '../../carnival';
 import {
+  BAKE_TARGET,
   BANNER_TIME,
   BOWL_X,
+  TOPPINGS,
+  TOPPING_PERFECT,
+  type Menu,
+  type Topping,
   CHOP_MARKS,
   CRACK_PERFECT,
   DISH_NAMES,
@@ -85,6 +90,26 @@ const C = {
   pan: '#7b679a',
   panLight: '#9a86b8',
   panDark: '#55446f',
+  dough: '#ffe6b0',
+  doughLight: '#fff3d6',
+  crustGold: '#f2b457',
+  crustBrown: '#b8723a',
+  sauce: '#ee4b3b',
+  sauceLight: '#ff7a5c',
+  sauceDark: '#c93a2e',
+  cheese: '#fff1b8',
+  cheeseGold: '#ffd25e',
+  cheeseBrown: '#e09a3c',
+  pepperoni: '#e3434f',
+  pepperoniDark: '#b92f3c',
+  mushroom: '#f1dfc7',
+  mushroomDark: '#c9a988',
+  pineapple: '#ffd84a',
+  olive: '#4f3a57',
+  pepper: '#4fc66a',
+  glass: '#5b3b4f',
+  glassLight: '#86607a',
+  ember: '#ff8a3d',
 };
 const CONFETTI = [C.hotPink, C.gold, C.mint, C.sky, C.lavender, C.pink, C.butter];
 
@@ -99,6 +124,9 @@ export const TITLES: Record<Stage, string> = {
   stir: 'Stir the soup!',
   season: 'Shake the salt!',
   flip: 'Flip the pancakes!',
+  sauce: 'Spread the sauce!',
+  top: 'Add the toppings!',
+  bake: 'Bake the pizza!',
 };
 export const HINTS: Record<Stage, [string, string]> = {
   chop: ['Tap when the knife', 'is on a dotted line!'],
@@ -106,6 +134,9 @@ export const HINTS: Record<Stage, [string, string]> = {
   stir: ['Hold and draw', 'circles in the pot!'],
   season: ['Hold to shake,', 'let go at the star!'],
   flip: ['Tap when the heart', 'is in the gold!'],
+  sauce: ['Hold and draw', 'circles on the pizza!'],
+  top: ['Tap when it is over', 'the sparkly spot!'],
+  bake: ['Hold to bake, let go', 'when it is golden!'],
 };
 const ICONS: Record<Stage, string> = {
   chop: '🥕',
@@ -113,7 +144,26 @@ const ICONS: Record<Stage, string> = {
   stir: '🥄',
   season: '🧂',
   flip: '🥞',
+  sauce: '🍅',
+  top: '🍄',
+  bake: '🔥',
 };
+
+const MENU_PROMPT = 'What shall we cook? Tap the pizza, or tap surprise!';
+/** The two choices on the title screen. */
+const MENU_CARDS: { menu: Menu; x: number; y: number; w: number; h: number }[] = [
+  { menu: 'surprise', x: W / 2 + 40 - 125, y: 345, w: 220, h: 160 },
+  { menu: 'pizza', x: W / 2 + 40 + 125, y: 345, w: 220, h: 160 },
+];
+
+/** Where the pizza sits while the toppings go on, seen from the side a little. */
+const PIZZA_VIEW = { x: 400, y: 335, rx: 170, ry: 80 } as const;
+/** Where each topping's pieces sit around its spot. */
+const PIECES = [
+  [-20, -5],
+  [18, -9],
+  [2, 11],
+] as const;
 
 const SOUND_BUTTON = { x: 40, y: 80, r: 24 };
 
@@ -534,6 +584,226 @@ function drawSpeech(g: G, lines: [string, string]) {
 }
 
 // ---------------------------------------------------------------------------
+// Pizza
+
+/** Reads '#rrggbb', or the 'rgb(r, g, b)' that `blend` returns. */
+function rgb(color: string): [number, number, number] {
+  if (color.startsWith('rgb')) {
+    const [r, g, b] = color
+      .slice(color.indexOf('(') + 1)
+      .split(',')
+      .map(parseFloat);
+    return [r, g, b];
+  }
+  const n = parseInt(color.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Blends between colours: t = 0 gives the first, t = 1 the last. */
+function blend(colors: string[], t: number): string {
+  const at = clamp01(t) * (colors.length - 1);
+  const i = Math.min(colors.length - 2, Math.floor(at));
+  const f = at - i;
+  const a = rgb(colors[i]);
+  const b = rgb(colors[i + 1]);
+  const mixed = a.map((v, k) => Math.round(v + (b[k] - v) * f));
+  return `rgb(${mixed.join(', ')})`;
+}
+
+/** One piece of a topping, about 14px across at scale 1, centred on (x, y). */
+function toppingPiece(g: G, kind: Topping, x: number, y: number, s: number, rot = 0) {
+  g.save();
+  g.translate(x, y);
+  g.rotate(rot);
+  g.scale(s, s);
+  if (kind === 'pepperoni') {
+    circle(g, 0, 0, 13);
+    fillStroke(g, vertical(g, -13, 13, [C.pepperoni, C.pepperoniDark]), 2.5);
+    g.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    for (const [dx, dy] of [
+      [-5, -4],
+      [4, 3],
+      [5, -6],
+      [-3, 6],
+    ]) {
+      circle(g, dx, dy, 1.8);
+      g.fill();
+    }
+  } else if (kind === 'mushroom') {
+    g.beginPath();
+    g.moveTo(-13, 1);
+    g.bezierCurveTo(-13, -15, 13, -15, 13, 1);
+    g.lineTo(5, 1);
+    g.lineTo(6, 12);
+    g.quadraticCurveTo(0, 15, -6, 12);
+    g.lineTo(-5, 1);
+    g.closePath();
+    fillStroke(g, vertical(g, -12, 14, [C.mushroom, C.mushroomDark]), 2.5);
+  } else if (kind === 'pineapple') {
+    g.beginPath();
+    g.moveTo(0, -12);
+    g.lineTo(12, 9);
+    g.quadraticCurveTo(0, 14, -12, 9);
+    g.closePath();
+    fillStroke(g, vertical(g, -12, 12, [C.butter, C.pineapple]), 2.5);
+  } else if (kind === 'olive') {
+    circle(g, 0, 0, 10);
+    g.lineWidth = 9;
+    g.strokeStyle = C.ink;
+    g.stroke();
+    g.lineWidth = 5;
+    g.strokeStyle = C.olive;
+    g.stroke();
+  } else {
+    g.beginPath();
+    g.ellipse(0, 0, 13, 10, 0, 0, Math.PI * 2);
+    g.lineWidth = 8;
+    g.strokeStyle = C.ink;
+    g.stroke();
+    g.lineWidth = 4.5;
+    g.strokeStyle = C.pepper;
+    g.stroke();
+  }
+  g.restore();
+}
+
+interface PizzaLook {
+  /** How much of the dough the sauce covers, 0 to 1. */
+  sauce: number;
+  cheese: boolean;
+  /** How many of TOPPINGS are on, in order. */
+  toppings: number;
+  /** How baked it is: 0 raw, BAKE_TARGET golden, 1 crispy. */
+  baked: number;
+  /** Turns the sauce swirl. */
+  swirl?: number;
+}
+
+/**
+ * A pizza centred on (x, y). With ry smaller than rx it's seen a little from
+ * the side; toppings sit where TOPPINGS puts them on PIZZA_VIEW, scaled.
+ */
+function drawPizza(g: G, x: number, y: number, rx: number, ry: number, look: PizzaLook) {
+  const squash = ry / rx;
+  const golden = look.baked / BAKE_TARGET;
+  const crisp = (look.baked - BAKE_TARGET) / (1 - BAKE_TARGET);
+  const crust =
+    look.baked <= BAKE_TARGET
+      ? blend([C.dough, C.crustGold], golden)
+      : blend([C.crustGold, C.crustBrown], crisp);
+  const crustLight =
+    look.baked <= BAKE_TARGET
+      ? blend([C.doughLight, C.dough], golden)
+      : blend([C.dough, C.crustGold], crisp);
+
+  // The crust's side, then its top.
+  shadow(g, x + 6, y + ry * 0.35 + 10 * squash, rx * 0.98, ry * 0.75);
+  oval(g, x, y + 9 * squash + 2, rx, ry);
+  fillStroke(g, blend([crust, C.crustBrown], 0.35), 3.5);
+  oval(g, x, y, rx, ry);
+  const top = g.createRadialGradient(x - rx * 0.3, y - ry * 0.4, 4, x, y, rx);
+  top.addColorStop(0, crustLight);
+  top.addColorStop(1, crust);
+  fillStroke(g, top, 3.5);
+
+  // The middle, where the sauce goes.
+  const inner = 0.86;
+  oval(g, x, y, rx * inner, ry * inner);
+  g.fillStyle = blend([C.doughLight, crustLight], 0.5);
+  g.fill();
+  g.strokeStyle = 'rgba(184, 114, 58, 0.35)';
+  g.lineWidth = 2;
+  g.stroke();
+
+  if (look.sauce > 0) {
+    const cover = 0.22 + 0.78 * clamp01(look.sauce);
+    g.beginPath();
+    for (let i = 0; i <= 48; i++) {
+      const a = (i / 48) * Math.PI * 2;
+      const wobble = look.sauce < 1 ? 1 + Math.sin(a * 7 + (look.swirl ?? 0)) * 0.05 : 1;
+      const r = cover * inner * 0.96 * wobble;
+      g.lineTo(x + Math.cos(a) * rx * r, y + Math.sin(a) * ry * r);
+    }
+    g.closePath();
+    const sauce = g.createRadialGradient(x - rx * 0.2, y - ry * 0.2, 2, x, y, rx * cover);
+    sauce.addColorStop(0, C.sauceLight);
+    sauce.addColorStop(1, look.baked > BAKE_TARGET ? C.sauceDark : C.sauce);
+    g.fillStyle = sauce;
+    g.fill();
+    // A swirl in the sauce while it's being spread.
+    if (look.swirl !== undefined) {
+      g.strokeStyle = 'rgba(255, 170, 140, 0.8)';
+      g.lineWidth = 4;
+      g.lineCap = 'round';
+      for (let j = 0; j < 3; j++) {
+        const r = (0.2 + j * 0.22) * cover;
+        g.beginPath();
+        g.ellipse(x, y, rx * r, ry * r, 0, look.swirl + j * 2.1, look.swirl + j * 2.1 + 1.5);
+        g.stroke();
+      }
+    }
+  }
+
+  if (look.cheese) {
+    // Melty cheese in soft blobs, turning golden in the oven.
+    const cheese =
+      look.baked <= BAKE_TARGET
+        ? blend([C.cheese, C.cheeseGold], golden * 0.8)
+        : blend([C.cheeseGold, C.cheeseBrown], crisp);
+    g.fillStyle = cheese;
+    const blobs = [
+      [0, 0, 0.42],
+      [-0.42, -0.2, 0.26],
+      [0.42, -0.18, 0.27],
+      [-0.36, 0.3, 0.27],
+      [0.38, 0.3, 0.26],
+      [0, -0.48, 0.24],
+      [0.02, 0.5, 0.24],
+      [-0.6, 0.05, 0.18],
+      [0.6, 0.05, 0.18],
+    ];
+    for (const [bx, by, r] of blobs) {
+      oval(g, x + bx * rx, y + by * ry, r * rx, r * ry);
+      g.fill();
+    }
+    // Toasty spots once it's golden.
+    if (look.baked > BAKE_TARGET * 0.8) {
+      g.fillStyle = `rgba(200, 120, 40, ${0.25 + 0.35 * clamp01(crisp)})`;
+      for (const [bx, by] of [
+        [-0.25, -0.1],
+        [0.3, 0.12],
+        [0.05, 0.32],
+        [-0.45, 0.22],
+        [0.2, -0.36],
+      ]) {
+        oval(g, x + bx * rx, y + by * ry, 0.05 * rx, 0.05 * ry);
+        g.fill();
+      }
+    }
+    g.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    oval(g, x - rx * 0.2, y - ry * 0.22, rx * 0.12, ry * 0.06, -0.3);
+    g.fill();
+  }
+
+  // Toppings, flattened to match the pizza's tilt.
+  const scale = rx / PIZZA_VIEW.rx;
+  for (let i = 0; i < look.toppings; i++) {
+    const spot = TOPPINGS[i];
+    const nx = (spot.x - PIZZA_VIEW.x) / PIZZA_VIEW.rx;
+    const ny = (spot.y - PIZZA_VIEW.y) / PIZZA_VIEW.ry;
+    PIECES.forEach(([dx, dy], k) => {
+      const tx = x + nx * rx + dx * scale;
+      const ty = y + ny * ry + dy * scale * (squash / (PIZZA_VIEW.ry / PIZZA_VIEW.rx));
+      g.save();
+      g.translate(tx, ty);
+      g.scale(1, Math.min(1, squash * 1.6));
+      toppingPiece(g, spot.kind, 0, 0, scale, i + k * 2.1);
+      g.restore();
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The renderer
 
 export function createRenderer(ctx: G, sound: Sound) {
@@ -561,6 +831,12 @@ export function createRenderer(ctx: G, sound: Sound) {
     bloopAt: 0,
     shownScore: 0,
     notYet: null as { x: number; y: number; age: number } | null,
+    tops: 0,
+    prevTopX: 0,
+    topDrop: null as { x: number; index: number; age: number } | null,
+    baked: false,
+    sizzleTimer: 0,
+    askedAt: -9,
   });
   let fx = fresh();
 
@@ -611,6 +887,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       fx.particles = keep;
       fx.seen = state;
       fx.prevEggX = state.crack.eggX;
+      fx.prevTopX = state.top.x;
     }
 
     if (state.phase === 'playing' && state.stageIndex !== fx.stageIndex) {
@@ -624,11 +901,19 @@ export function createRenderer(ctx: G, sound: Sound) {
     const eggs = state.crack.results.length;
     const flips = state.flip.results.length;
     const pinches = state.season.index;
+    const tops = state.top.results.length;
 
     if (state.feedback && state.feedback !== fx.feedback) {
       const feedback = state.feedback;
       sound.grade(feedback.grade, feedback.combo);
-      if (cuts > fx.cuts) {
+      if (tops > fx.tops) {
+        fx.topDrop = { x: fx.prevTopX, index: tops - 1, age: 0 };
+        sound.whoosh();
+      } else if (state.bake.done && !fx.baked) {
+        sound.ding();
+        celebrate(380, 300, feedback);
+        burst(380, 300, 12, ['heart', 'star'], [C.cheeseGold, C.sauceLight, C.white], 260);
+      } else if (cuts > fx.cuts) {
         fx.chopAge = 0;
         sound.chop();
         celebrate(state.chop.knifeX, 290, feedback);
@@ -657,6 +942,28 @@ export function createRenderer(ctx: G, sound: Sound) {
     fx.eggs = eggs;
     fx.flips = flips;
     fx.pinches = pinches;
+    fx.tops = tops;
+    fx.baked = state.bake.done;
+
+    // A falling topping lands on its spot with a little splat.
+    if (fx.topDrop) {
+      fx.topDrop.age += dt;
+      if (fx.topDrop.age >= 0.3) {
+        const spot = TOPPINGS[fx.topDrop.index];
+        sound.pop();
+        burst(spot.x, spot.y, 6, ['dot'], [C.cheese, C.sauceLight], 150);
+        if (state.feedback) celebrate(spot.x, spot.y - 20, state.feedback);
+        fx.topDrop = null;
+      }
+    }
+
+    if (state.phase === 'playing' && currentStage(state) === 'bake' && state.bake.baking) {
+      fx.sizzleTimer -= dt;
+      if (fx.sizzleTimer <= 0) {
+        sound.sizzle();
+        fx.sizzleTimer = 0.2;
+      }
+    }
 
     // A falling egg cracks when it lands in the bowl.
     if (fx.drop) {
@@ -742,6 +1049,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     }
 
     fx.prevEggX = state.crack.eggX;
+    fx.prevTopX = state.top.x;
   }
 
   function update(dt: number) {
@@ -1086,6 +1394,16 @@ export function createRenderer(ctx: G, sound: Sound) {
       }
     }
 
+    drawStirControls(state, pointer, C.wood);
+  }
+
+  /** The ring of stars, the spoon or the circling finger, and the clock. */
+  function drawStirControls(state: KitchenState, pointer: Pointer, spoon: string) {
+    const g = ctx;
+    const t = fx.time;
+    const s = state.stir;
+    const { x: px, y: py, radius: R } = POT;
+
     // A ring that fills up, with a star for every full turn.
     const turns = stirTurns(state);
     g.lineCap = 'round';
@@ -1121,7 +1439,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       rounded(g, 12, -7, 150, 14, 7);
       fillStroke(g, C.wood, 3.5);
       oval(g, 0, 0, 22, 16);
-      fillStroke(g, vertical(g, -16, 16, [C.woodLight, C.wood]), 3.5);
+      fillStroke(g, vertical(g, -16, 16, [C.woodLight, spoon]), 3.5);
       g.restore();
     } else if (playing) {
       const a = t * 2.2;
@@ -1146,6 +1464,264 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.closePath();
     g.fillStyle = C.mint;
     g.fill();
+  }
+
+  function drawSauce(state: KitchenState, pointer: Pointer) {
+    const g = ctx;
+    const { x: px, y: py, radius: R } = POT;
+    // A wooden pizza board under the dough.
+    shadow(g, px + 8, py + R - 2, R + 4, 20);
+    rounded(g, px + R - 6, py - 16, 120, 32, 16);
+    fillStroke(g, horizontal(g, px + R, px + R + 120, [C.wood, C.woodLight]));
+    circle(g, px, py, R);
+    fillStroke(g, vertical(g, py - R, py + R, [C.woodLight, C.wood]));
+    const r = R - 14;
+    drawPizza(g, px, py, r, r, {
+      sauce: stirTurns(state) / STIR_TURNS,
+      cheese: false,
+      toppings: 0,
+      baked: 0,
+      swirl: state.stir.radians * 0.85,
+    });
+    // A happy face on the dough until the sauce covers it.
+    if (stirTurns(state) < STIR_TURNS * 0.4) face(g, px, py + 6, 1.1, 'happy');
+    drawStirControls(state, pointer, C.sauce);
+  }
+
+  function drawTop(state: KitchenState) {
+    const g = ctx;
+    const t = fx.time;
+    const top = state.top;
+    const { x, y, rx, ry } = PIZZA_VIEW;
+
+    // A board, then the pizza with the toppings placed so far.
+    oval(g, x, y + 14, rx + 26, ry + 22);
+    fillStroke(g, vertical(g, y - ry, y + ry + 30, [C.woodLight, C.wood]));
+    const placed = top.results.length - (fx.topDrop ? 1 : 0);
+    drawPizza(g, x, y, rx, ry, { sauce: 1, cheese: true, toppings: placed, baked: 0 });
+
+    const active = state.phase === 'playing' && state.banner === 0 && top.index < TOPPINGS.length;
+    if (active) {
+      const spot = TOPPINGS[top.index];
+      // A glowing lane down to the spot, and a sparkly ring on the pizza.
+      g.fillStyle = `rgba(255, 201, 60, ${0.2 + Math.sin(t * 5) * 0.08})`;
+      rounded(g, spot.x - TOPPING_PERFECT - 8, 128, (TOPPING_PERFECT + 8) * 2, spot.y - 128, 26);
+      g.fill();
+      g.setLineDash([8, 7]);
+      g.lineDashOffset = -t * 30;
+      g.lineWidth = 4;
+      g.strokeStyle = C.gold;
+      oval(g, spot.x, spot.y, 30 + Math.sin(t * 6) * 2, 15 + Math.sin(t * 6));
+      g.stroke();
+      g.setLineDash([]);
+      g.lineDashOffset = 0;
+      for (const [sx, sy, r] of [
+        [-36, -12, 7],
+        [34, -16, 6],
+        [0, -26, 5],
+      ]) {
+        starPath(g, spot.x + sx, spot.y + sy, r + Math.sin(t * 7 + sx) * 1.5, t * 2);
+        fillStroke(g, C.gold, 2);
+      }
+      for (let i = 0; i < 2; i++) {
+        const phase = (t * 0.9 + i / 2) % 1;
+        const ay = 220 + phase * (spot.y - 260);
+        g.globalAlpha = Math.sin(phase * Math.PI);
+        g.strokeStyle = C.gold;
+        g.lineWidth = 5;
+        g.beginPath();
+        g.moveTo(spot.x - 12, ay - 7);
+        g.lineTo(spot.x, ay + 4);
+        g.lineTo(spot.x + 12, ay - 7);
+        g.stroke();
+        g.globalAlpha = 1;
+      }
+    }
+
+    const drawFloating = (kind: Topping, fx0: number, fy: number, rot: number, near: boolean) => {
+      g.save();
+      g.translate(fx0, fy);
+      g.rotate(rot);
+      toppingPiece(g, kind, 0, 0, 2.6);
+      const faceY = kind === 'mushroom' ? -12 : kind === 'pineapple' ? 6 : 0;
+      if (kind === 'olive' || kind === 'pepper') {
+        // Rings have a hole in the middle, so the face sits on a little sign.
+        circle(g, 0, -40, 15);
+        fillStroke(g, C.white, 2.5);
+        face(g, 0, -40, 0.55, near ? 'wow' : 'happy');
+      } else {
+        face(g, 0, faceY, 0.75, near ? 'wow' : 'happy');
+      }
+      g.restore();
+    };
+
+    if (fx.topDrop) {
+      const spot = TOPPINGS[fx.topDrop.index];
+      const p = clamp01(fx.topDrop.age / 0.3);
+      const dx = fx.topDrop.x + (spot.x - fx.topDrop.x) * p;
+      const dy = 165 + (spot.y - 165) * p * p;
+      const s = 1 - p * 0.55;
+      g.save();
+      g.translate(dx, dy);
+      g.scale(s, s);
+      drawFloating(spot.kind, 0, 0, p * 3, true);
+      g.restore();
+    }
+    if (active) {
+      const spot = TOPPINGS[top.index];
+      const near = Math.abs(top.x - spot.x) <= TOPPING_PERFECT + 10;
+      shadow(g, top.x, 238, 26, 6);
+      drawFloating(spot.kind, top.x, 165 + Math.sin(t * 4) * 6, Math.sin(t * 3) * 0.15, near);
+    }
+  }
+
+  function drawBake(state: KitchenState) {
+    const g = ctx;
+    const t = fx.time;
+    const b = state.bake;
+    const ox = 380;
+    const left = ox - 165;
+    const width = 330;
+    const heat = b.baking ? 1 : 0;
+
+    // Heat shimmer above the oven while it's on.
+    if (b.baking) {
+      for (let i = 0; i < 3; i++) {
+        const phase = (t * 0.8 + i / 3) % 1;
+        g.strokeStyle = `rgba(255, 138, 61, ${0.6 * Math.sin(phase * Math.PI)})`;
+        g.lineWidth = 5;
+        g.lineCap = 'round';
+        g.beginPath();
+        for (let k = 0; k <= 8; k++) {
+          g.lineTo(ox - 60 + i * 60 + Math.sin(k * 0.9 + t * 6 + i) * 6, 128 - phase * 30 - k * 4);
+        }
+        g.stroke();
+      }
+    }
+
+    // The oven.
+    shadow(g, ox + 6, 408, 170, 14);
+    for (const fxX of [left + 30, left + width - 30]) {
+      rounded(g, fxX - 14, 392, 28, 18, 6);
+      fillStroke(g, C.lavender, 3);
+    }
+    rounded(g, left, 136, width, 262, 34);
+    fillStroke(g, vertical(g, 136, 398, [C.white, '#ffe3ef']), 4.5);
+    // Control panel with knobs and a little heart light.
+    rounded(g, left + 14, 148, width - 28, 40, 18);
+    fillStroke(g, horizontal(g, left, left + width, [C.pink, C.hotPink]), 3.5);
+    [-110, -70, 70, 110].forEach((dx, i) => {
+      circle(g, ox + dx, 168, 12);
+      fillStroke(g, C.white, 3);
+      const a = b.baking ? t * 3 + i : -Math.PI / 2;
+      g.strokeStyle = C.ink;
+      g.lineWidth = 3;
+      g.beginPath();
+      g.moveTo(ox + dx, 168);
+      g.lineTo(ox + dx + Math.cos(a) * 8, 168 + Math.sin(a) * 8);
+      g.stroke();
+    });
+    heartPath(g, ox, 169, 11 + (b.baking ? Math.sin(t * 10) * 1.5 : 0));
+    fillStroke(g, b.baking ? C.gold : C.white, 3);
+    // Door handle.
+    rounded(g, ox - 70, 198, 140, 14, 7);
+    fillStroke(g, horizontal(g, ox - 70, ox + 70, [C.gold, C.butter, C.gold]), 3);
+
+    // The window, glowing while it bakes, with the pizza inside.
+    const wx = left + 30;
+    const wy = 222;
+    const ww = width - 60;
+    const wh = 150;
+    rounded(g, wx, wy, ww, wh, 24);
+    fillStroke(g, vertical(g, wy, wy + wh, [C.glassLight, C.glass]), 4);
+    g.save();
+    rounded(g, wx + 4, wy + 4, ww - 8, wh - 8, 20);
+    g.clip();
+    const flicker = 0.75 + Math.sin(t * 13) * 0.08 + Math.sin(t * 7.3) * 0.06;
+    const glow = g.createRadialGradient(ox, wy + wh, 10, ox, wy + wh, 200);
+    glow.addColorStop(0, `rgba(255, 170, 70, ${(0.35 + 0.5 * heat) * flicker})`);
+    glow.addColorStop(1, 'rgba(255, 120, 60, 0)');
+    g.fillStyle = glow;
+    g.fillRect(wx, wy, ww, wh);
+    // Rack and the glowing element below it.
+    g.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(wx, wy + 108);
+    g.lineTo(wx + ww, wy + 108);
+    g.stroke();
+    g.strokeStyle = b.baking ? C.ember : 'rgba(255, 255, 255, 0.25)';
+    g.lineWidth = 5;
+    g.beginPath();
+    for (let k = 0; k <= 12; k++) g.lineTo(wx + 20 + k * ((ww - 40) / 12), wy + 134 + (k % 2) * 6);
+    g.stroke();
+    const rise = b.baking ? Math.sin(t * 5) * 1.5 : 0;
+    drawPizza(g, ox, wy + 92 + rise, 100, 34, {
+      sauce: 1,
+      cheese: true,
+      toppings: TOPPINGS.length,
+      baked: b.level,
+    });
+    // Cheese bubbles while it bakes.
+    if (b.baking) {
+      for (let i = 0; i < 5; i++) {
+        const phase = (t * 1.4 + i * 0.27) % 1;
+        g.strokeStyle = `rgba(255, 255, 255, ${0.8 * (1 - phase)})`;
+        g.lineWidth = 2;
+        circle(g, ox - 60 + i * 30, wy + 86 - phase * 18, 2 + phase * 4);
+        g.stroke();
+      }
+    }
+    g.restore();
+    // Shine on the glass.
+    g.fillStyle = 'rgba(255, 255, 255, 0.18)';
+    g.beginPath();
+    g.moveTo(wx + 30, wy + 6);
+    g.lineTo(wx + 80, wy + 6);
+    g.lineTo(wx + 30, wy + 90);
+    g.lineTo(wx + 8, wy + 90);
+    g.closePath();
+    g.fill();
+
+    // The meter, with a star where it's golden.
+    drawMeter(b.level, BAKE_TARGET, [C.hotPink, C.ember, C.butter]);
+
+    if (state.phase === 'playing' && state.banner === 0 && !b.baking) {
+      const bob = Math.sin(t * 5) * 6;
+      g.fillStyle = C.ink;
+      emoji(g, '👆', ox + 120, 330 + bob, 46);
+    }
+  }
+
+  /** A tall meter with a star to stop at, beside the stage. */
+  function drawMeter(level: number, target: number, fill: string[]) {
+    const g = ctx;
+    const t = fx.time;
+    const mx = 588;
+    const top = 126;
+    const height = 258;
+    rounded(g, mx, top - 6, 46, height + 12, 23);
+    fillStroke(g, C.white);
+    g.save();
+    rounded(g, mx + 6, top, 34, height, 17);
+    g.clip();
+    const ty = top + height * (1 - target);
+    g.fillStyle = 'rgba(255, 201, 60, 0.4)';
+    g.fillRect(mx, ty - height * 0.08, 46, height * 0.16);
+    const fillTop = top + height * (1 - level);
+    g.fillStyle = vertical(g, top, top + height, fill);
+    g.fillRect(mx, fillTop, 46, height);
+    g.restore();
+    g.setLineDash([6, 6]);
+    g.strokeStyle = C.gold;
+    g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(mx + 4, ty);
+    g.lineTo(mx + 42, ty);
+    g.stroke();
+    g.setLineDash([]);
+    starPath(g, mx - 22, ty, 17 + Math.sin(t * 5) * 1.5, Math.sin(t * 2) * 0.2);
+    fillStroke(g, C.gold, 3.5);
   }
 
   function drawSeason(state: KitchenState) {
@@ -1239,32 +1815,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.restore();
 
     // The meter, with a star to stop at.
-    const mx = 588;
-    const top = 126;
-    const height = 258;
-    rounded(g, mx, top - 6, 46, height + 12, 23);
-    fillStroke(g, C.white);
-    g.save();
-    rounded(g, mx + 6, top, 34, height, 17);
-    g.clip();
-    const target = PINCHES[Math.min(s.index, PINCHES.length - 1)];
-    const ty = top + height * (1 - target);
-    g.fillStyle = 'rgba(255, 201, 60, 0.4)';
-    g.fillRect(mx, ty - height * 0.08, 46, height * 0.16);
-    const fillTop = top + height * (1 - s.level);
-    g.fillStyle = vertical(g, top, top + height, [C.lavender, C.sky]);
-    g.fillRect(mx, fillTop, 46, height);
-    g.restore();
-    g.setLineDash([6, 6]);
-    g.strokeStyle = C.gold;
-    g.lineWidth = 4;
-    g.beginPath();
-    g.moveTo(mx + 4, ty);
-    g.lineTo(mx + 42, ty);
-    g.stroke();
-    g.setLineDash([]);
-    starPath(g, mx - 22, ty, 17 + Math.sin(t * 5) * 1.5, Math.sin(t * 2) * 0.2);
-    fillStroke(g, C.gold, 3.5);
+    drawMeter(s.level, PINCHES[Math.min(s.index, PINCHES.length - 1)], [C.lavender, C.sky]);
   }
 
   function drawFlip(state: KitchenState) {
@@ -1405,14 +1956,19 @@ export function createRenderer(ctx: G, sound: Sound) {
   // -------------------------------------------------------------------------
   // Overlays
 
-  function drawHud(state: KitchenState) {
+  function drawHudSoundButton() {
     const g = ctx;
-    const t = fx.time;
-
     circle(g, SOUND_BUTTON.x, SOUND_BUTTON.y, SOUND_BUTTON.r);
     fillStroke(g, C.white, 3.5);
     g.fillStyle = C.ink;
     emoji(g, sound.muted ? '🔇' : '🔊', SOUND_BUTTON.x, SOUND_BUTTON.y + 1, 22);
+  }
+
+  function drawHud(state: KitchenState) {
+    const g = ctx;
+    const t = fx.time;
+
+    drawHudSoundButton();
 
     // The recipe: one bubble per stage.
     const n = state.recipe.length;
@@ -1497,7 +2053,12 @@ export function createRenderer(ctx: G, sound: Sound) {
       case 'crack':
         return [EGG_SPEEDS.length, state.crack.results.length];
       case 'stir':
+      case 'sauce':
         return [STIR_TURNS, Math.min(STIR_TURNS, Math.floor(stirTurns(state)))];
+      case 'top':
+        return [TOPPINGS.length, state.top.results.length];
+      case 'bake':
+        return [1, state.bake.done ? 1 : 0];
       case 'season':
         return [PINCHES.length, state.season.index];
       case 'flip':
@@ -1614,9 +2175,33 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.globalAlpha = 1;
   }
 
-  function drawDish(dish: Dish) {
+  function drawDish(dish: Dish, baked = BAKE_TARGET) {
     const g = ctx;
     const t = fx.time;
+    if (dish === 'pizza') {
+      for (let i = 0; i < 3; i++) {
+        const phase = (t * 0.5 + i / 3) % 1;
+        g.strokeStyle = `rgba(255, 255, 255, ${0.9 * Math.sin(phase * Math.PI)})`;
+        g.lineWidth = 6;
+        g.lineCap = 'round';
+        g.beginPath();
+        for (let k = 0; k <= 8; k++)
+          g.lineTo(-50 + i * 50 + Math.sin(k + t * 3 + i) * 6, -40 - phase * 40 - k * 5);
+        g.stroke();
+      }
+      oval(g, 0, 22, 138, 64);
+      fillStroke(g, vertical(g, -40, 86, [C.woodLight, C.wood]));
+      drawPizza(g, 0, 10, 116, 54, {
+        sauce: 1,
+        cheese: true,
+        toppings: TOPPINGS.length,
+        baked,
+      });
+      circle(g, 0, 14, 20);
+      fillStroke(g, C.cheese, 2.5);
+      face(g, 0, 14, 0.8, 'joy');
+      return;
+    }
     if (dish === 'pancakes') {
       oval(g, 0, 42, 112, 28);
       fillStroke(g, C.white);
@@ -1739,7 +2324,7 @@ export function createRenderer(ctx: G, sound: Sound) {
 
     g.save();
     g.translate(0, -66);
-    drawDish(dish);
+    drawDish(dish, state.bake.level);
     g.restore();
 
     rounded(g, -200, -226, 400, 58, 29);
@@ -1785,28 +2370,55 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.fillStyle = 'rgba(91, 59, 79, 0.18)';
     g.fillRect(0, 0, W, H);
     g.save();
-    g.translate(W / 2 + 40, 200);
+    g.translate(W / 2 + 40, 150);
     g.rotate(Math.sin(t * 1.5) * 0.02);
-    stickerText(g, 'Carnival', 0, -50, 52, vertical(g, -76, -24, [C.hotPink, C.purple]));
-    stickerText(g, 'Kitchen', 0, 14, 72, vertical(g, -22, 50, [C.gold, C.hotPink]));
+    stickerText(g, 'Carnival', 0, -44, 46, vertical(g, -66, -22, [C.hotPink, C.purple]));
+    stickerText(g, 'Kitchen', 0, 14, 64, vertical(g, -18, 46, [C.gold, C.hotPink]));
     g.restore();
     for (const [x, y, r] of [
-      [240, 130, 16],
-      [610, 120, 20],
-      [660, 240, 12],
-      [230, 250, 12],
+      [250, 100, 16],
+      [630, 96, 20],
+      [660, 190, 12],
+      [240, 200, 12],
     ]) {
       starPath(g, x, y, r + Math.sin(t * 4 + x) * 2, t + x);
       fillStroke(g, C.gold, 3);
     }
-    const pulse = 1 + Math.sin(t * 4) * 0.05;
-    g.save();
-    g.translate(W / 2 + 40, 330);
-    g.scale(pulse, pulse);
-    rounded(g, -150, -32, 300, 64, 32);
-    fillStroke(g, vertical(g, -32, 32, [C.pink, C.hotPink]));
-    stickerText(g, 'Tap to cook!', 0, 1, 30, C.white);
-    g.restore();
+
+    // Two big cards to pick from, wiggling in turn.
+    MENU_CARDS.forEach((card, i) => {
+      const pizza = card.menu === 'pizza';
+      const wiggle = Math.sin(t * 3 + i * Math.PI) * 0.03;
+      const pulse = 1 + Math.max(0, Math.sin(t * 3 + i * Math.PI)) * 0.04;
+      g.save();
+      g.translate(card.x, card.y);
+      g.rotate(wiggle);
+      g.scale(pulse, pulse);
+      rounded(g, -card.w / 2 + 6, -card.h / 2 + 8, card.w, card.h, 30);
+      g.fillStyle = C.shadow;
+      g.fill();
+      rounded(g, -card.w / 2, -card.h / 2, card.w, card.h, 30);
+      fillStroke(
+        g,
+        pizza
+          ? vertical(g, -card.h / 2, card.h / 2, [C.butter, C.gold])
+          : vertical(g, -card.h / 2, card.h / 2, [C.lavenderLight, C.lavender]),
+        5,
+      );
+      g.save();
+      g.translate(0, -18);
+      g.scale(0.5, 0.5);
+      drawDish(pizza ? 'pizza' : 'pancakes');
+      g.restore();
+      if (!pizza) {
+        // A question mark: nobody knows what the surprise will be.
+        stickerText(g, '?', 74, -46, 40, C.hotPink);
+      }
+      rounded(g, -82, 38, 164, 44, 22);
+      fillStroke(g, pizza ? C.hotPink : C.purple, 3.5);
+      stickerText(g, pizza ? 'Pizza!' : 'Surprise!', 0, 61, 28, C.white);
+      g.restore();
+    });
   }
 
   return {
@@ -1826,13 +2438,45 @@ export function createRenderer(ctx: G, sound: Sound) {
       return Math.hypot(x - SOUND_BUTTON.x, y - SOUND_BUTTON.y) <= SOUND_BUTTON.r + 8;
     },
 
-    /** Draws the title screen, before the first tap. */
+    /** Which title-screen card is at (x, y), if any. A little generous for small fingers. */
+    hitMenu(x: number, y: number): Menu | null {
+      const card = MENU_CARDS.find(
+        (c) => Math.abs(x - c.x) <= c.w / 2 + 12 && Math.abs(y - c.y) <= c.h / 2 + 12,
+      );
+      return card ? card.menu : null;
+    },
+
+    /** Asks out loud what to cook, at most every few seconds. */
+    askMenu() {
+      if (fx.time - fx.askedAt < 4) return;
+      fx.askedAt = fx.time;
+      sound.say(MENU_PROMPT);
+    },
+
+    /** Goes back to the title screen after a round, and asks what's next. */
+    showMenu() {
+      const keep = fx.particles;
+      fx = fresh();
+      fx.particles = keep;
+      fx.askedAt = 0;
+      sound.banner();
+      sound.say(MENU_PROMPT);
+    },
+
+    /** Whether the end card has been up long enough to leave it. */
+    endShown() {
+      return fx.overAge >= 1.2;
+    },
+
+    /** Draws the title screen, where the cook picks what to make. */
     drawTitle(dt: number) {
       update(dt);
       if (!kitchen) kitchen = paintKitchen();
       ctx.drawImage(kitchen, 0, 0);
-      drawBunny(ctx, fx.time, 'idle', 9);
+      drawBunny(ctx, fx.time, fx.mood, fx.moodAge);
       drawTitle();
+      drawHudSoundButton();
+      drawParticles();
     },
 
     draw(state: KitchenState, pointer: Pointer, dt: number) {
@@ -1848,6 +2492,9 @@ export function createRenderer(ctx: G, sound: Sound) {
       else if (stage === 'crack') drawCrack(state);
       else if (stage === 'stir') drawStir(state, pointer);
       else if (stage === 'season') drawSeason(state);
+      else if (stage === 'sauce') drawSauce(state, pointer);
+      else if (stage === 'top') drawTop(state);
+      else if (stage === 'bake') drawBake(state);
       else drawFlip(state);
 
       drawBunny(ctx, fx.time, fx.mood, fx.moodAge);
