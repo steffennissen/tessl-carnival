@@ -1,15 +1,15 @@
 # Carnival Kitchen
 
-Cook a surprise recipe with Chef Bunny. Every round picks three of five
-cooking steps and makes a dish: fluffy pancakes, a cozy veggie stew or a
-rainbow soup. It's made for young cooks: everything is slow and forgiving,
+Cook with Chef Bunny: pick **Pizza!** or a **Surprise!** recipe. A surprise
+picks three of five cooking steps and makes fluffy pancakes, a cozy veggie
+stew or a rainbow soup. Pizza always takes the same three steps. It's made for young cooks: everything is slow and forgiving,
 every grade is kind, and a voice reads each step out loud for cooks who
 can't read yet.
 
 ## How to play
 
-Tap the title screen to start. A card names each step, a voice reads it out,
-and Chef Bunny's speech bubble keeps the hint on screen.
+Tap **Pizza!** or **Surprise!** on the title screen. A card names each step, a
+voice reads it out, and Chef Bunny's speech bubble keeps the hint on screen.
 
 | Step                  | What to do                                                                       |
 | --------------------- | -------------------------------------------------------------------------------- |
@@ -19,15 +19,28 @@ and Chef Bunny's speech bubble keeps the hint on screen.
 | **Shake the salt**    | Hold to shake, and let go when the meter reaches the star. 3 shakes.             |
 | **Flip the pancakes** | Tap when the heart is in the gold. 4 pancakes, each a little faster.             |
 
-The steps always run in the order above, so a round might be chop, stir, flip
-or crack, shake, flip. Tap **Cook again!** on the end screen for a new recipe.
+Pizza:
+
+| Step                 | What to do                                                                             |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| **Spread the sauce** | Hold and draw circles on the pizza, just like stirring. 3 turns in 15 seconds.         |
+| **Add the toppings** | A topping floats across. Tap when it's over its sparkly spot. 5 toppings, each faster. |
+| **Bake the pizza**   | Hold to bake, and let go when the meter reaches the star and the pizza looks golden.   |
+
+A surprise's steps always run in the order of the first table, so a round
+might be chop, stir, flip or crack, shake, flip. Tap **Cook again!** on the end
+screen to go back to the title screen and pick again.
 The speaker button in the corner turns sound and the voice off and on.
 
 Nothing is ever wasted:
 
-- An egg that floats past comes round again.
-- Tapping when the egg is far from the bowl, or the heart is far from the gold,
-  just shows "Not yet!" and lets you try again.
+- An egg or a topping that floats past comes round again.
+- Tapping when the egg is far from the bowl, a topping is far from its spot,
+  or the heart is far from the gold, just shows "Not yet!" and lets you try
+  again.
+- Letting go of the oven while the pizza is still pale shows "Not yet!": the
+  pizza stays in, keeps its heat, and you can hold again. A pizza left in too
+  long comes out by itself, a little crispy.
 - A chop always cuts the nearest dotted line, and scores something whenever
   the knife is close to it.
 - A quick tap on the salt shaker that barely pours anything doesn't use up a
@@ -36,13 +49,16 @@ Nothing is ever wasted:
 ## Scoring
 
 - **Each step is worth up to 100 points**, split evenly between its actions
-  (20 a chop, 33⅓ an egg or shake, 25 a pancake).
+  (20 a chop or topping, 33⅓ an egg or shake, 25 a pancake, 100 the bake).
 - **An action scores by how close you were.** Chops score in full within 14 px
   of a line, and nothing from 60 px. Eggs score in full within 22 px of the
   bowl's middle, and the bowl takes any tap within 120 px. Shakes score in full
   within 0.06 of the star and nothing from 0.35 off. Flips score in full within
-  0.06 of the gold's middle, and the pan takes any tap within 0.3.
-- **Stirring** scores 50 for finishing, plus up to 50 for time left. If time
+  0.06 of the gold's middle, and the pan takes any tap within 0.3. Toppings
+  score in full within 20 px of their spot, and the pizza takes any tap
+  within 100 px. The bake scores in full within 0.07 of the star (0.7) and
+  nothing from 0.4 off; letting go below 0.5 is "Not yet!".
+- **Stirring** (and spreading the sauce) scores 50 for finishing, plus up to 50 for time left. If time
   runs out you get up to 50 for the turns you made. Circles count in either
   direction, but wiggling back and forth cancels out.
 - **Every action gets a kind grade:** Perfect! (90% of its points or more),
@@ -65,11 +81,11 @@ when the round ends. Chef Bunny's verdict:
 
 ## Files
 
-- `game.ts`: the game logic (`createState`, `pickRecipe`, `step`, `press`,
-  `release`, and one function per action: `chop`, `crack`, `stir`, `startPour`,
-  `flip`), the scoring helpers, and the `carnivalKitchen` entry, the default
+- `game.ts`: the game logic (`createState`, `recipeFor`, `pickRecipe`, `step`,
+  `press`, `release`, and one function per action: `chop`, `crack`, `stir`,
+  `startPour`, `flip`, `addTopping`, `startBake`), the scoring helpers, and the `carnivalKitchen` entry, the default
   export the midway finds.
-- `render.ts`: all the drawing: the kitchen, Chef Bunny, each step, the
+- `render.ts`: all the drawing: the kitchen, Chef Bunny, the pizza, each step, the
   popups, particles, and the title and end screens. It also watches the state
   to know when to play a sound.
 - `sound.ts`: sound effects made with Web Audio (no files to load) and the

@@ -4,10 +4,15 @@ import { createSound } from './sound';
 
 const { width: WIDTH, height: HEIGHT } = theme.canvas;
 
-/** Every stage the kitchen knows. Each round's recipe is three of them. */
+/** The stages a surprise recipe picks from. Each surprise recipe is three of them. */
 export const ALL_STAGES = ['chop', 'crack', 'stir', 'season', 'flip'] as const;
-export type Stage = (typeof ALL_STAGES)[number];
+/** Pizza always takes the same three steps. */
+export const PIZZA_STAGES = ['sauce', 'top', 'bake'] as const;
+export type Stage = (typeof ALL_STAGES)[number] | (typeof PIZZA_STAGES)[number];
 export const RECIPE_LENGTH = 3;
+
+/** What the cook picks on the title screen. */
+export type Menu = 'surprise' | 'pizza';
 /** Each stage is worth up to this many points, before combo bonuses. */
 export const STAGE_POINTS = 100;
 
@@ -69,6 +74,33 @@ export const FLIPS = [
 export const FLIP_PERFECT = 0.06;
 export const FLIP_ZONE = 0.3;
 
+// Sauce: the same circles as stirring, drawn on the pizza dough (at POT).
+
+// Toppings: each one floats across; tap when it's over its sparkly spot.
+export type Topping = 'pepperoni' | 'mushroom' | 'pineapple' | 'olive' | 'pepper';
+export const TOPPINGS: { kind: Topping; x: number; y: number; speed: number }[] = [
+  { kind: 'pepperoni', x: 330, y: 312, speed: 90 },
+  { kind: 'mushroom', x: 470, y: 316, speed: 98 },
+  { kind: 'pineapple', x: 400, y: 345, speed: 106 },
+  { kind: 'olive', x: 318, y: 356, speed: 114 },
+  { kind: 'pepper', x: 482, y: 358, speed: 122 },
+];
+export const TOPPING_START = -40;
+export const TOPPING_END = WIDTH + 40;
+export const TOPPING_PERFECT = 20;
+/** Taps this far or more from the spot are ignored, so no topping is wasted. */
+export const TOPPING_MISS = 100;
+
+// Bake: hold to bake, let go when the pizza is golden.
+/** Oven heat per second while held. */
+export const BAKE_SPEED = 0.18;
+export const BAKE_TARGET = 0.7;
+export const BAKE_PERFECT = 0.07;
+/** Off the target by this much or more scores nothing. */
+export const BAKE_ZONE = 0.4;
+/** Letting go this far before the target is "Not yet!": the pizza stays in. */
+export const BAKE_EARLY = 0.2;
+
 /** Every grade is kind: a miss is "Nice try!", never a telling-off. */
 export type Grade = 'Perfect!' | 'Great!' | 'Good!' | 'Nice try!';
 
@@ -97,6 +129,9 @@ export interface KitchenState {
   season: { level: number; pouring: boolean; index: number; points: number };
   /** `results` holds each pancake's share of its points, 0 to 1. */
   flip: { needle: number; dir: 1 | -1; index: number; points: number; results: number[] };
+  /** `results` holds each topping's share of its points, 0 to 1. */
+  top: { x: number; index: number; points: number; results: number[] };
+  bake: { level: number; baking: boolean; done: boolean };
   phase: 'playing' | 'over';
 }
 
@@ -109,6 +144,11 @@ export function pickRecipe(random: () => number = Math.random): Stage[] {
     picked.add(stage);
   }
   return ALL_STAGES.filter((stage) => picked.has(stage));
+}
+
+/** The recipe for what the cook picked on the title screen. */
+export function recipeFor(menu: Menu, random: () => number = Math.random): Stage[] {
+  return menu === 'pizza' ? [...PIZZA_STAGES] : pickRecipe(random);
 }
 
 export function createState(recipe: Stage[] = pickRecipe()): KitchenState {
@@ -125,6 +165,8 @@ export function createState(recipe: Stage[] = pickRecipe()): KitchenState {
     stir: { radians: 0, lastAngle: null, timeLeft: STIR_TIME },
     season: { level: 0, pouring: false, index: 0, points: 0 },
     flip: { needle: 0, dir: 1, index: 0, points: 0, results: [] },
+    top: { x: TOPPING_START, index: 0, points: 0, results: [] },
+    bake: { level: 0, baking: false, done: false },
     phase: 'playing',
   };
 }
@@ -146,6 +188,9 @@ export function liveScore(state: KitchenState): number {
     stir: 0,
     season: state.season.points,
     flip: state.flip.points,
+    sauce: 0,
+    top: state.top.points,
+    bake: 0,
   };
   return totalScore(state) + Math.round(running[currentStage(state)]);
 }
@@ -165,11 +210,12 @@ export function starsFor(score: number): number {
   return 1;
 }
 
-export type Dish = 'pancakes' | 'stew' | 'soup';
+export type Dish = 'pancakes' | 'stew' | 'soup' | 'pizza';
 
 /** The dish a recipe makes, from its last stage. */
 export function dishFor(recipe: readonly Stage[]): Dish {
   const last = recipe[recipe.length - 1];
+  if (last === 'bake') return 'pizza';
   if (last === 'flip') return 'pancakes';
   if (last === 'season') return 'stew';
   return 'soup';
@@ -179,6 +225,7 @@ export const DISH_NAMES: Record<Dish, string> = {
   pancakes: 'Fluffy Pancakes',
   stew: 'Cozy Veggie Stew',
   soup: 'Rainbow Soup',
+  pizza: 'Cheesy Pizza',
 };
 
 /** The popup for an action that earned `share` of its points (0 to 1). */
@@ -196,8 +243,8 @@ export function accuracy(distance: number, perfect: number, miss: number): numbe
   return 1 - (distance - perfect) / (miss - perfect);
 }
 
-function accepting(state: KitchenState, stage: Stage): boolean {
-  return state.phase === 'playing' && currentStage(state) === stage && state.banner === 0;
+function accepting(state: KitchenState, ...stages: Stage[]): boolean {
+  return state.phase === 'playing' && stages.includes(currentStage(state)) && state.banner === 0;
 }
 
 /** Scores one action worth `worth` points, and updates the combo and the popup. */
@@ -264,9 +311,12 @@ export function crack(state: KitchenState): number | null {
   return nextEgg(state, accuracy(distance, CRACK_PERFECT, CRACK_MISS));
 }
 
-/** Moves the spoon to (x, y) while the pointer is held down. */
+/**
+ * Moves the spoon to (x, y) while the pointer is held down. Spreading the
+ * pizza sauce is the same circles, so this does both.
+ */
 export function stir(state: KitchenState, x: number, y: number): void {
-  if (!accepting(state, 'stir')) return;
+  if (!accepting(state, 'stir', 'sauce')) return;
   const s = state.stir;
   const distance = Math.hypot(x - POT.x, y - POT.y);
   if (distance < 12 || distance > POT.radius + STIR_REACH) {
@@ -328,6 +378,7 @@ function endPour(state: KitchenState): number {
  */
 export function release(state: KitchenState): number | 'not yet' | null {
   state.stir.lastAngle = null;
+  if (accepting(state, 'bake') && state.bake.baking) return stopBaking(state);
   if (!accepting(state, 'season') || !state.season.pouring) return null;
   if (state.season.level < MIN_POUR) {
     state.season.pouring = false;
@@ -355,18 +406,61 @@ export function flip(state: KitchenState): number | null {
   return points;
 }
 
-/** Presses the button, doing whatever the current stage does on a press. */
+/** Drops the topping onto the pizza. Returns the points scored, or null. */
+export function addTopping(state: KitchenState): number | null {
+  if (!accepting(state, 'top')) return null;
+  const t = state.top;
+  const distance = Math.abs(t.x - TOPPINGS[t.index].x);
+  // Far from its spot: the topping keeps floating rather than being wasted.
+  if (distance >= TOPPING_MISS) return null;
+  const share = accuracy(distance, TOPPING_PERFECT, TOPPING_MISS);
+  const points = scoreAction(state, share, STAGE_POINTS / TOPPINGS.length);
+  t.results.push(share);
+  t.points += points;
+  t.index += 1;
+  t.x = TOPPING_START;
+  if (t.index === TOPPINGS.length) finishStage(state, t.points);
+  return points;
+}
+
+/** Puts the pizza in the oven and turns the heat on. */
+export function startBake(state: KitchenState): void {
+  if (!accepting(state, 'bake')) return;
+  state.bake.baking = true;
+}
+
+function stopBaking(state: KitchenState): number | 'not yet' {
+  const b = state.bake;
+  b.baking = false;
+  // Still pale: it keeps its heat and waits for another hold.
+  if (b.level < BAKE_TARGET - BAKE_EARLY) return 'not yet';
+  return takeOutPizza(state);
+}
+
+function takeOutPizza(state: KitchenState): number {
+  const b = state.bake;
+  b.baking = false;
+  b.done = true;
+  const share = accuracy(Math.abs(b.level - BAKE_TARGET), BAKE_PERFECT, BAKE_ZONE);
+  const points = scoreAction(state, share, STAGE_POINTS);
+  finishStage(state, points);
+  return points;
+}
+
 /**
- * Returns false for a tap that came too early: the egg or the heart wasn't
- * near the gold yet, so nothing happened.
+ * Presses the button, doing whatever the current stage does on a press.
+ * Returns false for a tap that came too early: the egg, the topping or the
+ * heart wasn't near its spot yet, so nothing happened.
  */
 export function press(state: KitchenState, x: number, y: number): boolean {
   if (state.phase !== 'playing' || state.banner > 0) return true;
   const stage = currentStage(state);
   if (stage === 'chop') chop(state);
   else if (stage === 'crack') return crack(state) !== null;
-  else if (stage === 'stir') stir(state, x, y);
+  else if (stage === 'stir' || stage === 'sauce') stir(state, x, y);
   else if (stage === 'season') startPour(state);
+  else if (stage === 'top') return addTopping(state) !== null;
+  else if (stage === 'bake') startBake(state);
   else return flip(state) !== null;
   return true;
 }
@@ -407,7 +501,19 @@ export function step(state: KitchenState, dt: number): void {
     c.eggX += EGG_SPEEDS[c.index] * dt;
     // An egg that floats past comes round again.
     if (c.eggX > EGG_END) c.eggX = EGG_START;
-  } else if (stage === 'stir') {
+  } else if (stage === 'top') {
+    const t = state.top;
+    t.x += TOPPINGS[t.index].speed * dt;
+    // A topping that floats past comes round again.
+    if (t.x > TOPPING_END) t.x = TOPPING_START;
+  } else if (stage === 'bake') {
+    const b = state.bake;
+    if (b.baking) {
+      b.level = Math.min(1, b.level + BAKE_SPEED * dt);
+      // Fully baked: it comes out by itself, a little crispy.
+      if (b.level === 1) takeOutPizza(state);
+    }
+  } else if (stage === 'stir' || stage === 'sauce') {
     const s = state.stir;
     s.timeLeft = Math.max(0, s.timeLeft - dt);
     // Out of time: up to 50 for the turns you managed.
@@ -430,7 +536,7 @@ export const carnivalKitchen: CarnivalGame = {
   id: 'carnival-kitchen',
   name: 'Carnival Kitchen',
   description:
-    'Cook a surprise three-step recipe. Sharp timing and perfect streaks score the most.',
+    'Make a pizza or a surprise recipe with Chef Bunny. Sharp timing and perfect streaks score the most.',
 
   start(canvas) {
     const ctx = canvas.getContext('2d');
@@ -443,7 +549,8 @@ export const carnivalKitchen: CarnivalGame = {
     canvas.style.touchAction = 'none';
 
     let state = createState();
-    let started = false;
+    // The title screen, where the cook picks pizza or a surprise.
+    let choosing = true;
     let scoreRecorded = false;
     const pointer: Pointer = { x: WIDTH / 2, y: HEIGHT / 2, down: false };
     const sound = createSound();
@@ -476,16 +583,24 @@ export const carnivalKitchen: CarnivalGame = {
       }
       pointer.down = true;
       activePointer = event.pointerId;
-      if (!started) {
-        // The first tap starts the round, so sound and speech are allowed.
-        started = true;
-        state = createState();
-        renderer.reset();
+      if (choosing) {
+        // Sound and speech are only allowed after a tap, so the title screen
+        // asks out loud once it has one.
+        const menu = renderer.hitMenu(pointer.x, pointer.y);
+        if (menu) {
+          choosing = false;
+          state = createState(recipeFor(menu));
+          scoreRecorded = false;
+          renderer.reset();
+        } else {
+          renderer.askMenu();
+        }
       } else if (state.phase === 'over') {
+        // A short pause first, so a last excited tap doesn't skip the stars.
+        if (!renderer.endShown()) return;
         saveScore();
-        state = createState();
-        scoreRecorded = false;
-        renderer.reset();
+        choosing = true;
+        renderer.showMenu();
       } else {
         if (!press(state, pointer.x, pointer.y)) renderer.notYet(pointer.x, pointer.y);
       }
@@ -513,7 +628,7 @@ export const carnivalKitchen: CarnivalGame = {
       // Cap the step so a background tab doesn't teleport everything.
       const dt = Math.min((time - last) / 1000, 0.05);
       last = time;
-      if (!started) {
+      if (choosing) {
         renderer.drawTitle(dt);
         frame = requestAnimationFrame(loop);
         return;

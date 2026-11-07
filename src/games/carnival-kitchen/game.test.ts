@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ALL_STAGES,
+  BAKE_EARLY,
+  BAKE_SPEED,
+  BAKE_TARGET,
   BANNER_TIME,
   BOWL_X,
   CHOP_MARKS,
@@ -16,13 +19,19 @@ import {
   KNIFE_MAX,
   KNIFE_MIN,
   PINCHES,
+  PIZZA_STAGES,
   POT,
   POUR_SPEED,
   RECIPE_LENGTH,
   STIR_REACH,
   STIR_TIME,
   STIR_TURNS,
+  TOPPINGS,
+  TOPPING_END,
+  TOPPING_MISS,
+  TOPPING_START,
   accuracy,
+  addTopping,
   chop,
   crack,
   createState,
@@ -34,8 +43,10 @@ import {
   pickRecipe,
   press,
   ratingFor,
+  recipeFor,
   release,
   starsFor,
+  startBake,
   startPour,
   step,
   stir,
@@ -78,7 +89,7 @@ describe('carnival kitchen', () => {
         const recipe = pickRecipe(() => seed);
         expect(recipe).toHaveLength(RECIPE_LENGTH);
         expect(new Set(recipe).size).toBe(RECIPE_LENGTH);
-        const order = recipe.map((s) => ALL_STAGES.indexOf(s));
+        const order = recipe.map((s) => (ALL_STAGES as readonly Stage[]).indexOf(s));
         expect(order).toEqual([...order].sort((a, b) => a - b));
       }
     });
@@ -309,6 +320,101 @@ describe('carnival kitchen', () => {
       expect(state.phase).toBe('over');
       expect(state.scores[2]).toBe(100);
       expect(flip(state)).toBeNull();
+    });
+  });
+
+  describe('pizza', () => {
+    const PIZZA = [...PIZZA_STAGES];
+
+    it('has its own recipe and dish', () => {
+      expect(recipeFor('pizza')).toEqual(['sauce', 'top', 'bake']);
+      expect(recipeFor('surprise', () => 0)).toEqual(pickRecipe(() => 0));
+      expect(dishFor(PIZZA)).toBe('pizza');
+    });
+
+    it('spreads the sauce with the same circles as stirring', () => {
+      const state = ready(PIZZA);
+      stirTurnsOf(state, STIR_TURNS);
+      expect(state.scores[0]).toBe(100);
+      expect(currentStage(state)).toBe('top');
+    });
+
+    it('scores a topping dropped on its spot', () => {
+      const state = ready(PIZZA);
+      state.stageIndex = 1;
+      state.top.x = TOPPINGS[0].x;
+      expect(addTopping(state)).toBeCloseTo(100 / TOPPINGS.length);
+      expect(state.top.results).toEqual([1]);
+      expect(state.top.x).toBe(TOPPING_START);
+    });
+
+    it('ignores a tap far from the spot, so no topping is wasted', () => {
+      const state = ready(PIZZA);
+      state.stageIndex = 1;
+      state.top.x = TOPPINGS[0].x + TOPPING_MISS;
+      expect(addTopping(state)).toBeNull();
+      expect(press(state, 0, 0)).toBe(false);
+      expect(state.top.index).toBe(0);
+    });
+
+    it('brings a topping that floats past back round', () => {
+      const state = ready(PIZZA);
+      state.stageIndex = 1;
+      state.top.x = TOPPING_END - 1;
+      step(state, 0.05);
+      expect(state.top.x).toBe(TOPPING_START);
+    });
+
+    it('scores a pizza taken out when it is golden', () => {
+      const state = ready(PIZZA);
+      state.stageIndex = 2;
+      startBake(state);
+      step(state, BAKE_TARGET / BAKE_SPEED);
+      expect(release(state)).toBeCloseTo(100);
+      expect(state.bake.done).toBe(true);
+      expect(state.phase).toBe('over');
+    });
+
+    it('keeps a pale pizza in the oven: "not yet", and the heat stays', () => {
+      const state = ready(PIZZA);
+      state.stageIndex = 2;
+      startBake(state);
+      step(state, (BAKE_TARGET - BAKE_EARLY - 0.1) / BAKE_SPEED);
+      const level = state.bake.level;
+      expect(release(state)).toBe('not yet');
+      expect(state.bake.level).toBe(level);
+      expect(state.phase).toBe('playing');
+      startBake(state);
+      step(state, (BAKE_TARGET - level) / BAKE_SPEED);
+      expect(release(state)).toBeCloseTo(100);
+    });
+
+    it('takes a forgotten pizza out by itself, still worth something', () => {
+      const state = ready(PIZZA);
+      state.stageIndex = 2;
+      startBake(state);
+      for (let i = 0; i < 200; i++) step(state, 0.05);
+      expect(state.bake.done).toBe(true);
+      expect(state.bake.level).toBe(1);
+      expect(state.scores[2]).toBeGreaterThan(0);
+      expect(state.phase).toBe('over');
+    });
+
+    it('plays a whole pizza through press', () => {
+      const state = ready(PIZZA);
+      stirTurnsOf(state, STIR_TURNS);
+      step(state, BANNER_TIME);
+      for (const spot of TOPPINGS) {
+        state.top.x = spot.x;
+        expect(press(state, 0, 0)).toBe(true);
+      }
+      step(state, BANNER_TIME);
+      press(state, 0, 0);
+      step(state, BAKE_TARGET / BAKE_SPEED);
+      release(state);
+      expect(state.phase).toBe('over');
+      expect(state.scores).toEqual([100, 100, 100]);
+      expect(liveScore(state)).toBe(totalScore(state));
     });
   });
 
