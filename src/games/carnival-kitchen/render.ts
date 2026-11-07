@@ -492,11 +492,10 @@ function drawMysteryDish(g: G, x: number, y: number, t: number) {
   fillStroke(g, C.hotPink, 3);
   // The question.
   stickerText(g, '?', 0, -58 + Math.sin(t * 4) * 3, 56, C.hotPink);
-  g.restore();
-
-  // The rim of the lid, over the plate.
-  oval(g, x, y - 4 - lift, 114, 9, -wobble);
+  // The rim, tilting with the dome as it lifts.
+  oval(g, 0, 0, 114, 9);
   fillStroke(g, C.steelDark, 3.5);
+  g.restore();
 }
 
 /**
