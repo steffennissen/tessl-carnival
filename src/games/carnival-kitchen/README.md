@@ -8,8 +8,8 @@ voice reads each step out loud for cooks who can't read yet.
 
 ## Phones and tablets
 
-On a touch screen (or a window narrower than 600 px) the kitchen fills the
-whole screen, and a 🏠 button next to the speaker goes back to the midway.
+On a phone or tablet (a device whose main input is a finger), or in a window
+narrower than 600 px, the kitchen fills the whole screen, and a 🏠 button next to the speaker goes back to the midway.
 Held upright, it turns tall: the score and recipe sit on top, the cooking in
 the middle and Chef Bunny below with bigger hint text. Held sideways, the
 kitchen stretches to fill the screen around the cooking. Turning the device
