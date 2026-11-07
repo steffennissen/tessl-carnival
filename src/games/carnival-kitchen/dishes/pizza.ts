@@ -2,7 +2,7 @@ import { C, circle, drawPizza, face, fillStroke, oval, vertical } from '../art';
 import type { Dish, ToppingSpot } from '../game';
 import { BAKE_TARGET } from '../pizza-shape';
 
-/** The pizza on the title screen, before anyone has made one: a bit of everything. */
+/** The pizza before anyone has made one (no round to draw from): a bit of everything. */
 const SHOW_TOPPINGS: ToppingSpot[] = [
   { kind: 'pepperoni', x: 330, y: 312, speed: 0 },
   { kind: 'mushroom', x: 470, y: 316, speed: 0 },

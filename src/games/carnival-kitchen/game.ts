@@ -41,8 +41,8 @@ export interface Dish {
   pours: number;
   /**
    * Draws the finished dish, centred on the origin, about 240 wide and 160
-   * tall, for the end card and the title screen. `state` is the round that
-   * made it, or null on the title screen. Helpers to draw with are in art.ts.
+   * tall, for the end card. `state` is the round that made it, or null for a
+   * dish nobody has cooked yet. Helpers to draw with are in art.ts.
    */
   draw(g: CanvasRenderingContext2D, time: number, state: KitchenState | null): void;
 }
