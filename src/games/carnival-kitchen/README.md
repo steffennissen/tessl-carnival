@@ -6,6 +6,15 @@ recipe, made step by step, and every round is a little different. It's made
 for young cooks: everything is slow and forgiving, every grade is kind, and a
 voice reads each step out loud for cooks who can't read yet.
 
+## Phones and tablets
+
+On a phone or tablet (a device whose main input is a finger), or in a window
+narrower than 600 px, the kitchen fills the whole screen, and a 🏠 button next to the speaker goes back to the midway.
+Held upright, it turns tall: the score and recipe sit on top, the cooking in
+the middle and Chef Bunny below with bigger hint text. Held sideways, the
+kitchen stretches to fill the screen around the cooking. Turning the device
+switches between the two. On a computer the game stays in the page as before.
+
 ## How to play
 
 Tap **Tap to cook!** on the title screen. A ribbon says what we're making, a
@@ -116,6 +125,9 @@ needs its rules in `game.ts` (`press`, `release`, `step`), its drawing in
   `Dish` shape, and the `carnivalKitchen` entry, the default export the midway
   finds.
 - `dishes/`: one file per dish, and `index.ts`, which finds them.
+- `layout.ts`: how the canvas fits the screen (page, wide or tall), and
+  where the 800×500 cooking scene sits on it. The game logic only ever sees
+  scene coordinates. `layout.test.ts` tests it.
 - `art.ts`: the drawing kit: palette, shapes, faces, text, and the pizza.
 - `render.ts`: drawing the kitchen, Chef Bunny, each step, the popups,
   particles, and the title and end screens. It also watches the state to know

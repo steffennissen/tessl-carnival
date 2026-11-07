@@ -29,7 +29,6 @@ import {
   C,
   CONFETTI,
   type G,
-  H,
   W,
   blend,
   circle,
@@ -51,6 +50,7 @@ import {
   toppingPiece,
   vertical,
 } from './art';
+import { type Layout, layoutFor } from './layout';
 import type { Sound } from './sound';
 
 /**
@@ -116,12 +116,58 @@ function iconFor(dish: Dish, stage: Stage): string {
 /** The big start button on the title screen. */
 const START_BUTTON = { x: W / 2 + 40, y: 392, w: 300, h: 70 };
 
-const SOUND_BUTTON = { x: 40, y: 80, r: 24 };
+const BUTTON_RADIUS = 24;
 
 export interface Pointer {
   x: number;
   y: number;
   down: boolean;
+}
+
+interface Spot {
+  x: number;
+  y: number;
+}
+
+interface Bubble {
+  x: number;
+  y: number;
+  w: number;
+  tail: 'down' | 'left';
+}
+
+/**
+ * Where the things around the cooking go on the canvas, for a layout: the
+ * buttons, score and recipe along the top, and Chef Bunny with her speech
+ * bubble. Everything else is drawn on the scene.
+ */
+export function placesFor(layout: Layout) {
+  const { width, height, sceneX: sx, sceneY: sy } = layout;
+  if (layout.shape === 'tall') {
+    // The buttons and score stay at the top; the recipe sits just above the
+    // cooking and Chef Bunny just below it, whatever the screen's height.
+    const bunnyY = Math.min(height - 150, sy + 635);
+    return {
+      home: { x: 40, y: 50 } as Spot | null,
+      sound: { x: 100, y: 50 },
+      score: { x: width - 168, y: 28 },
+      combo: { x: width / 2, y: sy + 75 },
+      recipe: { x: width / 2, y: sy + 13 },
+      bunny: { x: 92, y: bunnyY },
+      speech: { x: 180, y: bunnyY - 86, w: width - 200, tail: 'left' } as Bubble,
+    };
+  }
+  // On the page the scene is the whole canvas, and there's a back link above
+  // it, so there's no home button.
+  return {
+    home: layout.shape === 'wide' ? { x: sx + 40, y: sy + 80 } : null,
+    sound: { x: sx + (layout.shape === 'wide' ? 100 : 40), y: sy + 80 },
+    score: { x: sx + W - 168, y: sy + 58 },
+    combo: { x: sx + W - 93, y: sy + 126 },
+    recipe: { x: sx + W / 2, y: sy + 80 },
+    bunny: { x: sx + 86, y: sy + 392 },
+    speech: { x: sx + 12, y: sy + 230, w: 188, tail: 'down' } as Bubble,
+  };
 }
 
 type Mood = 'idle' | 'cheer' | 'nod';
@@ -144,12 +190,21 @@ interface Particle {
 // ---------------------------------------------------------------------------
 // The kitchen behind everything, drawn once
 
-function drawKitchen(g: G) {
+/**
+ * The kitchen, filling a canvas of any layout. The counter lines up with the
+ * scene's counter, and the window and shelf sit where the scene expects them.
+ */
+function drawKitchen(g: G, layout: Layout) {
+  const { width, height, sceneX } = layout;
+  const counter = layout.sceneY + 338;
+
   // Wall, with a pattern of dots and little hearts.
-  g.fillStyle = vertical(g, 0, 340, [C.wallTop, C.wallBottom]);
-  g.fillRect(0, 0, W, 340);
-  for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 21; col++) {
+  g.fillStyle = vertical(g, 0, counter + 2, [C.wallTop, C.wallBottom]);
+  g.fillRect(0, 0, width, counter + 2);
+  const rows = Math.floor((counter - 86) / 36) + 1;
+  const cols = Math.ceil(width / 40) + 1;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
       const x = col * 40 + (row % 2) * 20;
       const y = 60 + row * 36;
       if ((row + col) % 3 === 0) {
@@ -164,7 +219,10 @@ function drawKitchen(g: G) {
     }
   }
 
-  // A window with a sunny sky.
+  // A window with a sunny sky, at the scene's left (or the canvas's, if the
+  // scene is wider than the canvas).
+  g.save();
+  g.translate(Math.max(0, sceneX), counter - 338);
   rounded(g, 26, 112, 150, 108, 18);
   fillStroke(g, C.white);
   rounded(g, 36, 122, 130, 88, 12);
@@ -204,8 +262,62 @@ function drawKitchen(g: G) {
   }
   rounded(g, 12, 98, 178, 12, 6);
   fillStroke(g, C.hotPink, 3.5);
+  g.restore();
 
-  // A shelf with jars and a little plant.
+  // A shelf with jars and a little plant, at the scene's right. A tall
+  // canvas leaves it out: the meters and the plate stand there.
+  if (layout.shape !== 'tall') drawShelf(g, sceneX, counter - 338);
+
+  // The counter top and the cabinets below it.
+  g.fillStyle = vertical(g, counter, counter + 92, [C.counterTop, C.cream]);
+  g.fillRect(0, counter, width, 92);
+  g.strokeStyle = C.ink;
+  g.lineWidth = 4;
+  g.beginPath();
+  g.moveTo(0, counter);
+  g.lineTo(width, counter);
+  g.stroke();
+  rounded(g, -10, counter + 86, width + 20, 16, 8);
+  fillStroke(g, C.counterEdge);
+  g.fillStyle = C.cabinet;
+  g.fillRect(0, counter + 102, width, height - counter - 102);
+  const doors = Math.max(1, Math.round(width / 197));
+  const left = (width - (doors * 197 - 16)) / 2;
+  for (let y = counter + 114; y < height; y += 84) {
+    for (let i = 0; i < doors; i++) {
+      const x = left + i * 197;
+      rounded(g, x, y, 181, 70, 14);
+      fillStroke(g, C.cabinetLight, 3.5);
+      heartPath(g, x + 90.5, y + 14, 6);
+      fillStroke(g, C.hotPink, 2.5);
+    }
+  }
+
+  // Bunting along the top.
+  const sag = (x: number) => 10 + Math.sin((Math.PI * x) / width) * 22;
+  g.strokeStyle = C.ink;
+  g.lineWidth = 2.5;
+  g.beginPath();
+  for (let x = 0; x <= width; x += 10) g.lineTo(x, sag(x));
+  g.stroke();
+  const flags = [C.hotPink, C.butter, C.mint, C.sky, C.lavender];
+  const count = Math.round((width - 25) / 47.5) + 1;
+  const step = (width - 50) / (count - 1);
+  for (let i = 0; i < count; i++) {
+    const x = 25 + i * step;
+    const y = sag(x);
+    g.beginPath();
+    g.moveTo(x - 17, y);
+    g.lineTo(x + 17, sag(x + 17));
+    g.lineTo(x, y + 32);
+    g.closePath();
+    fillStroke(g, flags[i % flags.length], 3);
+  }
+}
+
+function drawShelf(g: G, dx: number, dy: number) {
+  g.save();
+  g.translate(dx, dy);
   rounded(g, 664, 198, 128, 14, 6);
   fillStroke(g, C.wood, 3.5);
   rounded(g, 676, 152, 34, 46, 10);
@@ -235,57 +347,19 @@ function drawKitchen(g: G) {
   g.lineTo(765, 198);
   g.closePath();
   fillStroke(g, C.hotPink, 3.5);
-
-  // The counter top and the cabinets below it.
-  g.fillStyle = vertical(g, 338, 430, [C.counterTop, C.cream]);
-  g.fillRect(0, 338, W, 92);
-  g.strokeStyle = C.ink;
-  g.lineWidth = 4;
-  g.beginPath();
-  g.moveTo(0, 338);
-  g.lineTo(W, 338);
-  g.stroke();
-  rounded(g, -10, 424, W + 20, 16, 8);
-  fillStroke(g, C.counterEdge);
-  g.fillStyle = C.cabinet;
-  g.fillRect(0, 440, W, H - 440);
-  for (let i = 0; i < 4; i++) {
-    const x = 14 + i * 197;
-    rounded(g, x, 452, 181, 70, 14);
-    fillStroke(g, C.cabinetLight, 3.5);
-    heartPath(g, x + 90.5, 466, 6);
-    fillStroke(g, C.hotPink, 2.5);
-  }
-
-  // Bunting along the top.
-  const sag = (x: number) => 10 + Math.sin((Math.PI * x) / W) * 22;
-  g.strokeStyle = C.ink;
-  g.lineWidth = 2.5;
-  g.beginPath();
-  for (let x = 0; x <= W; x += 10) g.lineTo(x, sag(x));
-  g.stroke();
-  const flags = [C.hotPink, C.butter, C.mint, C.sky, C.lavender];
-  for (let i = 0; i < 17; i++) {
-    const x = 25 + i * 47.5;
-    const y = sag(x);
-    g.beginPath();
-    g.moveTo(x - 17, y);
-    g.lineTo(x + 17, sag(x + 17));
-    g.lineTo(x, y + 32);
-    g.closePath();
-    fillStroke(g, flags[i % flags.length], 3);
-  }
+  g.restore();
 }
 
 // ---------------------------------------------------------------------------
 // Chef Bunny
 
-function drawBunny(g: G, t: number, mood: Mood, moodAge: number) {
+/** Chef Bunny, with her head at (x, y). */
+function drawBunny(g: G, t: number, mood: Mood, moodAge: number, at: Spot) {
   const cheering = mood === 'cheer';
   const hop = cheering ? -Math.abs(Math.sin(moodAge * 9)) * 16 : Math.sin(t * 2) * 2;
   const tilt = mood === 'nod' ? Math.sin(moodAge * 10) * 0.12 * Math.max(0, 1 - moodAge) : 0;
-  const x = 86;
-  const y = 392 + hop;
+  const x = at.x;
+  const y = at.y + hop;
 
   // Body and apron.
   oval(g, x, y + 82, 50, 46);
@@ -341,24 +415,45 @@ function drawBunny(g: G, t: number, mood: Mood, moodAge: number) {
   }
 }
 
-function drawSpeech(g: G, lines: [string, string]) {
-  rounded(g, 12, 230, 188, 82, 20);
+/**
+ * Chef Bunny's speech bubble. Above her head it points down; beside her (in
+ * the tall layout) it points left, and the words are bigger.
+ */
+function drawSpeech(g: G, lines: [string, string], bubble: Bubble) {
+  const { x, y, w, tail } = bubble;
+  const h = 82;
+  rounded(g, x, y, w, h, 20);
   fillStroke(g, C.white, 3.5);
+  // The tail: three points, then the same two edges again in ink, so the
+  // bubble's outline stays open where the tail joins it.
+  const points: [number, number][] =
+    tail === 'down'
+      ? [
+          [x + 60, y + h - 4],
+          [x + 72, y + h + 22],
+          [x + 86, y + h - 4],
+        ]
+      : [
+          [x + 4, y + 26],
+          [x - 22, y + 52],
+          [x + 4, y + 50],
+        ];
   g.beginPath();
-  g.moveTo(72, 308);
-  g.lineTo(84, 334);
-  g.lineTo(98, 308);
+  for (const [px, py] of points) g.lineTo(px, py);
   g.fillStyle = C.white;
   g.fill();
+  const inset = tail === 'down' ? [0, 3.5] : [-3.5, 0];
   g.strokeStyle = C.ink;
   g.lineWidth = 3.5;
   g.beginPath();
-  g.moveTo(72, 311.5);
-  g.lineTo(84, 334);
-  g.lineTo(98, 311.5);
+  points.forEach(([px, py], i) => {
+    const edge = i !== 1;
+    g.lineTo(px + (edge ? inset[0] : 0), py + (edge ? inset[1] : 0));
+  });
   g.stroke();
-  plainText(g, lines[0], 106, 257, 16, C.ink);
-  plainText(g, lines[1], 106, 284, 16, C.hotPink);
+  const size = tail === 'down' ? 16 : 22;
+  plainText(g, lines[0], x + w / 2, y + 27, size, C.ink);
+  plainText(g, lines[1], x + w / 2, y + 54, size, C.hotPink);
 }
 
 // ---------------------------------------------------------------------------
@@ -366,6 +461,38 @@ function drawSpeech(g: G, lines: [string, string]) {
 
 export function createRenderer(ctx: G, sound: Sound) {
   let kitchen: HTMLCanvasElement | null = null;
+  let layout = layoutFor(0, 0, false);
+  let places = placesFor(layout);
+  // Canvas pixels per canvas unit, so the art is sharp on high-density screens.
+  let pixels = 1;
+
+  /** Draws in canvas units, ignoring the scene's offset. */
+  function onCanvas(paint: () => void) {
+    ctx.save();
+    ctx.setTransform(pixels, 0, 0, pixels, 0, 0);
+    paint();
+    ctx.restore();
+  }
+
+  /** Dims the whole canvas behind a card. */
+  function dim(alpha: number) {
+    onCanvas(() => {
+      ctx.fillStyle = `rgba(91, 59, 79, ${alpha})`;
+      ctx.fillRect(0, 0, layout.width, layout.height);
+    });
+  }
+
+  /** The kitchen behind everything, then the scene's offset for the rest. */
+  function begin() {
+    if (!kitchen) kitchen = paintKitchen(layout, pixels);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(kitchen, 0, 0);
+    ctx.setTransform(pixels, 0, 0, pixels, layout.sceneX * pixels, layout.sceneY * pixels);
+  }
+
+  function bunny(mood: Mood, age: number) {
+    onCanvas(() => drawBunny(ctx, fx.time, mood, age, places.bunny));
+  }
 
   const fresh = () => ({
     time: 0,
@@ -638,7 +765,9 @@ export function createRenderer(ctx: G, sound: Sound) {
       p.rot += p.spin * dt;
       p.life -= dt;
     }
-    fx.particles = fx.particles.filter((p) => p.life > 0 && p.y < H + 30);
+    fx.particles = fx.particles.filter(
+      (p) => p.life > 0 && p.y < layout.height - layout.sceneY + 30,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -1721,9 +1850,11 @@ export function createRenderer(ctx: G, sound: Sound) {
       g.restore();
     }
 
-    // The plate, stacking up the pancakes you've flipped.
-    const sx = 700;
-    const sy = 372;
+    // The plate, stacking up the pancakes you've flipped. A tall canvas is too
+    // narrow for it beside the pan, so it goes above the handle.
+    const tall = layout.shape === 'tall';
+    const sx = tall ? 590 : 700;
+    const sy = tall ? 175 : 372;
     oval(g, sx, sy, 76, 22);
     fillStroke(g, C.white);
     oval(g, sx, sy - 2, 56, 13);
@@ -1786,25 +1917,37 @@ export function createRenderer(ctx: G, sound: Sound) {
   // -------------------------------------------------------------------------
   // Overlays
 
-  function drawHudSoundButton() {
+  /** The sound button, and the home button when the game fills the screen. */
+  function drawButtons() {
     const g = ctx;
-    circle(g, SOUND_BUTTON.x, SOUND_BUTTON.y, SOUND_BUTTON.r);
-    fillStroke(g, C.white, 3.5);
-    g.fillStyle = C.ink;
-    emoji(g, sound.muted ? '🔇' : '🔊', SOUND_BUTTON.x, SOUND_BUTTON.y + 1, 22);
+    onCanvas(() => {
+      const buttons: [Spot, string][] = [[places.sound, sound.muted ? '🔇' : '🔊']];
+      if (places.home) buttons.push([places.home, '🏠']);
+      for (const [spot, icon] of buttons) {
+        circle(g, spot.x, spot.y, BUTTON_RADIUS);
+        fillStroke(g, C.white, 3.5);
+        g.fillStyle = C.ink;
+        emoji(g, icon, spot.x, spot.y + 1, 22);
+      }
+    });
   }
 
   function drawHud(state: KitchenState) {
+    drawButtons();
+    onCanvas(() => drawTopBar(state));
+    drawProgress(state);
+  }
+
+  /** The recipe, the score and the streak, in canvas units. */
+  function drawTopBar(state: KitchenState) {
     const g = ctx;
     const t = fx.time;
-
-    drawHudSoundButton();
 
     // The recipe: one bubble per stage.
     const n = state.recipe.length;
     state.recipe.forEach((stage, i) => {
-      const x = W / 2 + (i - (n - 1) / 2) * 78;
-      const y = 80;
+      const x = places.recipe.x + (i - (n - 1) / 2) * 78;
+      const y = places.recipe.y;
       const done = i < state.stageIndex || state.phase === 'over';
       const current = i === state.stageIndex && state.phase === 'playing';
       if (i < n - 1) {
@@ -1841,23 +1984,28 @@ export function createRenderer(ctx: G, sound: Sound) {
     });
 
     // Score, counting up.
-    rounded(g, W - 168, 58, 150, 44, 22);
+    const { x: sx, y: sy } = places.score;
+    rounded(g, sx, sy, 150, 44, 22);
     fillStroke(g, C.white, 3.5);
     g.fillStyle = C.ink;
-    emoji(g, '⭐', W - 140, 81, 24);
-    plainText(g, String(Math.round(fx.shownScore)), W - 82, 81, 26, C.hotPink);
+    emoji(g, '⭐', sx + 28, sy + 23, 24);
+    plainText(g, String(Math.round(fx.shownScore)), sx + 86, sy + 23, 26, C.hotPink);
 
     if (state.combo >= 2 && state.phase === 'playing') {
       const pulse = 1 + Math.sin(t * 8) * 0.04;
       g.save();
-      g.translate(W - 93, 126);
+      g.translate(places.combo.x, places.combo.y);
       g.scale(pulse, pulse);
       rounded(g, -75, -16, 150, 32, 16);
       fillStroke(g, C.hotPink, 3);
       plainText(g, `✨ ${state.combo} in a row!`, 0, 1, 16, C.white);
       g.restore();
     }
+  }
 
+  /** The stars for this step's actions, under the cooking. */
+  function drawProgress(state: KitchenState) {
+    const g = ctx;
     if (state.phase === 'playing') {
       const [total, done] = progress(state);
       const width = total * 30;
@@ -1909,7 +2057,10 @@ export function createRenderer(ctx: G, sound: Sound) {
     const wobble = Math.sin(n.age * 30) * 0.12 * (1 - n.age / 0.8);
     g.globalAlpha = clamp01((0.8 - n.age) / 0.3);
     g.save();
-    g.translate(Math.min(W - 90, Math.max(90, n.x)), Math.max(40, n.y - 40 - n.age * 20));
+    // Kept on the canvas, which can be narrower than the scene.
+    const left = Math.max(90, 90 - layout.sceneX);
+    const right = Math.min(W - 90, layout.width - layout.sceneX - 90);
+    g.translate(Math.min(right, Math.max(left, n.x)), Math.max(40, n.y - 40 - n.age * 20));
     g.rotate(wobble);
     stickerText(g, 'Not yet!', 0, 0, 26, C.skyDark);
     g.restore();
@@ -1982,8 +2133,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     const scale = easeOutBack(clamp01(elapsed / 0.45));
     const fade = state.banner < 0.3 ? state.banner / 0.3 : 1;
     g.globalAlpha = fade;
-    g.fillStyle = 'rgba(91, 59, 79, 0.22)';
-    g.fillRect(0, 0, W, H);
+    dim(0.22);
     g.save();
     g.translate(W / 2, 250);
     g.scale(scale, scale);
@@ -2027,8 +2177,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     const score = totalScore(state);
     const stars = starsFor(score, maxScore(state));
 
-    g.fillStyle = `rgba(91, 59, 79, ${0.35 * clamp01(age / 0.4)})`;
-    g.fillRect(0, 0, W, H);
+    dim(0.35 * clamp01(age / 0.4));
 
     const scale = easeOutBack(clamp01(age / 0.5));
     g.save();
@@ -2105,20 +2254,22 @@ export function createRenderer(ctx: G, sound: Sound) {
   function drawTitle() {
     const g = ctx;
     const t = fx.time;
-    g.fillStyle = 'rgba(91, 59, 79, 0.18)';
-    g.fillRect(0, 0, W, H);
+    dim(0.18);
+    // Beside Chef Bunny, or in the middle when she stands below.
+    const cx = layout.shape === 'tall' ? W / 2 : START_BUTTON.x;
     g.save();
-    g.translate(W / 2 + 40, 150);
+    g.translate(cx, 150);
     g.rotate(Math.sin(t * 1.5) * 0.02);
     stickerText(g, 'Carnival', 0, -44, 46, vertical(g, -66, -22, [C.hotPink, C.purple]));
     stickerText(g, 'Kitchen', 0, 14, 64, vertical(g, -18, 46, [C.gold, C.hotPink]));
     g.restore();
-    for (const [x, y, r] of [
-      [250, 100, 16],
-      [630, 96, 20],
-      [660, 190, 12],
-      [240, 200, 12],
+    for (const [dx, y, r] of [
+      [-190, 100, 16],
+      [190, 96, 20],
+      [220, 190, 12],
+      [-200, 200, 12],
     ]) {
+      const x = cx + dx;
       starPath(g, x, y, r + Math.sin(t * 4 + x) * 2, t + x);
       fillStroke(g, C.gold, 3);
     }
@@ -2126,7 +2277,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     // Every dish the kitchen can make, hopping in turn: which one will it be?
     const spread = Math.min(170, 500 / DISHES.length);
     DISHES.forEach((dish, i) => {
-      const x = START_BUTTON.x + (i - (DISHES.length - 1) / 2) * spread;
+      const x = cx + (i - (DISHES.length - 1) / 2) * spread;
       const hop = Math.max(0, Math.sin(t * 3 - i * 1.2)) * 12;
       g.save();
       g.translate(x, 282 - hop);
@@ -2134,12 +2285,12 @@ export function createRenderer(ctx: G, sound: Sound) {
       dish.draw(g, t, null);
       g.restore();
     });
-    stickerText(g, '?', START_BUTTON.x + 4, 232 + Math.sin(t * 4) * 4, 40, C.hotPink);
+    stickerText(g, '?', cx + 4, 232 + Math.sin(t * 4) * 4, 40, C.hotPink);
 
     // One big button: the dish is a surprise.
     const pulse = 1 + Math.sin(t * 4) * 0.05;
     g.save();
-    g.translate(START_BUTTON.x, START_BUTTON.y);
+    g.translate(cx, START_BUTTON.y);
     g.scale(pulse, pulse);
     rounded(g, -START_BUTTON.w / 2, -START_BUTTON.h / 2, START_BUTTON.w, START_BUTTON.h, 35);
     fillStroke(g, vertical(g, -35, 35, [C.pink, C.hotPink]), 5);
@@ -2160,8 +2311,26 @@ export function createRenderer(ctx: G, sound: Sound) {
       sound.boop();
     },
 
+    /**
+     * Fits the drawing to a new layout. `pixels` is how many canvas pixels
+     * make one canvas unit; the caller sizes the canvas to match.
+     */
+    setLayout(next: Layout, nextPixels: number) {
+      layout = next;
+      places = placesFor(next);
+      pixels = nextPixels;
+      kitchen = null;
+    },
+
+    /** Whether a canvas point is on the sound button. */
     hitSoundButton(x: number, y: number) {
-      return Math.hypot(x - SOUND_BUTTON.x, y - SOUND_BUTTON.y) <= SOUND_BUTTON.r + 8;
+      return Math.hypot(x - places.sound.x, y - places.sound.y) <= BUTTON_RADIUS + 8;
+    },
+
+    /** Whether a canvas point is on the home button (when there is one). */
+    hitHomeButton(x: number, y: number) {
+      const home = places.home;
+      return !!home && Math.hypot(x - home.x, y - home.y) <= BUTTON_RADIUS + 8;
     },
 
     /** Whether the end card has been up long enough to leave it. */
@@ -2172,11 +2341,10 @@ export function createRenderer(ctx: G, sound: Sound) {
     /** Draws the title screen, waiting for a tap to start cooking. */
     drawTitle(dt: number) {
       update(dt);
-      if (!kitchen) kitchen = paintKitchen();
-      ctx.drawImage(kitchen, 0, 0);
-      drawBunny(ctx, fx.time, fx.mood, fx.moodAge);
+      begin();
+      bunny(fx.mood, fx.moodAge);
       drawTitle();
-      drawHudSoundButton();
+      drawButtons();
       drawParticles();
     },
 
@@ -2185,8 +2353,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       update(dt);
       fx.shownScore += (liveScore(state) - fx.shownScore) * Math.min(1, dt * 8);
 
-      if (!kitchen) kitchen = paintKitchen();
-      ctx.drawImage(kitchen, 0, 0);
+      begin();
 
       const stage = currentStage(state);
       if (stage === 'chop') drawChop(state);
@@ -2200,8 +2367,10 @@ export function createRenderer(ctx: G, sound: Sound) {
       else if (stage === 'bake') drawBake(state);
       else drawFlip(state);
 
-      drawBunny(ctx, fx.time, fx.mood, fx.moodAge);
-      if (state.phase === 'playing' && state.banner === 0) drawSpeech(ctx, HINTS[stage]);
+      bunny(fx.mood, fx.moodAge);
+      if (state.phase === 'playing' && state.banner === 0) {
+        onCanvas(() => drawSpeech(ctx, HINTS[stage], places.speech));
+      }
       drawHud(state);
       if (state.phase === 'playing') drawParticles();
       // The last action's popup floats above the next stage's banner.
@@ -2212,18 +2381,22 @@ export function createRenderer(ctx: G, sound: Sound) {
       if (state.phase === 'playing') drawNotYet();
       if (state.phase === 'over') {
         drawEnd(state);
-        drawBunny(ctx, fx.time, 'cheer', fx.overAge);
+        bunny('cheer', fx.overAge);
         drawParticles();
       }
     },
   };
 }
 
-function paintKitchen() {
+/** The kitchen for a layout, painted once at the canvas's pixel density. */
+function paintKitchen(layout: Layout, pixels: number) {
   const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
+  canvas.width = Math.round(layout.width * pixels);
+  canvas.height = Math.round(layout.height * pixels);
   const g = canvas.getContext('2d');
-  if (g) drawKitchen(g);
+  if (g) {
+    g.scale(pixels, pixels);
+    drawKitchen(g, layout);
+  }
   return canvas;
 }

@@ -1,5 +1,6 @@
 import { recordScore, theme, type CarnivalGame } from '../../carnival';
 import { DISHES } from './dishes';
+import { NARROW, layoutFor, sameLayout, toScene } from './layout';
 import { BAKE_TARGET, PIZZA_VIEW } from './pizza-shape';
 import { createRenderer, type Pointer } from './render';
 import { createSound } from './sound';
@@ -670,12 +671,65 @@ export const carnivalKitchen: CarnivalGame = {
   start(canvas) {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D is not available');
-    canvas.width = WIDTH;
-    canvas.height = HEIGHT;
 
-    // Stirring drags across the canvas, so stop touch screens from scrolling.
-    const touchAction = canvas.style.touchAction;
-    canvas.style.touchAction = 'none';
+    // Stirring drags across the canvas, so stop touch screens from scrolling,
+    // and holding a finger down (to pour or bake) mustn't select anything or
+    // open a menu. On a phone or tablet the canvas also covers the whole
+    // screen. All of it is put back when the game stops.
+    const canvasStyle = canvas.style.cssText;
+    const bodyOverflow = document.body.style.overflow;
+    const touchStyle = () => {
+      canvas.style.touchAction = 'none';
+      canvas.style.userSelect = 'none';
+      canvas.style.setProperty('-webkit-user-select', 'none');
+      canvas.style.setProperty('-webkit-touch-callout', 'none');
+    };
+    touchStyle();
+    const noMenu = (event: Event) => event.preventDefault();
+    canvas.addEventListener('contextmenu', noMenu);
+    const touchScreen = window.matchMedia('(pointer: coarse)');
+
+    let layout = layoutFor(0, 0, false);
+    /** Sizes the canvas for the screen as it is now: shape, then sharpness. */
+    const fit = () => {
+      const viewWidth = window.innerWidth;
+      const viewHeight = window.innerHeight;
+      const full = touchScreen.matches || viewWidth < NARROW;
+      const next = layoutFor(viewWidth, viewHeight, full);
+      if (full) {
+        // As big as fits, in the middle. The layout already matches the
+        // screen's shape, unless the screen is an odd one.
+        const fitScale = Math.min(viewWidth / next.width, viewHeight / next.height);
+        const cssWidth = next.width * fitScale;
+        const cssHeight = next.height * fitScale;
+        Object.assign(canvas.style, {
+          position: 'fixed',
+          left: `${(viewWidth - cssWidth) / 2}px`,
+          top: `${(viewHeight - cssHeight) / 2}px`,
+          width: `${cssWidth}px`,
+          height: `${cssHeight}px`,
+          borderRadius: '0',
+          zIndex: '100',
+        });
+        document.body.style.overflow = 'hidden';
+      } else {
+        canvas.style.cssText = canvasStyle;
+        touchStyle();
+        document.body.style.overflow = bodyOverflow;
+      }
+      // Canvas pixels per unit: as many as the screen shows, up to 3.
+      const shown = full
+        ? Math.min(viewWidth / next.width, viewHeight / next.height)
+        : canvas.getBoundingClientRect().width / next.width || 1;
+      const pixels = Math.min(3, Math.max(1, shown * (window.devicePixelRatio || 1)));
+      const width = Math.round(next.width * pixels);
+      const height = Math.round(next.height * pixels);
+      if (sameLayout(layout, next) && canvas.width === width && canvas.height === height) return;
+      layout = next;
+      canvas.width = width;
+      canvas.height = height;
+      renderer.setLayout(layout, pixels);
+    };
 
     let state = createState(pickDish());
     // The title screen, waiting for a tap to start cooking.
@@ -706,16 +760,28 @@ export const carnivalKitchen: CarnivalGame = {
       renderer.reset();
     };
 
+    /** Where the event is, in canvas units. The pointer keeps scene units. */
     const toCanvas = (event: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
-      pointer.x = ((event.clientX - rect.left) / rect.width) * WIDTH;
-      pointer.y = ((event.clientY - rect.top) / rect.height) * HEIGHT;
+      return {
+        x: ((event.clientX - rect.left) / rect.width) * layout.width,
+        y: ((event.clientY - rect.top) / rect.height) * layout.height,
+      };
+    };
+    const track = (event: PointerEvent) => {
+      const at = toCanvas(event);
+      Object.assign(pointer, toScene(layout, at.x, at.y));
+      return at;
     };
     const onDown = (event: PointerEvent) => {
       event.preventDefault();
-      toCanvas(event);
+      const at = track(event);
       sound.unlock();
-      if (renderer.hitSoundButton(pointer.x, pointer.y)) {
+      if (renderer.hitHomeButton(at.x, at.y)) {
+        location.hash = '#/';
+        return;
+      }
+      if (renderer.hitSoundButton(at.x, at.y)) {
         sound.toggle();
         return;
       }
@@ -737,7 +803,7 @@ export const carnivalKitchen: CarnivalGame = {
     };
     const onMove = (event: PointerEvent) => {
       if (activePointer !== null && event.pointerId !== activePointer) return;
-      toCanvas(event);
+      track(event);
       if (pointer.down) stir(state, pointer.x, pointer.y);
     };
     const onUp = (event: PointerEvent) => {
@@ -751,6 +817,8 @@ export const carnivalKitchen: CarnivalGame = {
     canvas.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
+    window.addEventListener('resize', fit);
+    fit();
 
     let frame = 0;
     let last = performance.now();
@@ -773,11 +841,14 @@ export const carnivalKitchen: CarnivalGame = {
     return () => {
       cancelAnimationFrame(frame);
       sound.close();
-      canvas.style.touchAction = touchAction;
+      canvas.style.cssText = canvasStyle;
+      document.body.style.overflow = bodyOverflow;
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
+      window.removeEventListener('resize', fit);
+      canvas.removeEventListener('contextmenu', noMenu);
     };
   },
 };
