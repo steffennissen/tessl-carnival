@@ -1,5 +1,6 @@
 import { theme } from '../../carnival';
-import { BAKE_TARGET, PIZZA_VIEW, type Topping, type ToppingSpot } from './game';
+import type { Topping, ToppingSpot } from './game';
+import { BAKE_TARGET, PIZZA_VIEW } from './pizza-shape';
 
 /**
  * The kitchen's drawing kit: its palette, shapes, faces and text, and the

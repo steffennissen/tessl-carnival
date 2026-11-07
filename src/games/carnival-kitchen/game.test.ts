@@ -554,6 +554,30 @@ describe('carnival kitchen', () => {
     expect(state.feedback).toBeNull();
   });
 
+  it('gives each step a fresh start, so a dish can use a kind of step twice', () => {
+    const twice = {
+      ...soup,
+      id: 'twice',
+      steps: ['chop', 'stir', 'mix', 'season', 'pour'] as Stage[],
+    };
+    const state = ready(twice);
+    chopPerfectly(state);
+    step(state, BANNER_TIME);
+    stirTurnsOf(state, STIR_TURNS);
+    step(state, BANNER_TIME);
+    expect(currentStage(state)).toBe('mix');
+    expect(stirTurns(state)).toBe(0);
+    stirTurnsOf(state, STIR_TURNS);
+    step(state, BANNER_TIME);
+    pourPerfectly(state);
+    step(state, BANNER_TIME);
+    expect(currentStage(state)).toBe('pour');
+    expect(state.season.index).toBe(0);
+    pourPerfectly(state);
+    expect(state.phase).toBe('over');
+    expect(state.scores).toEqual([100, 100, 100, 100, 100]);
+  });
+
   describe('whole rounds through press', () => {
     it('makes soup', () => {
       const state = ready(soup);

@@ -1,5 +1,6 @@
 import { C, circle, drawPizza, face, fillStroke, oval, vertical } from '../art';
-import { BAKE_TARGET, type Dish, type ToppingSpot } from '../game';
+import type { Dish, ToppingSpot } from '../game';
+import { BAKE_TARGET } from '../pizza-shape';
 
 /** The pizza on the title screen, before anyone has made one: a bit of everything. */
 const SHOW_TOPPINGS: ToppingSpot[] = [

@@ -1,5 +1,6 @@
 import { recordScore, theme, type CarnivalGame } from '../../carnival';
 import { DISHES } from './dishes';
+import { BAKE_TARGET, PIZZA_VIEW } from './pizza-shape';
 import { createRenderer, type Pointer } from './render';
 import { createSound } from './sound';
 
@@ -126,8 +127,7 @@ export type Topping = 'pepperoni' | 'mushroom' | 'pineapple' | 'olive' | 'pepper
 export const EXTRA_TOPPINGS: Topping[] = ['mushroom', 'pineapple', 'olive', 'pepper', 'tomato'];
 export const TOPPING_COUNT = 5;
 export const TOPPING_SPEEDS = [90, 98, 106, 114, 122];
-/** Where the pizza sits while the toppings go on, seen a little from the side. */
-export const PIZZA_VIEW = { x: 400, y: 335, rx: 170, ry: 80 } as const;
+export { PIZZA_VIEW };
 /** Spots stay this far inside the pizza (as a share of its radius), clear of the crust. */
 export const SPOT_REACH = 0.62;
 /** Spots keep at least this far apart (as a share of the radius), so toppings don't pile up. */
@@ -147,7 +147,7 @@ export const TOPPING_MISS = 100;
 // Bake: hold to bake, let go when the pizza is golden.
 /** Oven heat per second while held. */
 export const BAKE_SPEED = 0.18;
-export const BAKE_TARGET = 0.7;
+export { BAKE_TARGET };
 export const BAKE_PERFECT = 0.07;
 /** Off the target by this much or more scores nothing. */
 export const BAKE_ZONE = 0.4;
@@ -253,6 +253,24 @@ export function makePlan(dish: Dish, random: () => number = Math.random): Plan {
   return { marks, pinches, flips, toppings };
 }
 
+type StepStates = Pick<
+  KitchenState,
+  'chop' | 'crack' | 'stir' | 'season' | 'flip' | 'top' | 'bake'
+>;
+
+/** Every step's state, as it is before the step starts. */
+function stepStates(plan: Plan): StepStates {
+  return {
+    chop: { knifeX: KNIFE_MIN, dir: 1, cut: plan.marks.map(() => false), points: 0 },
+    crack: { eggX: EGG_START, index: 0, points: 0, results: [] },
+    stir: { radians: 0, lastAngle: null, timeLeft: STIR_TIME },
+    season: { level: 0, pouring: false, index: 0, points: 0 },
+    flip: { needle: 0, dir: 1, index: 0, points: 0, results: [] },
+    top: { x: TOPPING_START, index: 0, points: 0, results: [] },
+    bake: { level: 0, baking: false, done: false },
+  };
+}
+
 export function createState(dish: Dish, random: () => number = Math.random): KitchenState {
   const recipe = [...dish.steps];
   const plan = makePlan(dish, random);
@@ -266,13 +284,7 @@ export function createState(dish: Dish, random: () => number = Math.random): Kit
     combo: 0,
     banner: BANNER_TIME,
     feedback: null,
-    chop: { knifeX: KNIFE_MIN, dir: 1, cut: plan.marks.map(() => false), points: 0 },
-    crack: { eggX: EGG_START, index: 0, points: 0, results: [] },
-    stir: { radians: 0, lastAngle: null, timeLeft: STIR_TIME },
-    season: { level: 0, pouring: false, index: 0, points: 0 },
-    flip: { needle: 0, dir: 1, index: 0, points: 0, results: [] },
-    top: { x: TOPPING_START, index: 0, points: 0, results: [] },
-    bake: { level: 0, baking: false, done: false },
+    ...stepStates(plan),
     phase: 'playing',
   };
 }
@@ -357,10 +369,27 @@ function scoreAction(state: KitchenState, share: number, worth: number): number 
   return points;
 }
 
+/**
+ * Gives a step fresh state as it starts. Steps of the same kind share their
+ * state (stirring, sauce and batter all use `stir`), so a dish with two of a
+ * kind gets a clean start for the second one.
+ */
+function freshStepState(state: KitchenState, stage: Stage): void {
+  const fresh = stepStates(state.plan);
+  if (stage === 'chop') state.chop = fresh.chop;
+  else if (stage === 'crack') state.crack = fresh.crack;
+  else if (CIRCLE_STAGES.includes(stage)) state.stir = fresh.stir;
+  else if (POUR_STAGES.includes(stage)) state.season = fresh.season;
+  else if (stage === 'flip') state.flip = fresh.flip;
+  else if (stage === 'top') state.top = fresh.top;
+  else if (stage === 'bake') state.bake = fresh.bake;
+}
+
 function finishStage(state: KitchenState, points: number): void {
   state.scores[state.stageIndex] = Math.round(Math.min(STAGE_POINTS, Math.max(0, points)));
   state.stageIndex += 1;
   if (state.stageIndex < state.recipe.length) {
+    freshStepState(state, currentStage(state));
     state.banner = BANNER_TIME;
   } else {
     state.stageIndex = state.recipe.length - 1;
