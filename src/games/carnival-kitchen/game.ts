@@ -56,6 +56,8 @@ export const POUR_SPEED = 0.28;
 export const SEASON_PERFECT = 0.06;
 /** Off the star by this much or more scores nothing. */
 export const SEASON_ZONE = 0.35;
+/** A pour shorter than this was just a tap, so it doesn't use up a pinch. */
+export const MIN_POUR = 0.1;
 
 // Flip: tap when the heart is in the golden zone.
 export const FLIPS = [
@@ -321,11 +323,17 @@ function endPour(state: KitchenState): number {
 
 /**
  * Lets go of the button: lifts the spoon, and stops pouring salt.
- * Returns the points a pour scored, or null if nothing was poured.
+ * Returns the points a pour scored, null if nothing was being poured, or
+ * 'not yet' for a quick tap that barely poured: that pinch isn't used up.
  */
-export function release(state: KitchenState): number | null {
+export function release(state: KitchenState): number | 'not yet' | null {
   state.stir.lastAngle = null;
   if (!accepting(state, 'season') || !state.season.pouring) return null;
+  if (state.season.level < MIN_POUR) {
+    state.season.pouring = false;
+    state.season.level = 0;
+    return 'not yet';
+  }
   return endPour(state);
 }
 
@@ -441,6 +449,18 @@ export const carnivalKitchen: CarnivalGame = {
     const sound = createSound();
     const renderer = createRenderer(ctx, sound);
 
+    // The finger (or mouse) that's holding the spoon or the shaker. Other
+    // fingers moving or lifting don't touch its gesture; a new tap takes over.
+    let activePointer: number | null = null;
+
+    /** Saves a finished round's score, once, before anything can replace it. */
+    const saveScore = () => {
+      if (state.phase === 'over' && !scoreRecorded) {
+        recordScore(carnivalKitchen.id, totalScore(state));
+        scoreRecorded = true;
+      }
+    };
+
     const toCanvas = (event: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * WIDTH;
@@ -455,12 +475,14 @@ export const carnivalKitchen: CarnivalGame = {
         return;
       }
       pointer.down = true;
+      activePointer = event.pointerId;
       if (!started) {
         // The first tap starts the round, so sound and speech are allowed.
         started = true;
         state = createState();
         renderer.reset();
       } else if (state.phase === 'over') {
+        saveScore();
         state = createState();
         scoreRecorded = false;
         renderer.reset();
@@ -469,12 +491,16 @@ export const carnivalKitchen: CarnivalGame = {
       }
     };
     const onMove = (event: PointerEvent) => {
+      if (activePointer !== null && event.pointerId !== activePointer) return;
       toCanvas(event);
       if (pointer.down) stir(state, pointer.x, pointer.y);
     };
-    const onUp = () => {
+    const onUp = (event: PointerEvent) => {
+      if (event.pointerId !== activePointer) return;
+      activePointer = null;
       pointer.down = false;
-      release(state);
+      if (release(state) === 'not yet') renderer.notYet(pointer.x, pointer.y);
+      saveScore();
     };
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointermove', onMove);
@@ -493,10 +519,7 @@ export const carnivalKitchen: CarnivalGame = {
         return;
       }
       step(state, dt);
-      if (state.phase === 'over' && !scoreRecorded) {
-        recordScore(carnivalKitchen.id, totalScore(state));
-        scoreRecorded = true;
-      }
+      saveScore();
       renderer.draw(state, pointer, dt);
       frame = requestAnimationFrame(loop);
     };

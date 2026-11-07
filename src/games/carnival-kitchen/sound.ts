@@ -168,6 +168,8 @@ export function createSound(): Sound {
     },
     toggle() {
       muted = !muted;
+      // Silence sounds already playing or scheduled, not just new ones.
+      if (ctx && master) master.gain.setValueAtTime(muted ? 0 : 0.8, ctx.currentTime);
       if (muted) {
         try {
           window.speechSynthesis.cancel();

@@ -28,7 +28,10 @@ Nothing is ever wasted:
 - An egg that floats past comes round again.
 - Tapping when the egg is far from the bowl, or the heart is far from the gold,
   just shows "Not yet!" and lets you try again.
-- Every chop lands near a dotted line, so every chop scores something.
+- A chop always cuts the nearest dotted line, and scores something whenever
+  the knife is close to it.
+- A quick tap on the salt shaker that barely pours anything doesn't use up a
+  shake: it shows "Not yet!" so you can hold it properly.
 
 ## Scoring
 

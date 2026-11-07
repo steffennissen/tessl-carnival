@@ -269,6 +269,17 @@ describe('carnival kitchen', () => {
       state.stageIndex = 1;
       expect(release(state)).toBeNull();
     });
+
+    it('does not use up a shake on a quick tap', () => {
+      const state = ready(['chop', 'season', 'flip']);
+      state.stageIndex = 1;
+      startPour(state);
+      step(state, 0.05);
+      expect(release(state)).toBe('not yet');
+      expect(state.season.index).toBe(0);
+      expect(state.season.level).toBe(0);
+      expect(state.feedback).toBeNull();
+    });
   });
 
   describe('flip', () => {
