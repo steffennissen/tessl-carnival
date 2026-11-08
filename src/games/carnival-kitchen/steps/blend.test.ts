@@ -72,7 +72,7 @@ describe('blend', () => {
   it('starts each new blend chunky again, and keeps the last one smooth', () => {
     const dish = {
       ...dishById('strawberry-smoothie'),
-      steps: [{ kind: 'blend', blender: 'blender', contents: 'smoothie', blends: 2 } as const],
+      steps: [{ kind: 'blend', blender: 'blender', contents: 'bisque', blends: 2 } as const],
     };
     const state = ready(dish);
     const s = jar(state);
