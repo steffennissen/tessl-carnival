@@ -14,7 +14,7 @@ const SPOTS = [
 
 const sugarCookies: Dish = {
   id: 'sugar-cookies',
-  name: 'Cut-out Sugar Cookies',
+  name: 'Sugar Cookies',
   steps: [
     { kind: 'crack', item: 'egg' },
     { kind: 'mix', vessel: 'mixing-bowl', contents: 'cookie-dough' },

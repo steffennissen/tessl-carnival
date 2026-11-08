@@ -7,7 +7,7 @@ import type { SauceOptions } from '../steps/sauce';
 
 const omurice: Dish = {
   id: 'omurice',
-  name: 'Omurice with a Ketchup Heart',
+  name: 'Omurice',
   steps: [
     { kind: 'chop', item: 'onion' },
     { kind: 'stir', vessel: 'rice-pan', contents: 'rice' },

@@ -15,7 +15,7 @@ const SHOW_TOPPINGS: ToppingSpot[] = [
 
 const fruitSalad: Dish = {
   id: 'fruit-salad',
-  name: 'Rainbow Fruit Salad',
+  name: 'Fruit Salad',
   steps: [
     { kind: 'chop', item: 'strawberry' },
     { kind: 'chop', item: 'banana' },

@@ -87,26 +87,26 @@ a phone held sideways and a phone held upright. Stickers are kept by the
 carnival's shared sticker book (`earnSticker` and `stickersFor` from
 `src/carnival`), not by the game.
 
-| Dish                             | Steps                                                                               |
-| -------------------------------- | ----------------------------------------------------------------------------------- |
-| **Cheesy Pizza**                 | Chop the pepperoni, spread the sauce, add the toppings, bake the pizza              |
-| **Fluffy Pancakes**              | Crack the eggs, add flour and milk, mix the batter, flip the pancakes               |
-| **Veggie Soup**                  | Chop the carrot, stir the soup, shake the salt                                      |
-| **Creamy Dreamy Mac & Cheese**   | Grate the cheese, pour the milk, stir the cheese sauce, sprinkle the crumbs, bake   |
-| **Cheesy Pepper Twirl**          | Grate the cheese, shake the pepper, add pasta water, mix the cheese cream, toss     |
-| **Strawberry Smoothie**          | Chop the strawberry, chop the banana, add milk, blend                               |
-| **Rainbow Fruit Salad**          | Chop the strawberry, chop the banana, mix the fruit, add blueberries, kiwi and mint |
-| **Lulu's Pink Bisque**           | Chop the celery, stir the shells and veggies, add sunset splash, blend, add cream   |
-| **Omurice with a Ketchup Heart** | Chop the onion, stir the rice, crack the eggs, flip the omelettes, draw ketchup     |
-| **Taco Fiesta**                  | Chop the tomato, stir the taco meat, shake the spice, add the toppings              |
-| **Spaghetti & Meatballs**        | Chop the tomato, stir the sauce, shake the salt, add meatballs and basil            |
-| **Cheeseburger Tower**           | Chop the pickle, flip the patties, stack the burger                                 |
-| **Ice Cream Sundae**             | Scoop the ice cream, stack the scoops, drizzle the chocolate, add the toppings      |
-| **Sprinkle Cupcakes**            | Crack the eggs, add flour and sugar, mix, bake, add the toppings                    |
-| **Cut-out Sugar Cookies**        | Crack the eggs, mix the dough, roll it out, cut the cookies, bake                   |
-| **Sushi Rolls**                  | Chop the cucumber, spread the rice, add the fillings, roll the sushi, chop it       |
+| Dish                      | Steps                                                                               |
+| ------------------------- | ----------------------------------------------------------------------------------- |
+| **Pizza**                 | Chop the pepperoni, spread the sauce, add the toppings, bake the pizza              |
+| **Pancakes**              | Crack the eggs, add flour and milk, mix the batter, flip the pancakes               |
+| **Vegetable Soup**        | Chop the carrot, stir the soup, shake the salt                                      |
+| **Mac and Cheese**        | Grate the cheese, pour the milk, stir the cheese sauce, sprinkle the crumbs, bake   |
+| **Cacio e Pepe**          | Grate the cheese, shake the pepper, add pasta water, mix the cheese cream, toss     |
+| **Strawberry Smoothie**   | Chop the strawberry, chop the banana, add milk, blend                               |
+| **Fruit Salad**           | Chop the strawberry, chop the banana, mix the fruit, add blueberries, kiwi and mint |
+| **Lobster Bisque**        | Chop the celery, stir the shells and veggies, add seafood stock, blend, add cream   |
+| **Omurice**               | Chop the onion, stir the rice, crack the eggs, flip the omelettes, draw ketchup     |
+| **Tacos**                 | Chop the tomato, stir the taco meat, shake the spice, add the toppings              |
+| **Spaghetti & Meatballs** | Chop the tomato, stir the sauce, shake the salt, add meatballs and basil            |
+| **Cheeseburger**          | Chop the pickle, flip the patties, stack the burger                                 |
+| **Ice Cream Sundae**      | Scoop the ice cream, stack the scoops, drizzle the chocolate, add the toppings      |
+| **Cupcakes**              | Crack the eggs, add flour and sugar, mix, bake, add the toppings                    |
+| **Sugar Cookies**         | Crack the eggs, mix the dough, roll it out, cut the cookies, bake                   |
+| **Sushi Rolls**           | Chop the cucumber, spread the rice, add the fillings, roll the sushi, chop it       |
 
-Lulu's Pink Bisque is made from the shells Lulu the lobster has grown out of
+Lobster Bisque is made from the shells Lulu the lobster has grown out of
 (real lobsters shed theirs), so no lobster is ever cooked.
 
 Each step is one of these:
@@ -681,7 +681,7 @@ The details:
    ```ts
    interface Dish {
      id: string; // the file name
-     name: string; // "Cheesy Pizza": the end card, and "You made Cheesy Pizza!"
+     name: string; // "Pizza": the end card, and "You made Pizza!"
      steps: RecipeStep[]; // in cooking order
      draw(g: G, time: number, state: KitchenState | null): void; // the end card
    }

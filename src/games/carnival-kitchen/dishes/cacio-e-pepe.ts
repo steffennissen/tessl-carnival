@@ -29,7 +29,7 @@ function heartSteam(g: G, t: number, x: number, y: number) {
 
 const cacioEPepe: Dish = {
   id: 'cacio-e-pepe',
-  name: 'Cheesy Pepper Twirl',
+  name: 'Cacio e Pepe',
   steps: [
     { kind: 'grate', item: 'pecorino' },
     { kind: 'season', shaker: 'black-pepper', food: 'pecorino', shakes: 3, amount: '¼ teaspoon' },

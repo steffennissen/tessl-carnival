@@ -15,7 +15,7 @@ const SHOW_TOPPINGS: ToppingSpot[] = [
 
 const pizza: Dish = {
   id: 'pizza',
-  name: 'Cheesy Pizza',
+  name: 'Pizza',
   steps: [
     // There's no pepperoni emoji, so the card shows the knife.
     { kind: 'chop', item: 'pepperoni', icon: '🔪' },

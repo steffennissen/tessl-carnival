@@ -3,7 +3,7 @@ import type { Dish } from '../kit';
 
 const pancakes: Dish = {
   id: 'pancakes',
-  name: 'Fluffy Pancakes',
+  name: 'Pancakes',
   steps: [
     { kind: 'crack', item: 'egg' },
     { kind: 'pour', pours: ['flour', 'milk'], amounts: ['1½ cups', '1 cup'] },
