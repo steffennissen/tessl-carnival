@@ -27,7 +27,8 @@ fork, not to everyone who forks this repository.
 - Vitest for game logic. No browser tests: they need system packages the cloud
   machine doesn't have.
 - Scores live in the browser (local storage) behind `src/carnival/scores.ts`,
-  and collected stickers behind `src/carnival/stickers.ts`.
+  collected stickers behind `src/carnival/stickers.ts`, and saved settings
+  behind `src/carnival/preferences.ts`.
 - No native dependencies, and nothing that needs `sudo`. `npm ci` is the whole setup.
 
 ## Commands
@@ -69,6 +70,7 @@ src/
     registry.ts           the CarnivalGame shape and the registry
     scores.ts             recordScore, bestScore, topScores
     stickers.ts           earnSticker, stickersFor: what a player has collected
+    preferences.ts        savePreference, preferencesFor: settings a game remembers
     prizes.ts             prize tiers
     theme.ts              colours, fonts and sizes
   games/
@@ -102,7 +104,8 @@ that `src/games/index.ts` finds.
 2. **Every game reports scores through the shared scores module.** Call
    `recordScore(game.id, score)` from `src/carnival` once, when a round ends.
    Anything a game lets players collect, such as a sticker for each level, goes
-   through `earnSticker` and `stickersFor`. No game reads or writes local
+   through `earnSticker` and `stickersFor`, and settings a game remembers
+   through `savePreference` and `preferencesFor`. No game reads or writes local
    storage itself, or keeps its own high score table.
 3. **Every game draws with the carnival's theme.** Colours, fonts and sizes come
    from `theme` and `canvasFont` in `src/carnival/theme.ts`. No hex colours or
