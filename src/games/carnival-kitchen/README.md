@@ -94,6 +94,36 @@ Nothing is ever wasted:
 - A chop always cuts the nearest dotted line, and scores something whenever
   the knife is close to it.
 
+## Chef Bunny
+
+Chef Bunny cooks along with you. She's always kind: a miss never gets a sad
+face.
+
+- **Idle**, she breathes, blinks every few seconds (now and then twice),
+  flicks an ear, and watches your finger or mouse. Every so often she glances
+  out at you instead.
+- **A good action** (Perfect! or Great!) makes her hop and wave; a Good! gets
+  a nod. She looks at where it happened.
+- **A streak** of 3, 5, 10, 15... Perfect! in a row (see Combo bonus below)
+  is a party: she jumps twice, stars circle her and burst around her, a little
+  chime plays, and she says something like "Wow, three in a row!". Each
+  milestone gets one party.
+- **A miss** (Nice try!) or a **"Not yet!"** gets a soft encouraging face:
+  raised brows, a big smile and a cheery paw, looking at where you tapped.
+- **While you hold** to pour, shake, bake, blend, scoop, grate or toss, she
+  leans in for a peek with an "ooh" face, and leans back when you let go.
+
+Now and then she says a short line out loud, and it shows in her speech
+bubble for 2 seconds in place of the hint: always at a streak party, and only
+sometimes otherwise (1 in 5 for a cheer, about 1 in 8 for a nod, 1 in 3 for
+encouragement or "Not yet!", 1 in 4 when you start holding). She picks from
+small lists and never says the same line twice in a row. The step
+instructions come first, so she only chats while the step is taking input
+(never over the card), at least 4 seconds after the instruction started, at
+least 8 seconds after her last line, and only if the voice isn't already
+speaking; she never cuts anything off. With the sound off, the line still
+shows in her bubble.
+
 ## Scoring
 
 - **Each step is worth up to 100 points**, split evenly between its actions:
@@ -429,7 +459,8 @@ every popup. `view.effects` has:
   `chime(notes, gap, volume)`, with notes from `NOTE` in `sound.ts`. See
   `ToneOptions` and `HissOptions` there.
 - `celebrate(x, y)`: sparkles sized by the last popup's grade, and Chef Bunny
-  cheers or nods. Call it where the action happened.
+  reacts to the grade (see Chef Bunny above) and looks there. Call it where
+  the action happened.
 - `burst(x, y, count, shapes, colors, speed?, gravity?)`: particles; shapes
   are 'star', 'heart', 'dot', 'confetti', 'shell' and 'salt'. Use the
   ingredient's `colors`.
@@ -490,12 +521,16 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
 - `ingredients/`: one file per ingredient (its art), and `index.ts`, which
   finds them (`ingredient`, `artOf`).
 - `dishes/`: one file per dish (its recipe and end card), and `index.ts`.
-- `render.ts`: the kitchen, Chef Bunny, the HUD, the card and popups,
+- `chef.ts`: Chef Bunny's reactions, lines and their cooldowns, and her idle
+  blinks, ear flicks and glances: plain functions, tested in `chef.test.ts`.
+- `bunny.ts`: drawing Chef Bunny in a pose (mood, blink, ear, gaze, lean).
+- `render.ts`: the kitchen, Chef Bunny's place and what she sees, the HUD, the card and popups,
   particles, the title and end screens. It asks the step being cooked to draw
   itself, and every started step to `observe`.
 - `art.ts`: the drawing kit: palette, shapes, faces, text.
 - `sound.ts`: sound effects made with Web Audio (no files to load) and the
-  voice that reads each step out loud.
+  voice that reads each step out loud, plus `chatter` for Chef Bunny's own
+  lines, which only speaks when the voice is free.
 - `layout.ts`: how the canvas fits the screen (page, wide or tall), and
   where the 800×500 cooking scene sits on it. The game logic only ever sees
   scene coordinates. `layout.test.ts` tests it.

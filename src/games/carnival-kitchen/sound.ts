@@ -28,6 +28,12 @@ export interface Sound {
   fanfare(): void;
   say(text: string): void;
   /**
+   * Chef Bunny's own chatter ("Wow, three in a row!"): said only if the voice
+   * isn't already reading something, and never cuts anything off. Returns
+   * whether it was free to speak (true when muted: nothing to talk over).
+   */
+  chatter(text: string): boolean;
+  /**
    * A new sound from scratch, for a step that needs one of its own: a note
    * (`freq` in Hz, see NOTE) that can slide to another.
    */
@@ -266,6 +272,21 @@ export function createSound(): Sound {
       } catch {
         // No speech in this browser.
       }
+    },
+    chatter(text) {
+      if (muted) return true;
+      try {
+        const synth = window.speechSynthesis;
+        if (synth.speaking || synth.pending) return false;
+        const line = new SpeechSynthesisUtterance(text);
+        if (voice) line.voice = voice;
+        line.rate = 1;
+        line.pitch = 1.45;
+        synth.speak(line);
+      } catch {
+        // No speech in this browser.
+      }
+      return true;
     },
     tone,
     hiss,
