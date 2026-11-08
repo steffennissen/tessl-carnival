@@ -1,4 +1,4 @@
-import type { Dish } from './kit';
+import { smartSticker, type Dish } from './kit';
 import type { Layout } from './layout';
 
 /**
@@ -38,6 +38,11 @@ export function countLine(stickers: Record<string, number>, dishes: Dish[]): str
 /** Stars on a dish's sticker: 0 for a dish not cooked yet, else 1 to 3. */
 export function starsOf(stickers: Record<string, number>, id: string): number {
   return Math.max(0, Math.min(3, Math.round(stickers[id] ?? 0)));
+}
+
+/** Whether a dish has its Smart Chef star: a learning moment answered on her own. */
+export function smartOf(stickers: Record<string, number>, id: string): boolean {
+  return (stickers[smartSticker(id)] ?? 0) >= 1;
 }
 
 /**

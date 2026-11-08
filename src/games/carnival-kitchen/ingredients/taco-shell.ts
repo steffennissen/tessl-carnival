@@ -122,7 +122,7 @@ const tacoShell: Ingredient = {
       // Toppings on top, overflowing a little.
       toppings.forEach((spot: ToppingSpot, i) => {
         const art = artOf(spot.id, 'topping');
-        PIECES.forEach(([dx, dy], k) => {
+        (spot.single ? [[0, 0] as const] : PIECES).forEach(([dx, dy], k) => {
           drawPiece(g, art, spot.x + dx, spot.y + dy, 1.5, i + k * 2.1);
         });
       });

@@ -49,6 +49,11 @@ export interface StepBasics {
   hint?: [string, string];
   /** Overrides the emoji on the card and in the recipe along the top. */
   icon?: string;
+  /**
+   * Minutes this step takes on the kitchen clock. Leave it out for the
+   * kind's usual (DEFAULT_MINUTES in kit/clock.ts: chop 5, bake 15...).
+   */
+  minutes?: number;
 }
 
 /** One step of a recipe: `{ kind: 'chop', item: 'carrot' }`. */
@@ -73,6 +78,11 @@ export interface IngredientBasics {
   icon: string;
   /** Its colours, for crumbs, splashes and sparkles. At least one. */
   colors: string[];
+  /**
+   * A real amount for one pour or shake of it, shown by the meter: "1 cup",
+   * "¼ teaspoon". A recipe can say its own (`amounts` on pour, `amount` on season).
+   */
+  amount?: string;
 }
 
 /**
@@ -124,6 +134,34 @@ export interface KitchenState {
   banner: number;
   feedback: Feedback | null;
   phase: 'playing' | 'over';
+  /** The kitchen clock when the round started, in minutes since midnight (see kit/clock.ts). */
+  start: number;
+  /** The round's learning moment, if any, and the grown-ups' settings (see kit/learn.ts). */
+  learn: LearnRound;
+}
+
+/** Level 1 is early 2nd grade, Level 2 late 2nd grade. */
+export type Level = 1 | 2;
+
+/** What a grown-up chose in the grown-ups' settings. */
+export interface LearnSettings {
+  /** One learning moment (math or reading) woven into each round. */
+  learning: boolean;
+  level: Level;
+  /** Step cards and questions show their text, and the voice only reads when asked. */
+  readMyself: boolean;
+}
+
+/** How a learning question went: right on her own, or after Chef Bunny showed the answer. */
+export type Outcome = 'right' | 'helped';
+
+/** The learning side of a round. */
+export interface LearnRound {
+  settings: LearnSettings;
+  /** The activity woven into this round (its file name in activities/), or null. */
+  activity: string | null;
+  /** Each learning question answered so far, in order. */
+  answers: Outcome[];
 }
 
 /** What a step's rules get: the round, and this step's options and state. */
@@ -249,4 +287,21 @@ export interface Step<O extends StepBasics = StepBasics, S = unknown, F = unknow
   observe?(view: StepView<O, S, F>): void;
   /** Draws the step on the scene. Chef Bunny, the HUD and popups go on top. */
   draw(view: StepView<O, S, F>): void;
+  /**
+   * A learning moment (a question, an order ticket) rather than cooking: its
+   * card says "Smart Chef!" instead of a step number, it isn't in the recipe
+   * along the top, and it doesn't count toward the cooking score or stars.
+   */
+  learning?: boolean;
+  /**
+   * Chef Bunny's two lines right now, instead of the hint: for a step whose
+   * hint changes as it goes, such as a question after a wrong try.
+   */
+  bubble?(turn: Turn<O, S>): [string, string] | null;
+  /**
+   * For tests: does what a cook who knows the answer would do, such as
+   * tapping the right answer. Learning steps have one, so `playThrough` can
+   * finish any round.
+   */
+  solve?(turn: Turn<O, S>): void;
 }

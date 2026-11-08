@@ -6,6 +6,7 @@ const salt: Ingredient = {
   label: 'salt',
   plural: 'salt',
   icon: '🧂',
+  amount: '¼ teaspoon',
   // The grains: mostly white, some grey.
   colors: [C.white, C.steelDark],
 

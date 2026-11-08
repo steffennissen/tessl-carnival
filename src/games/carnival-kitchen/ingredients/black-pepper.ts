@@ -15,6 +15,7 @@ const blackPepper: Ingredient = {
   label: 'pepper',
   plural: 'pepper',
   icon: '🧂',
+  amount: '¼ teaspoon',
   // The grains: mostly black, some grey.
   colors: [K.grain, K.grainLight],
 

@@ -1,4 +1,4 @@
-import { C, type G, fillStroke, rounded, starPath, vertical } from '../art';
+import { C, type G, fillStroke, font, plainText, rounded, starPath, vertical } from '../art';
 import { STEP_POINTS, accuracy, finishStep, scoreAction } from './rules';
 import type { StepBasics, Turn } from './types';
 
@@ -122,7 +122,14 @@ export function holdProgress(turn: Turn<StepBasics, HoldState>): [number, number
  * The tall meter at the right of the scene (x 588 to 634, y 120 to 390),
  * with a star at `target`. `fill` is its gradient, top to bottom.
  */
-export function drawMeter(g: G, t: number, level: number, target: number, fill: string[]) {
+export function drawMeter(
+  g: G,
+  t: number,
+  level: number,
+  target: number,
+  fill: string[],
+  label?: string,
+) {
   const mx = 588;
   const top = 126;
   const height = 258;
@@ -148,4 +155,17 @@ export function drawMeter(g: G, t: number, level: number, target: number, fill: 
   g.setLineDash([]);
   starPath(g, mx - 22, ty, 17 + Math.sin(t * 5) * 1.5, Math.sin(t * 2) * 0.2);
   fillStroke(g, C.gold, 3.5);
+  if (label) drawAmount(g, label, mx + 23, top + height + 26);
+}
+
+/**
+ * A real amount ("1 cup", "15 minutes") on a little label centred on (x, y),
+ * as under the meter.
+ */
+export function drawAmount(g: G, label: string, x: number, y: number) {
+  g.font = font(18);
+  const w = Math.max(70, g.measureText(label).width + 24);
+  rounded(g, x - w / 2, y - 15, w, 30, 15);
+  fillStroke(g, C.butter, 3);
+  plainText(g, label, x, y + 1, 18, C.ink);
 }

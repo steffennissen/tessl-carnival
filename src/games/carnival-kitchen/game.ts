@@ -1,4 +1,5 @@
 import { earnSticker, recordScore, stickersFor, theme, type CarnivalGame } from '../../carnival';
+import { planRound } from './activities';
 import { bookButtonFor, bookPlaces, cellAt, inBox } from './book';
 import {
   createDecor,
@@ -11,14 +12,31 @@ import {
 } from './decorate';
 import { DISHES } from './dishes';
 import {
-  BANNER_TIME,
+  GEAR_HOLD,
+  grownupPlaces,
+  grownupTap,
+  loadSettings,
+  onGear,
+  saveSetting,
+  withSetting,
+} from './grownups';
+import {
+  CARD_SKIP_AFTER,
   FEEDBACK_TIME,
   STEP_POINTS,
+  bannerTime,
   currentRun,
   currentTurn,
+  plainPlan,
+  smartChef,
+  smartSticker,
+  startLearn,
+  startTime,
   type Dish,
   type KitchenState,
+  type LearnSettings,
   type Pointer,
+  type RoundPlan,
 } from './kit';
 import { NARROW, layoutFor, sameLayout, toScene } from './layout';
 import { createRenderer } from './render';
@@ -43,24 +61,59 @@ export function pickDish(random: () => number = Math.random, previous?: Dish): D
   return choices[Math.floor(random() * choices.length) % choices.length];
 }
 
-/** A new round of `dish`. Every step rolls what's random about it now. */
-export function createState(dish: Dish, random: () => number = Math.random): KitchenState {
-  const steps = dish.steps.map((options) => ({
+/**
+ * A new round of `dish`. Every step rolls what's random about it now. `plan`
+ * (from `planRound` in activities/) weaves in a learning moment and carries
+ * the grown-ups' settings and the clock's start; without one, the round is
+ * the dish's own recipe with no learning, starting at a random time.
+ */
+export function createState(
+  dish: Dish,
+  random: () => number = Math.random,
+  plan: RoundPlan = plainPlan(dish),
+): KitchenState {
+  const steps = plan.steps.map((options) => ({
     kind: options.kind,
     options,
     state: stepOf(options.kind).start(options, random),
   }));
-  return {
+  const state: KitchenState = {
     dish,
     steps,
     stepIndex: 0,
     scores: steps.map(() => 0),
     bonus: 0,
     combo: 0,
-    banner: BANNER_TIME,
+    banner: 0,
     feedback: null,
     phase: 'playing',
+    start: plan.start ?? startTime(plan.settings.level, random),
+    learn: startLearn(plan),
   };
+  state.banner = bannerTime(state);
+  return state;
+}
+
+/** Whether a step of the round is a learning step (a ticket, a question), not cooking. */
+export function isLearning(state: KitchenState, index: number): boolean {
+  const run = state.steps[index] as KitchenState['steps'][number] | undefined;
+  return !!run && !!stepOf(run.kind).learning;
+}
+
+/** The indices of the round's cooking steps: the recipe along the top, and its step numbers. */
+export function cookingSteps(state: KitchenState): number[] {
+  return state.steps.flatMap((_, i) => (isLearning(state, i) ? [] : [i]));
+}
+
+/**
+ * In "Read it myself" mode, a tap on a step's card once it has been up a
+ * moment moves on to the step. Returns whether it did.
+ */
+export function skipCard(state: KitchenState): boolean {
+  if (!state.learn.settings.readMyself || state.banner <= 0) return false;
+  if (bannerTime(state) - state.banner < CARD_SKIP_AFTER - 1e-9) return false;
+  state.banner = 0;
+  return true;
 }
 
 /** The kind of step being cooked, such as 'chop'. */
@@ -80,9 +133,9 @@ export function liveScore(state: KitchenState): number {
   return totalScore(state) + Math.round(running);
 }
 
-/** The most a round can score, before combo bonuses. */
+/** The most a round can score, before bonuses: its cooking steps (learning steps score nothing). */
 export function maxScore(state: KitchenState): number {
-  return state.steps.length * STEP_POINTS;
+  return cookingSteps(state).length * STEP_POINTS;
 }
 
 /** What Chef Bunny says about a final score out of `max`. Always something nice. */
@@ -235,7 +288,13 @@ export const carnivalKitchen: CarnivalGame = {
     let state = createState(pickDish());
     // The title screen waits for a tap to start cooking; the recipe book
     // opens from it; the kitchen is where the cooking (and decorating) is.
-    let screen: 'title' | 'book' | 'kitchen' = 'title';
+    let screen: 'title' | 'book' | 'grownups' | 'kitchen' = 'title';
+    // The grown-ups' settings, remembered between visits.
+    let settings: LearnSettings = loadSettings();
+    // The last round's learning activity, so the next one is different.
+    let lastActivity: string | null = null;
+    // Seconds the grown-ups' gear has been held on the title screen, or null.
+    let gearHeld: number | null = null;
     // The dish spinner is showing which dish was picked. The round waits,
     // its card's clock stopped, until it's done.
     let spinning = false;
@@ -244,6 +303,8 @@ export const carnivalKitchen: CarnivalGame = {
     // The finished dish's decorations, and the round's sticker news.
     let decor: DecorState = createDecor();
     let sticker: StickerNews = null;
+    // Whether the round earned its dish's Smart Chef star.
+    let smart = false;
     // The stickers the recipe book shows, read when it opens.
     let bookStickers: Record<string, number> = {};
     const pointer: Pointer = { x: WIDTH / 2, y: HEIGHT / 2, down: false };
@@ -264,6 +325,8 @@ export const carnivalKitchen: CarnivalGame = {
         const { id, level } = stickerFor(state);
         const before = stickersFor(carnivalKitchen.id)[id];
         sticker = stickerNews(before, earnSticker(carnivalKitchen.id, id, level));
+        smart = smartChef(state);
+        if (smart) earnSticker(carnivalKitchen.id, smartSticker(state.dish.id), 1);
         scoreRecorded = true;
       }
     };
@@ -278,10 +341,13 @@ export const carnivalKitchen: CarnivalGame = {
      */
     const newRound = (dish?: Dish, { spin = dish === undefined }: { spin?: boolean } = {}) => {
       lastDish = dish ?? pickDish(Math.random, lastDish);
-      state = createState(lastDish);
+      const plan = planRound(lastDish, settings, Math.random, lastActivity);
+      lastActivity = plan.activity ?? lastActivity;
+      state = createState(lastDish, Math.random, plan);
       scoreRecorded = false;
       decor = createDecor();
       sticker = null;
+      smart = false;
       screen = 'kitchen';
       renderer.reset();
       spinning = spin;
@@ -321,6 +387,18 @@ export const carnivalKitchen: CarnivalGame = {
         tapBook(at.x, at.y);
         return;
       }
+      if (screen === 'grownups') {
+        const tap = grownupTap(grownupPlaces(layout), at.x, at.y);
+        if (tap === 'close') {
+          sound.whoosh();
+          screen = 'title';
+        } else if (tap) {
+          sound.pop();
+          settings = withSetting(settings, tap);
+          saveSetting(tap.key, settings[tap.key]);
+        }
+        return;
+      }
       if (renderer.hitHomeButton(at.x, at.y)) {
         location.hash = '#/';
         return;
@@ -337,6 +415,24 @@ export const carnivalKitchen: CarnivalGame = {
       if (screen === 'kitchen' && state.phase === 'playing' && renderer.hitBadge(at.x, at.y)) {
         // The dish's badge: Chef Bunny says what we're making. Not a step press.
         renderer.sayDish(state.dish);
+        return;
+      }
+      if (screen === 'title' && onGear(layout, at.x, at.y)) {
+        // Held long enough, it opens the grown-ups' settings (see the loop).
+        gearHeld = 0;
+        activePointer = event.pointerId;
+        pointer.down = true;
+        return;
+      }
+      if (
+        screen === 'kitchen' &&
+        state.phase === 'playing' &&
+        state.banner > 0 &&
+        state.learn.settings.readMyself
+      ) {
+        // Read it myself: the card's speaker reads it out; a tap elsewhere moves on.
+        if (renderer.hitCardSpeaker(at.x, at.y)) renderer.readCard(state);
+        else if (!renderer.cardReading()) skipCard(state);
         return;
       }
       if (screen === 'title' && inBox(bookButtonFor(layout), at.x, at.y, 8)) {
@@ -376,6 +472,10 @@ export const carnivalKitchen: CarnivalGame = {
       if (event.pointerId !== activePointer) return;
       activePointer = null;
       pointer.down = false;
+      if (gearHeld !== null) {
+        gearHeld = null;
+        return;
+      }
       if (decorating()) {
         const did = decorRelease(decor, decorPlaces(layout.shape));
         if (did === 'place') renderer.sparkle(pointer.x, pointer.y);
@@ -400,18 +500,30 @@ export const carnivalKitchen: CarnivalGame = {
       const dt = Math.min((time - last) / 1000, 0.05);
       last = time;
       if (screen === 'title') {
-        renderer.drawTitle(dt);
+        if (gearHeld !== null) {
+          gearHeld += dt;
+          if (gearHeld >= GEAR_HOLD) {
+            gearHeld = null;
+            sound.pop();
+            screen = 'grownups';
+          }
+        }
+        renderer.drawTitle(dt, (gearHeld ?? 0) / GEAR_HOLD);
       } else if (screen === 'book') {
         renderer.drawBook(dt, bookStickers);
+      } else if (screen === 'grownups') {
+        renderer.drawGrownups(dt, settings);
       } else if (spinning) {
         // The round doesn't tick while the spinner runs.
         renderer.drawSpin(dt);
         if (renderer.spinDone()) spinning = false;
       } else {
+        // A card being read out by its speaker stays up until it's done.
+        if (renderer.cardReading() && state.banner > 0) state.banner = Math.max(state.banner, 0.5);
         tick(state, dt);
         saveScore();
         if (decorating()) decorTick(decor, dt);
-        renderer.draw(state, pointer, dt, { decor, sticker });
+        renderer.draw(state, pointer, dt, { decor, sticker, smart });
       }
       frame = requestAnimationFrame(loop);
     };

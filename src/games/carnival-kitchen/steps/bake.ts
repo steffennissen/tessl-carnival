@@ -14,6 +14,7 @@ import { artOf, ingredient } from '../ingredients';
 import {
   GOLDEN,
   drawMeter,
+  stepMinutes,
   holdProgress,
   pressHold,
   releaseHold,
@@ -217,7 +218,14 @@ const bake: Step<BakeOptions, HoldState, BakeFx> = {
     g.fill();
 
     // The meter, with a star where it's golden.
-    drawMeter(g, t, b.level, BAKE_TARGET, [C.hotPink, C.ember, C.butter]);
+    drawMeter(
+      g,
+      t,
+      b.level,
+      BAKE_TARGET,
+      [C.hotPink, C.ember, C.butter],
+      `${stepMinutes(options)} minutes`,
+    );
 
     if (taking && !b.holding) {
       const bob = Math.sin(t * 5) * 6;

@@ -92,3 +92,32 @@ describe('sameLayout', () => {
     expect(sameLayout(layoutFor(390, 844, true), layoutFor(844, 390, true))).toBe(false);
   });
 });
+
+describe('the kitchen clock', () => {
+  it('hangs on the canvas, clear of Chef Bunny and her bubble, in every layout', async () => {
+    const { placesFor } = await import('./render');
+    for (const [w, h, full] of [
+      [1200, 800, false],
+      [844, 390, true],
+      [390, 844, true],
+      [600, 900, true],
+      [1024, 768, true],
+    ] as const) {
+      const layout = layoutFor(w, h, full);
+      const p = placesFor(layout);
+      const { x, y, r } = p.clock;
+      expect(x - r).toBeGreaterThanOrEqual(0);
+      expect(x + r).toBeLessThanOrEqual(layout.width);
+      expect(y - r).toBeGreaterThanOrEqual(0);
+      expect(y + r).toBeLessThanOrEqual(layout.height);
+      const bubble = p.speech;
+      const clearOfBubble =
+        x + r <= bubble.x ||
+        x - r >= bubble.x + bubble.w ||
+        y - r >= bubble.y + 82 ||
+        y + r <= bubble.y;
+      expect(clearOfBubble).toBe(true);
+      expect(Math.hypot(x - p.bunny.x, y - p.bunny.y)).toBeGreaterThan(r + 60);
+    }
+  });
+});

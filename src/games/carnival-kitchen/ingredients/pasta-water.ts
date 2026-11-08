@@ -12,6 +12,7 @@ const pastaWater: Ingredient = {
   label: 'pasta water',
   plural: 'pasta water',
   icon: '💧',
+  amount: '¼ cup',
   colors: [C.skyLight, C.white],
 
   pour: {

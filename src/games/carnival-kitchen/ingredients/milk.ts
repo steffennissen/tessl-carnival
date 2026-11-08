@@ -6,6 +6,7 @@ const milk: Ingredient = {
   label: 'milk',
   plural: 'milk',
   icon: '🥛',
+  amount: '1 cup',
   colors: [C.white, C.skyLight],
 
   pour: {

@@ -7,6 +7,7 @@ const sugar: Ingredient = {
   label: 'sugar',
   plural: 'sugar',
   icon: '🍬',
+  amount: '½ cup',
   colors: [C.white, C.pink, C.skyLight],
 
   pour: {

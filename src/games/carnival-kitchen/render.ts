@@ -33,7 +33,7 @@ import {
   tickChef,
   type ChefEvent,
 } from './chef';
-import { type Box, bookButtonFor, bookPlaces, countLine, starsOf, twoLines } from './book';
+import { type Box, bookButtonFor, bookPlaces, countLine, smartOf, starsOf, twoLines } from './book';
 import {
   DECORATIONS,
   type DecorState,
@@ -42,12 +42,31 @@ import {
   drawDecorations,
 } from './decorate';
 import { DISHES } from './dishes';
-import { type StickerNews, liveScore, maxScore, ratingFor, starsFor, totalScore } from './game';
 import {
-  BANNER_TIME,
+  type StickerNews,
+  cookingSteps,
+  isLearning,
+  liveScore,
+  maxScore,
+  ratingFor,
+  starsFor,
+  totalScore,
+} from './game';
+import { gearFor, grownupPlaces, optionBoxes } from './grownups';
+import {
   FEEDBACK_TIME,
+  bannerTime,
+  clockText,
   currentRun,
   currentTurn,
+  drawClock,
+  drawSpeaker,
+  drawWords,
+  fitWords,
+  roundTime,
+  stepMinutes,
+  wordNow,
+  type LearnSettings,
   type Dish,
   type Effects,
   type Feedback,
@@ -58,7 +77,7 @@ import {
   type StepView,
 } from './kit';
 import { type Layout, layoutFor } from './layout';
-import { NOTE, type Sound } from './sound';
+import { NOTE, type Reading, type Sound } from './sound';
 import { SPINNER_DISH, SPIN_TIME, drawSpinner, reelPosition, spinEnd, spinTime } from './spinner';
 import { hintOf, iconOf, stepOf, titleOf } from './steps';
 
@@ -126,6 +145,8 @@ export function placesFor(layout: Layout) {
       recipe: { x: width / 2, y: sy + 13 },
       bunny: { x: 92, y: bunnyY },
       speech: { x: 180, y: bunnyY - 86, w: width - 200, tail: 'left' } as Bubble,
+      clock: tallClock(width, height, bunnyY),
+      shelf: false,
     };
   }
   // On the page the scene is the whole canvas, and there's a back link above
@@ -139,7 +160,15 @@ export function placesFor(layout: Layout) {
       : sy >= 90
         ? { x: sx + W / 2 - 180, y: (sy - 80) / 2, w: 360, h: 80 }
         : { x: sx + W / 2 - 165, y: sy + 4, w: 330, h: 40 };
+  // The kitchen clock: beside the scene at the right when there's room
+  // (the badge is at the left), or on the wall where the shelf would be.
+  const clock =
+    side >= 110
+      ? { x: sx + W + sx / 2, y: sy + 200, r: Math.min(72, sx / 2 - 16) }
+      : { x: sx + 742, y: sy + 196, r: 42 };
   return {
+    clock,
+    shelf: side >= 110,
     badge,
     home: layout.shape === 'wide' ? { x: sx + 40, y: sy + 80 } : null,
     sound: { x: sx + (layout.shape === 'wide' ? 100 : 40), y: sy + 80 },
@@ -151,10 +180,23 @@ export function placesFor(layout: Layout) {
   };
 }
 
+/**
+ * The kitchen clock on a tall screen: in the drawers below Chef Bunny's
+ * bubble, as big as the room there allows, beside her rather than over her.
+ */
+function tallClock(width: number, height: number, bunnyY: number) {
+  const room = height - bunnyY;
+  const r = Math.max(48, Math.min(140, room / 2 - 28));
+  const x = room >= 260 ? width / 2 + 60 : width - 92;
+  return { x, y: bunnyY + Math.max(72, room / 2 + 10), r };
+}
+
 /** What the end of a round shows besides the round: decorating, and sticker news. */
 export interface RoundEnd {
   decor: DecorState;
   sticker: StickerNews;
+  /** Whether the round earned its dish's Smart Chef star. */
+  smart: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -234,9 +276,10 @@ function drawKitchen(g: G, layout: Layout) {
   fillStroke(g, C.hotPink, 3.5);
   g.restore();
 
-  // A shelf with jars and a little plant, at the scene's right. A tall
-  // canvas leaves it out: the meters and the plate stand there.
-  if (layout.shape !== 'tall') drawShelf(g, sceneX, counter - 338);
+  // A shelf with jars and a little plant, at the scene's right, unless the
+  // kitchen clock hangs there. A tall canvas leaves it out: the meters and
+  // the plate stand there.
+  if (placesFor(layout).shelf) drawShelf(g, sceneX, counter - 338);
 
   // The counter top and the cabinets below it.
   g.fillStyle = vertical(g, counter, counter + 92, [C.counterTop, C.cream]);
@@ -639,8 +682,21 @@ export function createRenderer(ctx: G, sound: Sound) {
     starsPlayed: 0,
     shownScore: 0,
     notYet: null as { x: number; y: number; age: number } | null,
+    /** The time the kitchen clock shows: it sweeps on to the round's time. */
+    clock: null as number | null,
+    smartShown: false,
   });
   let fx = fresh();
+
+  /** A step's card being read out by its speaker ("Read it myself"), or null. */
+  let card: { reading: Reading; state: KitchenState; index: number } | null = null;
+  /** Whether the card on screen is being read out. */
+  const cardReading = () =>
+    !!card &&
+    card.state === fx.seen &&
+    card.index === card.state.stepIndex &&
+    card.state.banner > 0 &&
+    !card.reading.done();
 
   /** The dish spinner while it runs (see spinner.ts), or null. */
   let spin: {
@@ -751,9 +807,12 @@ export function createRenderer(ctx: G, sound: Sound) {
       const run = currentRun(state);
       sound.banner();
       // The first step also says what we're making, unless the spinner did.
+      // Read it myself: the card waits for its speaker to be tapped.
       const intro =
         state.stepIndex === 0 && announced !== state.dish ? `Let's make ${state.dish.name}! ` : '';
-      sound.say(`${intro}${titleOf(run)} ${hintOf(run).join(' ')}`);
+      if (!state.learn.settings.readMyself) {
+        sound.say(`${intro}${titleOf(run)} ${hintOf(run).join(' ')}`);
+      }
       instructionStarted(fx.chef, fx.time);
       fx.said = null;
     }
@@ -791,7 +850,11 @@ export function createRenderer(ctx: G, sound: Sound) {
             : end.sticker === 'better'
               ? ' Your sticker got more stars!'
               : '';
-        sound.say(`${ratingFor(totalScore(state), maxScore(state))} You made ${dish}!${news}`);
+        const times = ` You started at ${clockText(state.start)} and finished at ${clockText(roundTime(state))}!`;
+        const smartLine = end.smart ? ' You are a Smart Chef!' : '';
+        sound.say(
+          `${ratingFor(totalScore(state), maxScore(state))} You made ${dish}!${times}${news}${smartLine}`,
+        );
       }
       fx.overAge += dt;
       fx.chef.mood = 'cheer';
@@ -887,14 +950,16 @@ export function createRenderer(ctx: G, sound: Sound) {
     const g = ctx;
     const t = fx.time;
 
-    // The recipe: one bubble per step.
-    const n = state.steps.length;
-    state.steps.forEach((run, i) => {
-      const x = places.recipe.x + (i - (n - 1) / 2) * 78;
+    // The recipe: one bubble per cooking step (learning steps aren't in it).
+    const cooking = cookingSteps(state);
+    const n = cooking.length;
+    cooking.forEach((i, k) => {
+      const run = state.steps[i];
+      const x = places.recipe.x + (k - (n - 1) / 2) * 78;
       const y = places.recipe.y;
       const done = i < state.stepIndex || state.phase === 'over';
       const current = i === state.stepIndex && state.phase === 'playing';
-      if (i < n - 1) {
+      if (k < n - 1) {
         g.strokeStyle = done ? C.mint : 'rgba(255, 255, 255, 0.9)';
         g.lineWidth = 6;
         g.beginPath();
@@ -1048,50 +1113,118 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.globalAlpha = 1;
   }
 
+  /** The card's speaker button, in scene units ("Read it myself" only). */
+  const CARD_SPEAKER = { x: W / 2 - 200, y: 250 + 52, r: 28 };
+
+  /** What a card says under its title: the step's number and minutes, or Smart Chef. */
+  function cardLine(state: KitchenState): string {
+    if (isLearning(state, state.stepIndex)) return '🎓 Smart Chef!';
+    const cooking = cookingSteps(state);
+    const number = `Step ${cooking.indexOf(state.stepIndex) + 1} of ${cooking.length}`;
+    const minutes = stepMinutes(currentRun(state).options);
+    return minutes > 0 ? `${number} · ⏰ ${minutes} min` : number;
+  }
+
   function drawBanner(state: KitchenState) {
     const g = ctx;
     const run = currentRun(state);
-    const elapsed = BANNER_TIME - state.banner;
+    const elapsed = bannerTime(state) - state.banner;
     const scale = easeOutBack(clamp01(elapsed / 0.45));
     const fade = state.banner < 0.3 ? state.banner / 0.3 : 1;
+    const reader = state.learn.settings.readMyself;
     g.globalAlpha = fade;
     dim(0.22);
     g.save();
     g.translate(W / 2, 250);
     g.scale(scale, scale);
-    rounded(g, -260, -82, 520, 164, 38);
+    // Read it myself: a taller card with the hint on it too, and a speaker.
+    const half = reader ? 112 : 82;
+    rounded(g, -260, -half, 520, half * 2, 38);
     fillStroke(g, C.white, 6, C.hotPink);
     g.setLineDash([10, 9]);
-    rounded(g, -246, -68, 492, 136, 28);
+    rounded(g, -246, -half + 14, 492, half * 2 - 28, 28);
     g.lineWidth = 3;
     g.strokeStyle = C.lavender;
     g.stroke();
     g.setLineDash([]);
     g.save();
-    g.translate(-172, 2);
+    g.translate(-172, reader ? -34 : 2);
     g.rotate(Math.sin(fx.time * 3) * 0.12);
     g.fillStyle = C.ink;
-    emoji(g, iconOf(run), 0, 0, 76);
+    emoji(g, iconOf(run), 0, 0, reader ? 64 : 76);
     g.restore();
-    stickerText(
-      g,
-      titleOf(run),
-      50,
-      -16,
-      38,
-      vertical(g, -36, 4, [C.hotPink, C.purple]),
-      'center',
-      380,
-    );
-    plainText(g, `Step ${state.stepIndex + 1} of ${state.steps.length}`, 50, 36, 20, C.purple);
+    if (reader) {
+      const reading = cardReading() && card ? card.reading : null;
+      const word = wordNow(reading);
+      drawSpeaker(
+        g,
+        CARD_SPEAKER.x - W / 2,
+        CARD_SPEAKER.y - 250,
+        CARD_SPEAKER.r,
+        word >= 0,
+        fx.time,
+      );
+      const title = fitWords(g, titleOf(run), 360, 34, 1);
+      drawWords(g, title.lines, 50, -62, title.size, 0, { highlight: word, color: C.hotPink });
+      const hint = hintOf(run);
+      const titleWords = titleOf(run).split(' ').length;
+      const hintSize = fitWords(g, hint.join(' '), 720, 24, 2).size;
+      let at = titleWords;
+      hint.forEach((line, i) => {
+        drawWords(g, [line], 50, -12 + i * 34, hintSize, 0, {
+          highlight: word - at,
+          color: C.ink,
+        });
+        at += line.split(' ').length;
+      });
+      plainText(g, cardLine(state), 50, 70, 18, C.purple);
+    } else {
+      stickerText(
+        g,
+        titleOf(run),
+        50,
+        -16,
+        38,
+        vertical(g, -36, 4, [C.hotPink, C.purple]),
+        'center',
+        380,
+      );
+      plainText(g, cardLine(state), 50, 36, 20, C.purple);
+    }
     // The first step says what we're making, on a ribbon above the card.
     if (state.stepIndex === 0) {
-      rounded(g, -190, -122, 380, 50, 25);
+      rounded(g, -190, -half - 40, 380, 50, 25);
       fillStroke(g, horizontal(g, -190, 190, [C.purple, C.lavender, C.purple]), 4);
-      stickerText(g, `Let's make ${state.dish.name}!`, 0, -97, 26, C.white, 'center', 350);
+      stickerText(g, `Let's make ${state.dish.name}!`, 0, -half - 15, 26, C.white, 'center', 350);
     }
     g.restore();
     g.globalAlpha = 1;
+  }
+
+  /**
+   * The kitchen clock on the wall. When a step finishes, its minutes go by:
+   * the minute hand sweeps round to the new time with a tick every 5 minutes,
+   * and the clock grows a little while it moves, so it's easy to watch.
+   */
+  function drawWallClock(state: KitchenState, dt: number) {
+    const target = roundTime(state);
+    if (fx.clock === null || fx.clock > target) fx.clock = target;
+    const before = fx.clock;
+    if (before < target) {
+      fx.clock = Math.min(target, before + dt * Math.max(6, (target - before) * 1.6));
+      if (Math.floor(fx.clock / 5) > Math.floor(before / 5)) sound.tick(0.7);
+    }
+    const moving = fx.clock < target;
+    const { x, y, r } = places.clock;
+    const grow = moving ? 1.08 : 1;
+    onCanvas(() => {
+      shadow(ctx, x + 3, y + r * grow + 4, r * 0.7, 5);
+      drawClock(ctx, x, y, r * grow, fx.clock ?? target, {
+        t: fx.time,
+        glow: moving ? 'minute' : null,
+        numbers: r >= 30,
+      });
+    });
   }
 
   function drawEnd(state: KitchenState, end: RoundEnd) {
@@ -1107,7 +1240,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.save();
     g.translate(W / 2, 250);
     g.scale(scale, scale);
-    rounded(g, -250, -196, 500, 392, 38);
+    rounded(g, -250, -196, 500, 436, 38);
     fillStroke(g, C.white);
 
     // Sun rays behind the dish.
@@ -1158,15 +1291,33 @@ export function createRenderer(ctx: G, sound: Sound) {
       g,
       ratingFor(score, maxScore(state)),
       0,
-      122,
+      116,
       32,
-      vertical(g, 104, 140, [C.hotPink, C.purple]),
+      vertical(g, 98, 134, [C.hotPink, C.purple]),
     );
-    plainText(g, `⭐ ${score} points`, 0, 158, 20, C.purple);
+    // When you started and finished, in words and on two little clocks.
+    const started = state.start;
+    const finished = roundTime(state);
+    plainText(
+      g,
+      `You started at ${clockText(started)} and finished at ${clockText(finished)}!`,
+      0,
+      150,
+      18,
+      C.ink,
+    );
+    for (const [x, label, time] of [
+      [-192, 'Start', started],
+      [192, 'Finish', finished],
+    ] as const) {
+      plainText(g, `${label} ${clockText(time)}`, x, 8, 15, C.purple);
+      drawClock(g, x, 58, 38, time, { t });
+    }
+    plainText(g, `⭐ ${score} points`, 0, 178, 20, C.purple);
 
     const pulse = 1 + Math.sin(t * 4) * 0.04;
     g.save();
-    g.translate(0, 196);
+    g.translate(0, 212);
     g.scale(pulse, pulse);
     rounded(g, -118, -26, 236, 52, 26);
     fillStroke(g, vertical(g, -26, 26, [C.cabinetLight, C.mint]));
@@ -1193,6 +1344,28 @@ export function createRenderer(ctx: G, sound: Sound) {
       const [top, bottom] = end.sticker === 'new' ? ['New', 'sticker!'] : ['Sticker', 'upgraded!'];
       stickerText(g, top, 0, -10, 19, C.hotPink, 'center', 76);
       stickerText(g, bottom, 0, 12, 17, C.purple, 'center', 80);
+      g.restore();
+    }
+
+    // The Smart Chef star, for a learning moment answered on her own.
+    if (end.smart && age >= newsAt) {
+      if (!fx.smartShown) {
+        fx.smartShown = true;
+        burst(400 - 176, 250 - 112, 14, ['star', 'heart'], CONFETTI, 200);
+      }
+      const s = easeOutBack(clamp01((age - newsAt) / 0.4));
+      g.save();
+      g.translate(-176, -112);
+      g.rotate(-0.2 + Math.sin(t * 3) * 0.05);
+      g.scale(s, s);
+      starPath(g, 0, 0, 66, -t * 0.2);
+      fillStroke(g, vertical(g, -60, 60, [C.lavenderLight, C.purple]), 4);
+      circle(g, 0, 0, 42);
+      fillStroke(g, C.white, 3);
+      g.fillStyle = C.ink;
+      emoji(g, '🎓', 0, -14, 24);
+      stickerText(g, 'Smart', 0, 8, 17, C.purple, 'center', 76);
+      stickerText(g, 'Chef!', 0, 26, 16, C.hotPink, 'center', 76);
       g.restore();
     }
 
@@ -1388,6 +1561,13 @@ export function createRenderer(ctx: G, sound: Sound) {
       } else {
         drawCovered(g, cx, cell.y + 52 * s, s);
       }
+      if (smartOf(stickers, dish.id)) {
+        // The Smart Chef star: a learning moment answered on her own.
+        starPath(g, cell.x + cell.w - 22 * s, cell.y + 22 * s, 16 * s, 0.2);
+        fillStroke(g, C.lavender, 2.5, C.purple);
+        g.fillStyle = C.ink;
+        emoji(g, '🎓', cell.x + cell.w - 22 * s, cell.y + 23 * s, 13 * s);
+      }
       for (let k = 0; k < 3; k++) {
         starPath(g, cx + (k - 1) * 20 * s, cell.y + 124 * s, 8 * s);
         fillStroke(g, k < level ? C.gold : C.white, 2, k < level ? C.ink : C.starEdge);
@@ -1448,6 +1628,80 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.restore();
 
     onCanvas(drawBookButton);
+  }
+
+  /**
+   * The grown-ups' gear in the corner, with its hint. `held` (0 to 1) is how
+   * far through the hold it is: a ring fills round it.
+   */
+  function drawGear(held: number) {
+    const g = ctx;
+    const gear = gearFor(layout);
+    circle(g, gear.x, gear.y, gear.r);
+    fillStroke(g, 'rgba(255, 255, 255, 0.85)', 3);
+    g.fillStyle = C.ink;
+    g.save();
+    g.translate(gear.x, gear.y + 1);
+    g.rotate(held * Math.PI);
+    emoji(g, '⚙️', 0, 0, gear.r * 1.1);
+    g.restore();
+    if (held > 0) {
+      g.strokeStyle = C.purple;
+      g.lineWidth = 6;
+      g.lineCap = 'round';
+      g.beginPath();
+      g.arc(gear.x, gear.y, gear.r + 7, -Math.PI / 2, -Math.PI / 2 + held * Math.PI * 2);
+      g.stroke();
+    }
+    g.globalAlpha = 0.75;
+    plainText(g, 'Hold for grown-ups', gear.x - gear.r - 8, gear.y + 1, 14, C.ink, 'right');
+    g.globalAlpha = 1;
+  }
+
+  /** The grown-ups' settings page. */
+  function drawGrownupPage(settings: LearnSettings) {
+    const g = ctx;
+    const p = grownupPlaces(layout);
+    dim(0.3);
+    rounded(g, p.page.x, p.page.y, p.page.w, p.page.h, 32);
+    fillStroke(g, C.cream, 5, C.purple);
+    stickerText(
+      g,
+      '⚙️ For grown-ups',
+      p.title.x,
+      p.title.y,
+      p.tall ? 40 : 34,
+      vertical(g, p.title.y - 20, p.title.y + 20, [C.purple, C.hotPink]),
+      'center',
+      p.page.w - 170,
+    );
+    circle(g, p.close.x, p.close.y, p.close.r);
+    fillStroke(g, C.white, 3.5);
+    plainText(g, '✕', p.close.x, p.close.y + 1, 28, C.ink);
+    for (const { row, label, note, control } of p.rows) {
+      plainText(g, row.label, label.x, label.y, p.tall ? 30 : 26, C.ink, 'left');
+      g.font = font(16);
+      const fit = Math.min(1, p.noteWidth / Math.max(1, g.measureText(row.note).width));
+      plainText(g, row.note, note.x, note.y, 16 * fit, C.purple, 'left');
+      optionBoxes(control).forEach((b, i) => {
+        const [text, value] = row.options[i];
+        const on = settings[row.key] === value;
+        rounded(g, b.x + 4, b.y, b.w - 8, b.h, b.h / 2);
+        fillStroke(g, on ? vertical(g, b.y, b.y + b.h, [C.pink, C.hotPink]) : C.white, 3.5);
+        plainText(
+          g,
+          text,
+          b.x + b.w / 2,
+          b.y + b.h / 2 + 1,
+          p.tall ? 26 : 22,
+          on ? C.white : C.ink,
+        );
+      });
+    }
+    const d = p.done;
+    rounded(g, d.x, d.y, d.w, d.h, d.h / 2);
+    fillStroke(g, vertical(g, d.y, d.y + d.h, [C.cabinetLight, C.mint]), 4);
+    plainText(g, 'Done', d.x + d.w / 2, d.y + d.h / 2 + 1, 26, C.ink);
   }
 
   return {
@@ -1592,15 +1846,47 @@ export function createRenderer(ctx: G, sound: Sound) {
       return fx.overAge >= 1.2;
     },
 
-    /** Draws the title screen, waiting for a tap to start cooking. */
-    drawTitle(dt: number) {
+    /**
+     * Draws the title screen, waiting for a tap to start cooking. `gearHeld`
+     * (0 to 1) is how far through holding the grown-ups' gear.
+     */
+    drawTitle(dt: number, gearHeld = 0) {
       update(dt);
       begin();
       bunny();
       drawTitle();
+      onCanvas(() => drawGear(gearHeld));
       drawButtons();
       drawParticles();
     },
+
+    /** Draws the grown-ups' settings page. */
+    drawGrownups(dt: number, settings: LearnSettings) {
+      update(dt);
+      begin();
+      onCanvas(() => drawGrownupPage(settings));
+    },
+
+    /** Whether a canvas point is on the step card's speaker ("Read it myself"). */
+    hitCardSpeaker(x: number, y: number) {
+      const sx = CARD_SPEAKER.x + layout.sceneX;
+      const sy = CARD_SPEAKER.y + layout.sceneY;
+      return Math.hypot(x - sx, y - sy) <= CARD_SPEAKER.r + 10;
+    },
+
+    /** Reads the step's card out loud, its words lighting up as they're said. */
+    readCard(state: KitchenState) {
+      const run = currentRun(state);
+      sound.pop();
+      card = {
+        reading: sound.read(`${titleOf(run)} ${hintOf(run).join(' ')}`),
+        state,
+        index: state.stepIndex,
+      };
+    },
+
+    /** Whether the step's card is being read out by its speaker. */
+    cardReading,
 
     /** Draws the recipe book, with the stickers earned so far. */
     drawBook(dt: number, stickers: Record<string, number>) {
@@ -1629,6 +1915,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       fx.shownScore += (liveScore(state) - fx.shownScore) * Math.min(1, dt * 8);
 
       begin();
+      if (state.phase === 'playing') drawWallClock(state, dt);
 
       // The step being cooked draws itself on the scene.
       const run = currentRun(state);
@@ -1648,7 +1935,8 @@ export function createRenderer(ctx: G, sound: Sound) {
       bunny();
       if (state.phase === 'playing' && state.banner === 0) {
         const said = fx.said;
-        onCanvas(() => drawSpeech(ctx, said ? [said.text] : hintOf(run), places.speech));
+        const lines = stepOf(run.kind).bubble?.(currentTurn(state)) ?? hintOf(run);
+        onCanvas(() => drawSpeech(ctx, said ? [said.text] : lines, places.speech));
       }
       drawHud(state);
       if (state.phase === 'playing') drawParticles();

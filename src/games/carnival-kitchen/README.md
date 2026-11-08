@@ -20,7 +20,9 @@ switches between the two. On a computer the game stays in the page as before.
 
 Tap **Tap to cook!** on the title screen. There's nothing to choose: the dish
 waits under a lid with a "?" on it, and the kitchen picks it when you tap.
-The speaker button in the corner turns sound and the voice off and on.
+The speaker button in the corner turns sound and the voice off and on. The
+small gear in the bottom corner, "Hold for grown-ups", opens the grown-ups'
+settings when it's held for 1.5 seconds (see "Learning" below).
 
 A round goes like this:
 
@@ -33,8 +35,11 @@ A round goes like this:
    skips the rest of the wait, and taps before that do nothing. A dish picked
    from the recipe book skips the spinner.
 3. **The steps**, one card at a time. A ribbon on the first card says what
-   we're making, a card names each step, a voice reads it out, and Chef
-   Bunny's speech bubble keeps the hint on screen.
+   we're making, a card names each step with its number and how many
+   minutes it takes ("Step 1 of 4 · ⏰ 5 min"), a voice reads it out, and Chef
+   Bunny's speech bubble keeps the hint on screen. With learning on, one
+   learning moment is woven in, such as an order ticket to read first and a
+   counting question after the toppings (see "Learning").
 4. **Decorate your dish!** The finished dish sits on a cloth with a tray of six
    treats: sprinkles, a cherry, a heart, a star, a flower and a little flag.
    Drag a treat onto the dish, or tap a treat and then tap the dish to add as
@@ -46,7 +51,9 @@ A round goes like this:
    treats fit on a dish; another one replaces the oldest. Decorations start
    fresh every round.
 5. **The end card**: the dish with its decorations, the stars, Chef Bunny's
-   verdict and the points. If the dish earned its first sticker, or more stars
+   verdict, when you started and finished ("You started at 4:00 and finished
+   at 4:35!", on two little clocks, and said out loud) and the points. A
+   learning moment answered on her own adds a **Smart Chef** badge. If the dish earned its first sticker, or more stars
    than its sticker had, a badge says **New sticker!** or **Sticker
    upgraded!** after the stars, and Chef Bunny says so too. After a short
    pause, tap **Cook again!** for another dish, never the same one twice in a
@@ -66,7 +73,8 @@ Every finished round earns its dish's sticker at the round's stars (1 to 3).
 A sticker only ever keeps its best stars. The recipe book, from the title
 screen's **📖 Recipes** button, shows all the dishes in a grid with a count
 such as "7 of 16 dishes": each cooked dish with its picture, name and best
-stars, and the rest under a little lid with a "?". Tap a cooked dish to cook
+stars, and the rest under a little lid with a "?". A dish whose learning moment was answered on her
+own also has a purple Smart Chef star (🎓) in its corner. Tap a cooked dish to cook
 it again; tap anywhere else, or the ✕, to go back to the title screen. The
 grid picks as many columns as make the dishes biggest, so it fits a computer,
 a phone held sideways and a phone held upright. Stickers are kept by the
@@ -200,12 +208,18 @@ shows in her bubble.
   one step to the next. Circles, grating, rolling and tossing neither add to
   it nor break it.
 
+- **Learning moments never cost points.** Learning steps (a ticket, a
+  question) aren't part of the cooking score or the stars: the stars go by
+  the cooking steps only. A learning question answered right on her own
+  (first or second try) adds a 10 point bonus (`SMART_BONUS`); after Chef
+  Bunny has shown the answer, it adds nothing, and takes nothing away.
+
 The score in the corner counts up as you earn points. Your final score is the
 step points plus the combo bonus, and it's saved to the carnival's score board
 once, when the round ends (before decorating, which doesn't change it), along
-with the dish's sticker. Dishes have three to five steps, so stars and Chef
-Bunny's verdict go by your share of what the dish could score (100 a step,
-before bonuses):
+with the dish's sticker. Dishes have three to five cooking steps, so stars and Chef
+Bunny's verdict go by your share of what the dish could score (100 a cooking
+step, before bonuses):
 
 | Share of the most | Stars | Verdict                |
 | ----------------- | ----- | ---------------------- |
@@ -215,17 +229,213 @@ before bonuses):
 | 33% to 49%        | 1     | Yummy!                 |
 | Under 33%         | 1     | Good cooking!          |
 
+## Learning
+
+Carnival Kitchen is made for a young cook in 2nd grade, so it weaves a little
+math and reading into the cooking, and keeps real time and real amounts on
+screen all the time.
+
+### Always there: the kitchen clock and real amounts
+
+- **The kitchen clock.** An analog clock with the numbers 1 to 12, a tick for
+  every minute, a short hour hand and a long minute hand hangs in the kitchen
+  in every layout: on the wall at the right on a computer, beside the cooking
+  on a wide screen, and big in the drawers below Chef Bunny on a phone held
+  upright. Each round starts at a real afternoon time (2:00 to 5:30; on the
+  hour or half hour at Level 1, any 5 minutes at Level 2) and each step takes
+  real minutes. When a step is done, the minute hand sweeps on to the new
+  time with a tick every 5 minutes, and the clock grows a little while it
+  moves, so she can watch the time go by. The end card says when she started
+  and finished. It's always on, whatever the settings: it only shows things
+  as they are, it asks nothing.
+- **Minutes per step.** Every recipe step can say `minutes`; left out, it's
+  the kind's usual (`DEFAULT_MINUTES` in `kit/clock.ts`): chop 5, crack 2,
+  pour 2, mix 5, stir 10, season 1, sauce 3, top 5, bake 15, flip 5, grate 3,
+  toss 5, blend 2, scoop 3, stack 3, roll 5. Learning steps take none. Give a
+  dish its real times where a real recipe has them, such as
+  `{ kind: 'bake', item: 'cookies', minutes: 10 }`.
+- **Real amounts.** The meter shows a real amount under it: the pour's ("1
+  cup", "½ cup"), the shake's ("¼ teaspoon"), and the bake's time ("15
+  minutes"). An ingredient says its usual amount for one pour or shake with
+  `amount`; a recipe can say its own with `amounts` on a pour (one per pour)
+  or `amount` on a season step. Use cups for flour, milk and water,
+  tablespoons and teaspoons for small things.
+
+### The grown-ups' settings
+
+Hold the gear on the title screen for 1.5 seconds (a ring fills round it)
+and a page for grown-ups opens. A quick tap does nothing, so a young cook
+doesn't wander in.
+
+| Setting        | Choices          | Default | What it does                                                                                                  |
+| -------------- | ---------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| Learning       | On, Off          | On      | One learning moment (math or reading) woven into each round. Off: just cooking.                               |
+| Level          | Level 1, Level 2 | Level 1 | Level 1 is early 2nd grade, Level 2 late 2nd grade: bigger numbers, harder words.                             |
+| Read it myself | On, Off          | Off     | Cards and questions show their words and wait; the voice only reads when 🔊 is tapped, lighting up each word. |
+
+They're saved with the carnival's shared preferences (`savePreference`), so
+they're remembered between visits. `grownups.ts` has the page's layout and
+hit testing as plain functions, tested in `grownups.test.ts`.
+
+**Read it myself.** Step cards grow to show the hint too and stay up for 6
+seconds (a tap on the card after a moment moves on), with a 🔊 button: tap it
+and the voice reads the card, each word lighting up as it's said (and the
+card waits until it's done). Questions and tickets show their words with a
+🔊 too, and nothing reads itself. With it off, everything is read out as
+before, and questions light up their words as they're read too. Chef Bunny's
+cheers and the end card still speak.
+
+### A learning moment
+
+With learning on, each round gets at most one learning moment: one of the
+activities that fit the dish, picked at random, but never the same one as
+last round when another one fits. A dish nothing fits is just cooked.
+Nothing can be failed:
+
+- A wrong answer greys out, Chef Bunny gives an encouraging face and a hint
+  ("Point and count them one by one!"), and she tries again.
+- After two wrong tries Chef Bunny shows the answer: it glows, she says how
+  to get it ("Let's count: one, two, three. Three!"), and a tap on it carries
+  on.
+- A right answer gets sparkles, a cheer and "Yes! +10".
+- A round whose every question was answered on her own earns the dish's
+  **Smart Chef** star (the sticker `smart:<dish id>`, kept by `earnSticker`),
+  shown on the end card and in the recipe book.
+
+**Order tickets** (`activities/ticket.ts`: reading and counting) fit dishes
+with toppings you can count, and the burger. The round starts with a
+customer's ticket: "One pizza with 2 olives and 3 mushrooms, please!". She
+reads it (Level 1 reads itself out straight away; Level 2 waits 4 seconds
+first, so she gets the first go; 🔊 reads it any time) and taps **Let's
+cook!**. The toppings (or the burger's layers) are then exactly what the
+ticket says, one piece each so they can be counted, with the ticket's note
+pinned up at the right ticking each line off. Right after comes a counting
+question with a picture of what she made: "How many toppings did you put
+on?", or "You put on 5 toppings. Add 2 more. How many is that?".
+
+| Level | Ticket                                                            | Question                                   |
+| ----- | ----------------------------------------------------------------- | ------------------------------------------ |
+| 1     | Digits, one or two kinds, 2 to 5 things                           | Count them, or add 1 to 3 more (within 10) |
+| 2     | Number words, two or three kinds, up to 7, and "No tomatoes!" too | Add 3 to 9 more (within 20)                |
+
+Anything chopped earlier is always on the ticket (the pizza's pepperoni), and
+a burger always has one or two patties.
+
+### How it's built
+
+| Piece                   | What it is                                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `activities/`           | One file per activity, default export an `Activity`; `activities/index.ts` finds them and has `planRound`.      |
+| `kit/learn.ts`          | Settings (`settingsFrom`, `DEFAULT_SETTINGS`), `Activity`, `RoundPlan`, answering (`answer`), `smartChef`.      |
+| `kit/quiz.ts`           | The quiz mini-game: a question with answer buttons, and its drawing, voice and Chef Bunny reactions.            |
+| `kit/words.ts`          | Reading: `wordsOf`, `numberWord`, `fitWords`, `drawWords` (with the word being read lit up), `drawSpeaker`.     |
+| `kit/clock.ts`          | Kitchen time: `stepMinutes`, `roundTime`, `startTime`, `drawClock`, and the maths for dragging a clock's hands. |
+| `kit/order.ts`          | Order tickets: `Order`, `drawOrderNote`.                                                                        |
+| `steps/ask.ts`          | A question step with a picture of the step before. Most activities use it as is.                                |
+| `steps/ticket.ts`       | The order ticket step.                                                                                          |
+| `sound.ts` `read(text)` | Reads out loud like `say`, and follows the word being said (or times it), for lighting words up.                |
+
+A round's steps can include **learning steps** (a `Step` with
+`learning: true`): they're not in the recipe along the top, their card says
+"🎓 Smart Chef!" instead of a step number, and they score nothing toward the
+stars. `createState(dish, random, plan)` takes the plan from `planRound`;
+without one it's the dish's own recipe with learning off, so tests and old
+code work as before. `state.learn` has the settings, the activity and the
+answers so far; `state.start` is the clock's start time.
+
+### Adding a learning activity
+
+An activity is one new file, `activities/<id>.ts`, and usually that's all.
+
+1. **Decide where it goes.** Most activities are a question at the right
+   moment, as an `ask` step inserted in the recipe; some change an existing
+   step's options too (the ticket changes the top step's toppings); a few
+   need a step of their own (setting a clock by dragging its hands, paying
+   with coins).
+2. **Write the activity:**
+
+   ```ts
+   import { nearChoices, type Activity } from '../kit';
+   import type { AskOptions } from '../steps/ask';
+
+   const trays: Activity = {
+     id: 'trays', // the file name
+     name: 'Tray arrays',
+     skills: ['math'],
+     fits: (dish) => dish.steps.some((s) => s.kind === 'bake' && s.item === 'cupcake-tray'),
+     weave({ dish, level, random, start }) {
+       const rows = level === 1 ? 2 : 3;
+       const cols = 2 + (Math.floor(random() * 3) % 3);
+       const { choices, index } = nearChoices(rows * cols, random, 1);
+       const ask: AskOptions = {
+         kind: 'ask',
+         title: 'Count the cupcakes!',
+         icon: '🧁',
+         question: {
+           text: `${rows} rows of ${cols}. How many cupcakes?`,
+           choices: choices.map(String),
+           answer: index,
+           hint: ['Count one row,', 'then the next!'],
+           help: `${rows} rows of ${cols} makes ${rows * cols}!`,
+         },
+       };
+       const i = dish.steps.findIndex((s) => s.kind === 'bake');
+       return [...dish.steps.slice(0, i + 1), ask, ...dish.steps.slice(i + 1)];
+     },
+   };
+   export default trays;
+   ```
+
+   `weave` gets the dish, the level, `random` (roll everything with it, so
+   tests repeat) and the clock's start time (`timeAtStep(steps, start, i)`
+   says what the clock shows at step i). It returns the round's steps: new
+   objects, never the dish's own changed.
+
+3. **The question** (`Question` in `kit/quiz.ts`): `text` (read out and lit
+   up), 2 to 4 short `choices` with the `answer`'s index, a two-line `hint`
+   for after a wrong try, and the `help` Chef Bunny says when she shows it.
+   `layout: 'row'` puts the answers in a row under the question instead of
+   beside a picture (for words, such as "Tap the CHEESE"). An `ask` step's
+   picture is the step before it, as it was left; `picture: 'none'` leaves
+   it out, and `tag` puts a sticker on it ("+5 🍄").
+4. **A step of its own**, when a question isn't enough: a step file with
+   `learning: true`, a `solve(turn)` that does what someone who knows would
+   do (tests use it), and the shared rules: keep an `AnswerState` in its
+   state and call `answer(round, state, correct)`, which returns 'right',
+   'try again' or 'show'. Use `autoReadDelay(settings, pause)` for when to
+   read itself out, `sound.read` and `drawWords` for lit-up words,
+   `drawSpeaker` for its 🔊, and `effects.celebrate` to make Chef Bunny
+   cheer (a 'Perfect!' feedback) or encourage ('Nice try!'). `steps/ask.ts`
+   and `kit/quiz.ts` show all of it. Scene space for questions: the bubble
+   at `QUIZ_BUBBLE`, a picture at `QUIZ_PICTURE`, the answers right of it:
+   clear of Chef Bunny and the HUD in every layout.
+5. **Time activities** build on `drawClock(g, x, y, r, time, { glow })`
+   (any size) and the plain maths in `kit/clock.ts`: `angleAt` (a drag to an
+   angle), `minuteFromAngle(angle, 5)` (snapped), `hourFromAngle`,
+   `withMinuteHand` and `withHourHand` (setting a time hand by hand),
+   `clockText` ("4:05") and `timeAtStep`.
+6. **Run `npm run check`.** `activities/activities.test.ts` weaves every
+   activity into every dish it fits, at both levels, checks the same seed
+   weaves the same round, cooks it to the end and draws every frame in all
+   three layouts. Add `activities/<id>.test.ts` for the activity's own
+   rules (its numbers stay within the level, the answer is right).
+
+Like dishes, a new activity needs no change anywhere else, so several can be
+added at once. Say in the pull request what this section should gain (a
+paragraph like "Order tickets" above), and it's added once they're all in.
+
 ## How it's built
 
 A round cooks a **dish**. A dish is a list of **steps** (chop, stir, bake...),
 and each step says which **ingredients** it uses. Each of the three is a
 folder with one file per thing, found automatically:
 
-| Folder         | One file per | Default export | Found by               |
-| -------------- | ------------ | -------------- | ---------------------- |
-| `dishes/`      | dish         | `Dish`         | `dishes/index.ts`      |
-| `steps/`       | kind of step | `Step`         | `steps/index.ts`       |
-| `ingredients/` | ingredient   | `Ingredient`   | `ingredients/index.ts` |
+| Folder         | One file per      | Default export | Found by               |
+| -------------- | ----------------- | -------------- | ---------------------- |
+| `dishes/`      | dish              | `Dish`         | `dishes/index.ts`      |
+| `steps/`       | kind of step      | `Step`         | `steps/index.ts`       |
+| `ingredients/` | ingredient        | `Ingredient`   | `ingredients/index.ts` |
+| `activities/`  | learning activity | `Activity`     | `activities/index.ts`  |
 
 The file name is the id: `steps/chop.ts` has the kind `'chop'`,
 `ingredients/tomato-sauce.ts` has the id `'tomato-sauce'`. Nothing lists them
@@ -314,6 +524,11 @@ The details:
    | `stack`  | `base` (stackBase), `layers`: ids (stack), bottom first                                                                                     | Stack it up!                |
    | `roll`   | `how`: 'dough' or 'mat', `item` (rollOut or rollUp)                                                                                         | Roll out / Roll the `item`! |
 
+   Every step can also take `minutes` (on the kitchen clock), a pour
+   `amounts` (one per pour: "1 cup") and a season step `amount` ("¼
+   teaspoon"): see "Learning". The learning steps `ticket` and `ask` are
+   woven in by activities, not written in recipes.
+
    In brackets is the art role each ingredient must have (see "Adding an
    ingredient"). The ones there today:
 
@@ -379,6 +594,7 @@ const sprinkles: Ingredient = {
   label: 'sprinkles', // in titles: "Chop the carrot!"
   plural: 'sprinkles', // optional; label + 's' if left out: "Crack the eggs!"
   icon: '🌈', // its emoji, for the card and the recipe along the top
+  // amount: '1 cup', // optional: a real amount for one pour or shake, under the meter
   colors: [C.hotPink, C.sky], // crumbs, splashes and sparkles; at least one
   topping: { draw(g) { ... }, faceY: 0 }, // one object per role
 };
@@ -492,6 +708,9 @@ The `Step` interface (`kit/types.ts`; `O` options, `S` state, `F` effect memory)
 | `fx?()`                          | Fresh memory for effects (when the last chop was, an egg still falling).                                  |
 | `observe?(view)`                 | Each frame, from the step's start to the end of the round: play sounds and throw sparkles on changes.     |
 | `draw(view)`                     | Draws the step on the scene.                                                                              |
+| `learning?`                      | A learning step (a ticket, a question): see "Learning".                                                   |
+| `bubble?(turn)`                  | Chef Bunny's two lines right now, instead of the hint (after a wrong answer, say).                        |
+| `solve?(turn)`                   | For tests: does what someone who knows would do. Learning steps have one, for `playThrough`.              |
 
 The game only calls `press`, `move`, `release` and `update` while the step
 is being cooked and its card has gone. A `turn` is `{ round, options, state }`:
@@ -523,6 +742,7 @@ drawing. Each file says which step to copy.
 | Hold-meter (`kit/hold.ts`) | Hold to fill a meter, let go at the star; a full meter lets go by itself; too soon is "Not yet!".                        | `startHold(targets)`, `pressHold`, `releaseHold(turn, rules)`, `updateHold`, `holdProgress`, `drawMeter`, `POUR_RULES`, `TARGET_LOW`/`HIGH`, `GOLDEN` |
 | Float-tap (`kit/float.ts`) | Things drift left to right; tap when one is over its target x; too far is "Not yet!"; past the end it comes round again. | `startFloat`, `tapFloat(turn, targetX, count, rules)`, `updateFloat`, `floatProgress`, `drawGlowLane`, `drawFallArrows`                               |
 | Needle (`kit/needle.ts`)   | A heart swings along a gauge; tap in the gold; far off is "Not yet!".                                                    | `startNeedle`, `tapNeedle(turn, target, count, rules)`, `updateNeedle`, `drawGauge`                                                                   |
+| Quiz (`kit/quiz.ts`)       | A question with answer buttons; wrong greys out with a hint, two wrong shows it, right cheers then moves on.             | `startQuiz`, `pressQuiz`, `updateQuiz`, `quizBubble`, `solveQuiz`, `observeQuiz`, `drawQuiz`, `choiceBoxes`                                           |
 
 Their states (`CircleState`, `HoldState`, `FloatState`, `NeedleState`) can be
 extended with more fields, as `CrackState extends FloatState` adds `speeds`.
@@ -585,6 +805,9 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
   to 110); the score and streak top right (x 630 to 785, y 55 to 145); the
   progress stars at the bottom middle (y 465 to 500). The window and shelf
   are just the wall: draw over them if you need to.
+- **The kitchen clock** hangs at x 700 to 784, y 154 to 238 on a computer
+  (where the shelf would be); steps draw over it. The order note sits at x
+  606 to 694 from y 168.
 - **Phones held upright** ('tall') show only about x 100 to 700, with the
   recipe at the top of the scene (y 0 to 45, the streak at y 60 to 90) and
   Chef Bunny below it, so keep what matters between x 110 and 690 and below
@@ -604,8 +827,9 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
   the default export the midway finds.
 - `kit/`: what everything shares. `types.ts` (Dish, Step, Ingredient,
   KitchenState, StepView...), `rules.ts` (scoring and finishing),
-  `circles.ts`, `hold.ts`, `float.ts`, `needle.ts` (the mini-games) and
-  `scene.ts` (shared scene pieces). Import it from `'../kit'`.
+  `circles.ts`, `hold.ts`, `float.ts`, `needle.ts`, `quiz.ts` (the mini-games),
+  `scene.ts` (shared scene pieces), `learn.ts`, `words.ts`, `order.ts` (learning)
+  and `clock.ts` (kitchen time). Import it from `'../kit'`.
 - `steps/`: one file per kind of step (its rules, drawing, card and sounds),
   a test next to each, and `index.ts`, which finds them.
 - `ingredients/`: one file per ingredient (its art), and `index.ts`, which
@@ -632,6 +856,10 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
   dragging and letting go. `decorate.test.ts` tests it.
 - `book.ts`: the recipe book's count, grid and hit testing, and the title
   screen's book button. `book.test.ts` tests it.
+- `grownups.ts`: the grown-ups' settings: the gear, the page's layout and
+  hit testing, and loading and saving them. `grownups.test.ts` tests it.
+- `activities/`: one file per learning activity, and `index.ts`, which finds
+  them and plans each round (`planRound`). See "Learning".
 - `layout.ts`: how the canvas fits the screen (page, wide or tall), and
   where the 800×500 cooking scene sits on it. The game logic only ever sees
   scene coordinates. `layout.test.ts` tests it.

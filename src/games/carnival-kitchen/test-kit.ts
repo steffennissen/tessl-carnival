@@ -6,6 +6,7 @@ import {
   CIRCLE,
   POUR_SPEED,
   currentRun,
+  currentTurn,
   type Dish,
   type Effects,
   type HoldState,
@@ -13,7 +14,7 @@ import {
   type StepRun,
   type StepView,
 } from './kit';
-import type { Sound } from './sound';
+import type { Reading, Sound } from './sound';
 import { stepOf } from './steps';
 
 /**
@@ -90,6 +91,15 @@ export function playThrough(state: KitchenState, each: (dt: number) => void = ()
       each(1 / 60);
       continue;
     }
+    // A learning step (a question, a ticket): answer it as someone who knows.
+    const step = stepOf(currentRun(state).kind);
+    if (step.learning && step.solve) {
+      tick(state, 0.5);
+      each(0.5);
+      step.solve(currentTurn(state));
+      each(1 / 60);
+      continue;
+    }
     press(state, 480, 275);
     each(1 / 60);
     circleTurnsOf(state, 1);
@@ -132,9 +142,13 @@ export function fakeCanvas(): G {
   });
 }
 
+/** Words read out by `quiet`: done straight away. */
+const READ: Reading = { count: 0, word: () => -1, done: () => true };
+
 /** Sounds that do nothing. */
 export const quiet = new Proxy({} as Sound, {
-  get: (_target, prop) => (prop === 'muted' ? false : () => undefined),
+  get: (_target, prop) =>
+    prop === 'muted' ? false : prop === 'read' ? () => READ : () => undefined,
 });
 
 /** Effects that do nothing, counting what was asked for. */
