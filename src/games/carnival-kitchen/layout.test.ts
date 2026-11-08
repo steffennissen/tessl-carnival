@@ -4,6 +4,8 @@ import {
   SCENE,
   TALL_MIN_HEIGHT,
   TALL_WIDTH,
+  fillsScreen,
+  isTouchDevice,
   layoutFor,
   sameLayout,
   toScene,
@@ -75,6 +77,32 @@ describe('layoutFor', () => {
 
   it('falls back to the page for a screen with no size', () => {
     expect(layoutFor(0, 0, true).shape).toBe('page');
+  });
+});
+
+describe('fillsScreen', () => {
+  const device = { coarse: false, touchPoints: 0, platform: 'MacIntel', viewWidth: 1280 };
+
+  it('stays in the page on a computer', () => {
+    expect(fillsScreen(device)).toBe(false);
+    expect(fillsScreen({ ...device, platform: 'Win32', touchPoints: 10 })).toBe(false);
+  });
+
+  it('fills the screen on phones and tablets', () => {
+    expect(fillsScreen({ ...device, coarse: true, platform: 'iPhone', touchPoints: 5 })).toBe(true);
+    expect(fillsScreen({ ...device, coarse: true, platform: 'Linux armv8l', touchPoints: 5 })).toBe(
+      true,
+    );
+  });
+
+  it('knows an iPad that says it is a Mac, even with a trackpad attached', () => {
+    expect(fillsScreen({ ...device, touchPoints: 5 })).toBe(true);
+  });
+
+  it('fills a narrow window, which is still not a touch device', () => {
+    expect(fillsScreen({ ...device, viewWidth: 500 })).toBe(true);
+    expect(isTouchDevice({ ...device, viewWidth: 500 })).toBe(false);
+    expect(isTouchDevice({ ...device, touchPoints: 5 })).toBe(true);
   });
 });
 

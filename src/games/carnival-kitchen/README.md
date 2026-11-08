@@ -9,8 +9,14 @@ voice reads each step out loud for cooks who can't read yet.
 
 ## Phones and tablets
 
-On a phone or tablet (a device whose main input is a finger), or in a window
-narrower than 600 px, the kitchen fills the whole screen, and a 🏠 button next to the speaker goes back to the midway.
+On a phone or tablet (a device whose main input is a finger, or an iPad,
+even with a keyboard or trackpad attached), or in a window narrower than
+600 px, the kitchen fills the whole screen, and a 🏠 button next to the
+speaker goes back to the midway. On a phone or tablet the first tap also
+asks the browser for real full screen, hiding its bars where it allows that
+(an iPad or an Android phone; an iPhone keeps its bars). If she leaves full
+screen, it isn't asked for again until the game starts again, and leaving the
+game leaves full screen.
 Held upright, it turns tall: the score and recipe sit on top, the cooking in
 the middle and Chef Bunny below with bigger hint text. Held sideways, the
 kitchen stretches to fill the screen around the cooking. Turning the device

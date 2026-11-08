@@ -38,7 +38,7 @@ import {
   type Pointer,
   type RoundPlan,
 } from './kit';
-import { NARROW, layoutFor, sameLayout, toScene, type Shape } from './layout';
+import { fillsScreen, isTouchDevice, layoutFor, sameLayout, toScene, type Shape } from './layout';
 import { createRenderer } from './render';
 import { createSound } from './sound';
 import { stepOf } from './steps';
@@ -244,12 +244,48 @@ export const carnivalKitchen: CarnivalGame = {
     canvas.addEventListener('contextmenu', noMenu);
     const touchScreen = window.matchMedia('(pointer: coarse)');
 
+    /** What the browser says about this device, for the layout. */
+    const device = () => ({
+      coarse: touchScreen.matches,
+      touchPoints: navigator.maxTouchPoints || 0,
+      platform: navigator.platform || '',
+      viewWidth: window.innerWidth,
+    });
+
+    // On a phone or tablet the first tap also asks for real full screen,
+    // hiding the browser's bars, where the browser allows it (an iPad or an
+    // Android phone does; an iPhone doesn't, and the canvas just fills the
+    // page). Asked once; if she leaves full screen it isn't asked again. Left
+    // when the game stops.
+    let askedFullScreen = false;
+    const page = document.documentElement;
+    const enterFullScreen = () => {
+      if (askedFullScreen || document.fullscreenElement || !isTouchDevice(device())) return;
+      askedFullScreen = true;
+      const ask =
+        page.requestFullscreen?.bind(page) ??
+        (
+          page as { webkitRequestFullscreen?: () => Promise<void> | void }
+        ).webkitRequestFullscreen?.bind(page);
+      try {
+        const asked = ask?.();
+        if (asked instanceof Promise) asked.catch(() => undefined);
+      } catch {
+        // Not allowed here: the canvas still fills the page.
+      }
+    };
+    const leaveFullScreen = () => {
+      if (askedFullScreen && document.fullscreenElement) {
+        document.exitFullscreen().catch(() => undefined);
+      }
+    };
+
     let layout = layoutFor(0, 0, false);
     /** Sizes the canvas for the screen as it is now: shape, then sharpness. */
     const fit = () => {
       const viewWidth = window.innerWidth;
       const viewHeight = window.innerHeight;
-      const full = touchScreen.matches || viewWidth < NARROW;
+      const full = fillsScreen(device());
       const next = layoutFor(viewWidth, viewHeight, full);
       if (full) {
         // As big as fits, in the middle. The layout already matches the
@@ -384,6 +420,7 @@ export const carnivalKitchen: CarnivalGame = {
       event.preventDefault();
       const at = track(event);
       sound.unlock();
+      enterFullScreen();
       if (screen === 'book') {
         tapBook(at.x, at.y);
         return;
@@ -533,6 +570,7 @@ export const carnivalKitchen: CarnivalGame = {
 
     return () => {
       cancelAnimationFrame(frame);
+      leaveFullScreen();
       sound.close();
       canvas.style.cssText = canvasStyle;
       document.body.style.overflow = bodyOverflow;

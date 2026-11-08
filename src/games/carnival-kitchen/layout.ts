@@ -29,6 +29,33 @@ export const NARROW = 600;
 
 export type Shape = 'page' | 'wide' | 'tall';
 
+/** What the browser says about the device, for `fillsScreen`. */
+export interface Device {
+  /** Whether the main pointer is a finger: `(pointer: coarse)`. */
+  coarse: boolean;
+  /** `navigator.maxTouchPoints`. */
+  touchPoints: number;
+  /** `navigator.platform`, such as 'MacIntel' or 'iPhone'. */
+  platform: string;
+  /** The window's width, in CSS pixels. */
+  viewWidth: number;
+}
+
+/**
+ * Whether it's a phone or tablet. An iPad says it's a Mac, and with a
+ * keyboard or trackpad attached its main pointer isn't a finger, so it's
+ * known by being a "Mac" with a touch screen.
+ */
+export function isTouchDevice(device: Device): boolean {
+  const iPad = device.platform === 'MacIntel' && device.touchPoints > 1;
+  return device.coarse || iPad;
+}
+
+/** Whether the game fills the screen: on phones and tablets, and in a narrow window. */
+export function fillsScreen(device: Device): boolean {
+  return isTouchDevice(device) || device.viewWidth < NARROW;
+}
+
 export interface Layout {
   shape: Shape;
   /** The canvas size, in canvas units. */
