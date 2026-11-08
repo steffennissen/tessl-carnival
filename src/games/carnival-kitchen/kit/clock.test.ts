@@ -11,10 +11,14 @@ import {
   handAngles,
   hourFromAngle,
   minuteFromAngle,
+  quarterWords,
+  sameClockTime,
+  sayTime,
   roundTime,
   startTime,
   stepMinutes,
   timeAtStep,
+  turnMinuteHand,
   withHourHand,
   withMinuteHand,
 } from './clock';
@@ -92,5 +96,36 @@ describe('kitchen clock', () => {
     const g = fakeCanvas();
     for (const r of [12, 40, 120])
       drawClock(g, 100, 100, r, 995, { numbers: r > 20, glow: 'minute' });
+  });
+
+  it('turns the minute hand like a geared clock: past 12, the hour moves on', () => {
+    const at = (minute: number) => (minute / 60) * TAU;
+    expect(clockText(turnMinuteHand(15 * 60 + 50, at(5)))).toBe('4:05');
+    expect(clockText(turnMinuteHand(16 * 60 + 5, at(55)))).toBe('3:55');
+    expect(clockText(turnMinuteHand(15 * 60 + 10, at(30)))).toBe('3:30');
+    // Round and round from 12:00 to 2:30, five minutes at a time.
+    let time = 12 * 60;
+    for (let m = 5; m <= 150; m += 5) time = turnMinuteHand(time, at(m % 60));
+    expect(clockText(time)).toBe('2:30');
+  });
+
+  it('says times the way people do', () => {
+    expect(sayTime(16 * 60)).toBe("four o'clock");
+    expect(sayTime(16 * 60 + 5)).toBe('four oh five');
+    expect(sayTime(16 * 60 + 15)).toBe('four fifteen');
+    expect(sayTime(16 * 60 + 30)).toBe('four thirty');
+    expect(sayTime(16 * 60 + 45)).toBe('four forty-five');
+    expect(sayTime(12 * 60 + 50)).toBe('twelve fifty');
+    expect(quarterWords(16 * 60)).toBe("4 o'clock");
+    expect(quarterWords(16 * 60 + 15)).toBe('quarter past 4');
+    expect(quarterWords(16 * 60 + 30, true)).toBe('half past four');
+    expect(quarterWords(16 * 60 + 45)).toBe('quarter to 5');
+    expect(quarterWords(12 * 60 + 45)).toBe('quarter to 1');
+    expect(quarterWords(16 * 60 + 20)).toBeNull();
+  });
+
+  it('matches times on the face, morning or afternoon', () => {
+    expect(sameClockTime(16 * 60 + 30, 4 * 60 + 30)).toBe(true);
+    expect(sameClockTime(16 * 60 + 30, 16 * 60 + 35)).toBe(false);
   });
 });

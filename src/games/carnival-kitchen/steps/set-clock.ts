@@ -1,0 +1,371 @@
+import {
+  C,
+  CONFETTI,
+  circle,
+  clamp01,
+  easeOutBack,
+  emoji,
+  fillStroke,
+  rounded,
+  stickerText,
+  vertical,
+} from '../art';
+import {
+  QUIZ_BUBBLE,
+  QUIZ_OUTRO,
+  QUIZ_SPEAKER,
+  SMART_BONUS,
+  angleAt,
+  answer,
+  autoReadDelay,
+  clockText,
+  drawClock,
+  drawQuestion,
+  finishStep,
+  handAngles,
+  inCircle,
+  sameClockTime,
+  sayTime,
+  startAnswer,
+  turnMinuteHand,
+  withHourHand,
+  withMinuteHand,
+  type AnswerState,
+  type Box,
+  type Feedback,
+  type Step,
+  type StepBasics,
+  type Turn,
+} from '../kit';
+import type { Reading } from '../sound';
+
+/**
+ * Set the clock: "Set the clock to 4:30!" A big clock starts at 12:00; she
+ * drags its hands (any touch on the face grabs the nearer hand, and the
+ * minute hand snaps to the 5-minute marks), then taps Check!. With `geared`
+ * (Level 1) the hour hand turns along with the minute hand, as on a real
+ * clock; without it (Level 2) each hand is set on its own.
+ *
+ * The shared answer rules: a wrong check gets a hint about the hand that's
+ * off and another go; after two, Chef Bunny turns the hands to the time and
+ * Check! carries on. A learning step: no part of the cooking score.
+ */
+
+export interface SetClockOptions extends StepBasics {
+  kind: 'set-clock';
+  /** What she reads, and the voice reads out: "Set the clock to 4:30!" */
+  text: string;
+  /** The time to set (minutes since midnight); am or pm doesn't matter on a clock. */
+  target: number;
+  /** The hour hand turns with the minute hand, like a real clock (Level 1). */
+  geared: boolean;
+  /** What Chef Bunny says when she shows it. */
+  help: string;
+  /** Where the hands start: 12:00 if left out. */
+  from?: number;
+}
+
+declare module '../kit/types' {
+  interface StepKinds {
+    'set-clock': SetClockOptions;
+  }
+}
+
+/** The big clock and the Check! button, in scene units. Clear of Chef Bunny and the HUD. */
+export const SET_CLOCK = { x: 340, y: 354, r: 104 } as const;
+export const CHECK: Box = { x: 482, y: 296, w: 200, h: 104 };
+
+/** Which hand a touch is off: for the hint. */
+export type HandOff = 'hour' | 'minute' | 'both';
+
+export interface SetClockState extends AnswerState {
+  /** What the clock shows now. */
+  time: number;
+  /** The hand being dragged. */
+  holding: 'hour' | 'minute' | null;
+  /** Whether she has moved a hand yet (the pointing finger goes away). */
+  moved: boolean;
+  /** Which hand was off at the last wrong check. */
+  off: HandOff | null;
+  /** Checked right. */
+  done: boolean;
+  reads: number;
+  age: number;
+  after: number;
+}
+
+export function startSetClock(o: SetClockOptions): SetClockState {
+  return {
+    ...startAnswer(),
+    time: o.from ?? 12 * 60,
+    holding: null,
+    moved: false,
+    off: null,
+    done: false,
+    reads: 0,
+    age: 0,
+    after: 0,
+  };
+}
+
+/** How far apart two angles are, 0 to π. */
+function apart(a: number, b: number): number {
+  const d = Math.abs(a - b) % (Math.PI * 2);
+  return d > Math.PI ? Math.PI * 2 - d : d;
+}
+
+/**
+ * The hand a touch at (x, y) grabs, or null off the clock. Near a hand's
+ * line, that hand (both near: the outer part of the face is the minute
+ * hand's); anywhere else on the face, the outer ring is the minute hand's
+ * and the middle the hour hand's.
+ */
+export function grabHand(time: number, x: number, y: number): 'hour' | 'minute' | null {
+  const { x: cx, y: cy, r } = SET_CLOCK;
+  const d = Math.hypot(x - cx, y - cy);
+  if (d > r * 1.25) return null;
+  const angle = angleAt(cx, cy, x, y);
+  const hands = handAngles(time);
+  const nearHour = apart(angle, hands.hour) < 0.45;
+  const nearMinute = apart(angle, hands.minute) < 0.45;
+  if (nearHour !== nearMinute) return nearHour ? 'hour' : 'minute';
+  return d >= r * 0.6 ? 'minute' : 'hour';
+}
+
+/** Which hand is off from the target, or null if the clock shows it. */
+export function handOff(time: number, target: number): HandOff | null {
+  if (sameClockTime(time, target)) return null;
+  const minuteOff = ((time % 60) + 60) % 60 !== ((target % 60) + 60) % 60;
+  const hourOff = !sameClockTime(time - (time % 60), target - (target % 60));
+  if (minuteOff && hourOff) return 'both';
+  return minuteOff ? 'minute' : 'hour';
+}
+
+const inBox = (b: Box, x: number, y: number) =>
+  x >= b.x - 8 && x <= b.x + b.w + 8 && y >= b.y - 8 && y <= b.y + b.h + 8;
+
+/** Turns the held hand to point at (x, y). */
+function turnHand(turn: Turn<SetClockOptions, SetClockState>, x: number, y: number) {
+  const s = turn.state;
+  if (!s.holding) return;
+  const angle = angleAt(SET_CLOCK.x, SET_CLOCK.y, x, y);
+  if (s.holding === 'hour') s.time = withHourHand(s.time, angle);
+  else s.time = turn.options.geared ? turnMinuteHand(s.time, angle) : withMinuteHand(s.time, angle);
+  s.moved = true;
+}
+
+export function pressSetClock(
+  turn: Turn<SetClockOptions, SetClockState>,
+  x: number,
+  y: number,
+): boolean {
+  const s = turn.state;
+  if (s.done) return true;
+  if (inCircle(QUIZ_SPEAKER.x, QUIZ_SPEAKER.y, QUIZ_SPEAKER.r, x, y)) {
+    s.reads += 1;
+    return true;
+  }
+  if (inBox(CHECK, x, y)) {
+    const off = handOff(s.time, turn.options.target);
+    const result = answer(turn.round, s, off === null);
+    if (result === 'right') s.done = true;
+    else {
+      s.off = off;
+      // Chef Bunny shows it: the hands turn to the time, and Check! carries on.
+      if (result === 'show') s.time = turn.options.target;
+    }
+    return true;
+  }
+  // Once she's been shown the time, the hands stay put.
+  if (s.shown) return true;
+  s.holding = grabHand(s.time, x, y);
+  turnHand(turn, x, y);
+  return true;
+}
+
+interface SetClockFx {
+  reading: Reading | null;
+  reads: number;
+  autoRead: boolean;
+  wrong: number;
+  shown: boolean;
+  done: boolean;
+  /** The time the hands show while sweeping round to the answer. */
+  shownTime: number | null;
+  /** The time last frame, for the ticks. */
+  time: number | null;
+}
+
+const CHEER: Feedback = { grade: 'Perfect!', points: 0, combo: 0, age: 0 };
+const ENCOURAGE: Feedback = { grade: 'Nice try!', points: 0, combo: 0, age: 0 };
+
+const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
+  kind: 'set-clock',
+  learning: true,
+  uses: () => [],
+  start: (o) => startSetClock(o),
+  title: () => 'Set the clock!',
+  hint: () => ['Drag the hands,', 'then tap Check!'],
+  icon: () => '⏰',
+  progress: ({ state }) => [1, state.done ? 1 : 0],
+  press: (turn, x, y) => pressSetClock(turn, x, y),
+  move: (turn, x, y) => turnHand(turn, x, y),
+  release(turn) {
+    turn.state.holding = null;
+    return null;
+  },
+  update(turn, dt) {
+    const s = turn.state;
+    s.age += dt;
+    if (!s.done) return;
+    s.after += dt;
+    if (s.after >= QUIZ_OUTRO) finishStep(turn.round, 0);
+  },
+  bubble({ state: s, options }) {
+    const target = clockText(options.target);
+    if (s.done)
+      return s.outcome === 'right'
+        ? ['Yes! You are', 'a Smart Chef!']
+        : ['Yes, that is', `${target}!`];
+    if (s.shown) return [`That's ${target}!`, 'Tap Check!'];
+    if (s.off === 'minute') return ['The long hand', 'shows the minutes!'];
+    if (s.off === 'hour') return ['The short hand', 'shows the hour!'];
+    if (s.off === 'both') return ['Long hand: minutes.', 'Short hand: the hour.'];
+    return null;
+  },
+  solve(turn) {
+    turn.state.time = turn.options.target;
+    pressSetClock(turn, CHECK.x + CHECK.w / 2, CHECK.y + CHECK.h / 2);
+    setClock.update?.(turn, QUIZ_OUTRO);
+  },
+
+  fx: () => ({
+    reading: null,
+    reads: 0,
+    autoRead: false,
+    wrong: 0,
+    shown: false,
+    done: false,
+    shownTime: null,
+    time: null,
+  }),
+
+  observe({ state: s, options, fx, effects, round, taking, dt }) {
+    const { sound } = effects;
+    const settings = round.learn.settings;
+    const delay = autoReadDelay(settings);
+    if (taking && !fx.autoRead && delay !== null && s.age >= delay && !s.done) {
+      fx.autoRead = true;
+      fx.reading = sound.read(options.text);
+    }
+    if (s.reads > fx.reads) {
+      fx.reads = s.reads;
+      fx.autoRead = true;
+      fx.reading = sound.read(options.text);
+    }
+    // A soft tick for every 5 minutes the hands are turned.
+    if (fx.time !== null && fx.time !== s.time && !s.shown) sound.tick(1.3);
+    fx.time = s.time;
+    // The hands sweep round to the time when Chef Bunny shows it.
+    if (fx.shownTime === null) fx.shownTime = s.time;
+    if (s.shown) {
+      const gap = s.time - fx.shownTime;
+      fx.shownTime +=
+        Math.sign(gap) * Math.min(Math.abs(gap), dt * Math.max(60, Math.abs(gap) * 2));
+    } else fx.shownTime = s.time;
+    const middle = { x: CHECK.x + CHECK.w / 2, y: CHECK.y + CHECK.h / 2 };
+    if (s.wrong > fx.wrong && !s.shown) {
+      fx.wrong = s.wrong;
+      sound.boop();
+      effects.celebrate(middle.x, middle.y, ENCOURAGE);
+      const tip =
+        s.off === 'minute'
+          ? 'The long hand shows the minutes.'
+          : s.off === 'hour'
+            ? 'The short hand shows the hour.'
+            : 'The long hand shows the minutes, and the short hand shows the hour.';
+      if (!settings.readMyself) sound.say(`Not quite! ${tip} Try again!`);
+    }
+    if (s.shown && !fx.shown) {
+      fx.shown = true;
+      sound.chime([1046.5, 1318.5], 0.12, 0.12);
+      if (!settings.readMyself) sound.say(options.help);
+    }
+    if (s.done && !fx.done) {
+      fx.done = true;
+      sound.chime([1046.5, 1318.5, 1568, 2093], 0.07, 0.16);
+      effects.burst(SET_CLOCK.x, SET_CLOCK.y, 20, ['star', 'heart', 'star', 'dot'], CONFETTI, 280);
+      effects.celebrate(middle.x, middle.y, CHEER);
+      sound.say(`Yes! It's ${sayTime(options.target)}!`);
+    }
+  },
+
+  draw({ g, t, state: s, options, fx, taking }) {
+    if (!taking && s.age === 0) return;
+    const appear = easeOutBack(clamp01(s.age / 0.4));
+    g.save();
+    g.translate(450, 200);
+    g.scale(appear, appear);
+    g.translate(-450, -200);
+    drawQuestion(g, options.text, QUIZ_BUBBLE, QUIZ_SPEAKER, fx.reading, t);
+    g.restore();
+
+    // The clock, with big knobs on the hands' ends to grab.
+    const { x, y, r } = SET_CLOCK;
+    const time = s.shown ? (fx.shownTime ?? s.time) : s.time;
+    const pop = easeOutBack(clamp01((s.age - 0.1) / 0.4));
+    g.save();
+    g.translate(x, y);
+    g.scale(pop, pop);
+    g.translate(-x, -y);
+    drawClock(g, x, y, r, time, { t, glow: s.holding ?? (s.shown ? 'minute' : null) });
+    const hands = handAngles(time);
+    const knob = (angle: number, length: number, size: number, color: string, held: boolean) => {
+      const kx = x + Math.sin(angle) * length;
+      const ky = y - Math.cos(angle) * length;
+      circle(g, kx, ky, size * (held ? 1.25 : 1));
+      fillStroke(g, color, 3.5);
+      circle(g, kx - size * 0.3, ky - size * 0.3, size * 0.28);
+      g.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      g.fill();
+    };
+    knob(hands.hour, r * 0.45, 15, C.hotPink, s.holding === 'hour');
+    knob(hands.minute, r * 0.74, 13, C.purple, s.holding === 'minute');
+    g.restore();
+    if (taking && !s.moved && !s.shown) {
+      const bob = Math.sin(t * 5) * 6;
+      g.fillStyle = C.ink;
+      emoji(g, '👆', x + 22, y - r * 0.74 + 34 + bob, 40);
+    }
+
+    // Check!
+    const glow = s.shown && !s.done;
+    const press = s.done ? 1 + 0.1 * Math.sin(clamp01(s.after / 0.4) * Math.PI) : 1;
+    const b = CHECK;
+    g.save();
+    g.translate(b.x + b.w / 2, b.y + b.h / 2);
+    const throb = glow ? 1 + Math.sin(t * 6) * 0.05 : press;
+    g.scale(throb, throb);
+    if (glow) {
+      g.strokeStyle = C.gold;
+      g.lineWidth = 7;
+      rounded(g, -b.w / 2 - 7, -b.h / 2 - 7, b.w + 14, b.h + 14, 30);
+      g.stroke();
+    }
+    rounded(g, -b.w / 2, -b.h / 2, b.w, b.h, 26);
+    fillStroke(g, vertical(g, -b.h / 2, b.h / 2, [C.cabinetLight, C.mint]), 4);
+    stickerText(g, 'Check! ✔', 0, 2, 36, C.hotPink, 'center', b.w - 20);
+    g.restore();
+    if (s.done) {
+      const up = easeOutBack(clamp01(s.after / 0.35));
+      g.save();
+      g.translate(b.x + b.w / 2, b.y - 20);
+      g.scale(up, up);
+      g.rotate(-0.08);
+      stickerText(g, s.outcome === 'right' ? `Yes! +${SMART_BONUS}` : 'Yes!', 0, 0, 30, C.hotPink);
+      g.restore();
+    }
+  },
+};
+
+export default setClock;

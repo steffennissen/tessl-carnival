@@ -1,5 +1,6 @@
 import { C, type G, circle, fillStroke, font } from '../art';
 import type { KitchenState, Level, StepBasics } from './types';
+import { numberWord } from './words';
 
 /**
  * Kitchen time: the wall clock. Each round starts at a real afternoon time
@@ -196,4 +197,49 @@ export function drawClock(
   circle(g, 0, 0, Math.max(2, r * 0.07));
   fillStroke(g, C.hotPink, Math.max(1, r * 0.025));
   g.restore();
+}
+
+/**
+ * `time` with its minute hand turned to `angle`, snapped, the way a real
+ * geared clock does it: the hour hand goes along, so turning the minute hand
+ * past 12 moves on to the next hour (or back to the one before).
+ */
+export function turnMinuteHand(time: number, angle: number, snap = 5): number {
+  const at = Math.floor(time / 60) * 60 + minuteFromAngle(angle, snap);
+  return [at - 60, at, at + 60].reduce((best, t) =>
+    Math.abs(t - time) < Math.abs(best - time) ? t : best,
+  );
+}
+
+/** Whether two times look the same on a clock's face (4:30 am and pm alike). */
+export function sameClockTime(a: number, b: number): boolean {
+  return (((a - b) % 720) + 720) % 720 === 0;
+}
+
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty'];
+
+/** A time said out loud the way people say it: "four o'clock", "four oh five", "four thirty-five". */
+export function sayTime(time: number): string {
+  const hour = numberWord(clockHour(time));
+  const minute = ((time % 60) + 60) % 60;
+  if (minute === 0) return `${hour} o'clock`;
+  if (minute < 10) return `${hour} oh ${numberWord(minute)}`;
+  if (minute <= 20) return `${hour} ${numberWord(minute)}`;
+  const tens = TENS[Math.floor(minute / 10)];
+  return `${hour} ${minute % 10 ? `${tens}-${numberWord(minute % 10)}` : tens}`;
+}
+
+/**
+ * A time on the hour, half or quarter in words: "4 o'clock", "quarter past
+ * 4", "half past 4", "quarter to 5" (with `spoken`, "four" for "4"). Null
+ * for any other time.
+ */
+export function quarterWords(time: number, spoken = false): string | null {
+  const minute = ((time % 60) + 60) % 60;
+  const name = (t: number) => (spoken ? numberWord(clockHour(t)) : String(clockHour(t)));
+  if (minute === 0) return `${name(time)} o'clock`;
+  if (minute === 15) return `quarter past ${name(time)}`;
+  if (minute === 30) return `half past ${name(time)}`;
+  if (minute === 45) return `quarter to ${name(time + 60)}`;
+  return null;
 }

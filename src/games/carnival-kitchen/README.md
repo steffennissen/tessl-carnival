@@ -321,6 +321,54 @@ on?", or "You put on 5 toppings. Add 2 more. How many is that?".
 Anything chopped earlier is always on the ticket (the pizza's pepperoni), and
 a burger always has one or two patties.
 
+**Clock time** (`activities/clock-time.ts`: telling the time) fits every
+dish, and has `weight: 3`, so the planner picks it three times as often as
+an activity without a weight (it still never comes twice in a row). It uses
+the round's real kitchen time, and is one of:
+
+- **What time is it?** (`steps/read-clock.ts`) A big clock shows the kitchen
+  time right after a step ("Stirring took 10 minutes. What time is it now?"),
+  or at the start, with three times to pick from. The wrong ones are classic
+  slips: the hands read the wrong way round (6:20 for 4:30) and the hour the
+  hour hand is nearest (5:45 for 4:45). At Level 1 the answers are sometimes
+  words: "half past 4", "quarter to 5".
+- **Set the clock** (`steps/set-clock.ts`) "Stirring will be done at 4:15.
+  Set the clock to 4:15!" A big clock starts at 12:00. Touching the face
+  grabs the nearer hand (the outer ring is the minute hand's), the minute
+  hand snaps to the 5-minute marks, and **Check!** checks it. At Level 1 the
+  hands are geared like a real clock: turning the minute hand past 12 moves
+  the hour hand on. At Level 2 each hand is set on its own. A wrong check
+  says which hand is off; after two, the hands sweep to the time. Then she
+  cooks the step and watches the kitchen clock get there.
+- **When will it be done?** (Level 2) "Baking takes 15 minutes. It's 3:10 now.
+  When will it be done?", right before the bake (or another step of 5
+  minutes or more), so the kitchen clock then really sweeps those minutes.
+  Once answered, the big clock shades the minutes in. So the bake can start
+  on a 5, the step before it may take a few minutes longer than usual.
+
+| Level | Times                         | Kinds                                   | The hands            |
+| ----- | ----------------------------- | --------------------------------------- | -------------------- |
+| 1     | On the hour, half and quarter | What time is it?, Set the clock         | Geared, like a clock |
+| 2     | Any 5 minutes                 | All three, "When will it be done?" most | Each set on its own  |
+
+Chef Bunny says times the way people do ("four thirty", "half past four",
+"quarter to five": `sayTime` and `quarterWords` in `kit/clock.ts`), and
+when she shows an answer she says where the hands point.
+
+**The customer pays** (`activities/customer-pays.ts`, `steps/pay.ts`:
+money) fits every dish. After the last step, before decorating, a customer
+buys the dish: "That's 45¢. Tap the coins to pay!" She taps coins in the bank
+(each drawn with its value and name, sized like the real coins) into the
+tray, and a total counts up. A coin tapped in the tray goes back. Paying
+exactly right checks itself; too much gets a gentle "Oops, too much!"; a
+**Check!** that's short says how much more is needed. After two short
+checks, Chef Bunny lays out the fewest coins and counts them on.
+
+| Level | Price      | Coins                             |
+| ----- | ---------- | --------------------------------- |
+| 1     | 10¢ to 50¢ | Dimes, nickels and pennies        |
+| 2     | 26¢ to 99¢ | Quarters, dimes, nickels, pennies |
+
 ### How it's built
 
 | Piece                   | What it is                                                                                                      |
@@ -413,7 +461,10 @@ An activity is one new file, `activities/<id>.ts`, and usually that's all.
    (any size) and the plain maths in `kit/clock.ts`: `angleAt` (a drag to an
    angle), `minuteFromAngle(angle, 5)` (snapped), `hourFromAngle`,
    `withMinuteHand` and `withHourHand` (setting a time hand by hand),
-   `clockText` ("4:05") and `timeAtStep`.
+   `turnMinuteHand` (the same, geared), `sameClockTime`, `clockText`
+   ("4:05"), `sayTime` ("four oh five"), `quarterWords` ("quarter to 5")
+   and `timeAtStep`. The `read-clock` and `set-clock` steps are ready to use.
+   An activity can say `weight` (1 if left out) to come up more often.
 6. **Run `npm run check`.** `activities/activities.test.ts` weaves every
    activity into every dish it fits, at both levels, checks the same seed
    weaves the same round, cooks it to the end and draws every frame in all
