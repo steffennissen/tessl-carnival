@@ -236,6 +236,9 @@ export const carnivalKitchen: CarnivalGame = {
     // The title screen waits for a tap to start cooking; the recipe book
     // opens from it; the kitchen is where the cooking (and decorating) is.
     let screen: 'title' | 'book' | 'kitchen' = 'title';
+    // The dish spinner is showing which dish was picked. The round waits,
+    // its card's clock stopped, until it's done.
+    let spinning = false;
     let lastDish: Dish | undefined;
     let scoreRecorded = false;
     // The finished dish's decorations, and the round's sticker news.
@@ -268,8 +271,12 @@ export const carnivalKitchen: CarnivalGame = {
     /** Whether the finished dish is being decorated, before the stars. */
     const decorating = () => state.phase === 'over' && !decor.done;
 
-    /** Starts cooking `dish`, or the next dish picked at random. */
-    const newRound = (dish?: Dish) => {
+    /**
+     * Starts cooking `dish`, or the next dish picked at random. A dish picked
+     * at random is shown on the dish spinner first (`spin`), which lands on
+     * it; a chosen dish starts straight away unless `spin` says otherwise.
+     */
+    const newRound = (dish?: Dish, { spin = dish === undefined }: { spin?: boolean } = {}) => {
       lastDish = dish ?? pickDish(Math.random, lastDish);
       state = createState(lastDish);
       scoreRecorded = false;
@@ -277,6 +284,8 @@ export const carnivalKitchen: CarnivalGame = {
       sticker = null;
       screen = 'kitchen';
       renderer.reset();
+      spinning = spin;
+      if (spin) renderer.startSpin(lastDish);
     };
 
     /** Where the event is, in canvas units. The pointer keeps scene units. */
@@ -318,6 +327,16 @@ export const carnivalKitchen: CarnivalGame = {
       }
       if (renderer.hitSoundButton(at.x, at.y)) {
         sound.toggle();
+        return;
+      }
+      if (spinning) {
+        // Taps can't stop the spinner, but once it has landed one skips the wait.
+        renderer.skipSpin();
+        return;
+      }
+      if (screen === 'kitchen' && state.phase === 'playing' && renderer.hitBadge(at.x, at.y)) {
+        // The dish's badge: Chef Bunny says what we're making. Not a step press.
+        renderer.sayDish(state.dish);
         return;
       }
       if (screen === 'title' && inBox(bookButtonFor(layout), at.x, at.y, 8)) {
@@ -384,6 +403,10 @@ export const carnivalKitchen: CarnivalGame = {
         renderer.drawTitle(dt);
       } else if (screen === 'book') {
         renderer.drawBook(dt, bookStickers);
+      } else if (spinning) {
+        // The round doesn't tick while the spinner runs.
+        renderer.drawSpin(dt);
+        if (renderer.spinDone()) spinning = false;
       } else {
         tick(state, dt);
         saveScore();

@@ -19,18 +19,23 @@ switches between the two. On a computer the game stays in the page as before.
 ## How to play
 
 Tap **Tap to cook!** on the title screen. There's nothing to choose: the dish
-waits under a lid with a "?" on it, and the kitchen picks it when you tap. A
-ribbon says what we're making, a
-card names each step, a voice reads it out, and Chef Bunny's speech bubble
-keeps the hint on screen. The speaker button in the corner turns sound and
-the voice off and on.
+waits under a lid with a "?" on it, and the kitchen picks it when you tap.
+The speaker button in the corner turns sound and the voice off and on.
 
 A round goes like this:
 
 1. **Title screen.** Tap **Tap to cook!** for a surprise dish, or **📖 Recipes**
    to open the recipe book.
-2. **The steps**, one card at a time.
-3. **Decorate your dish!** The finished dish sits on a cloth with a tray of six
+2. **The dish spinner.** A carnival slot machine with a reel of dish pictures
+   spins fast, ticks slower and slower, and lands with a bounce and sparkles on
+   the dish that was picked, with its big picture and name, while Chef Bunny
+   says "Let's make ...!". It takes about 4 seconds; once it has landed, a tap
+   skips the rest of the wait, and taps before that do nothing. A dish picked
+   from the recipe book skips the spinner.
+3. **The steps**, one card at a time. A ribbon on the first card says what
+   we're making, a card names each step, a voice reads it out, and Chef
+   Bunny's speech bubble keeps the hint on screen.
+4. **Decorate your dish!** The finished dish sits on a cloth with a tray of six
    treats: sprinkles, a cherry, a heart, a star, a flower and a little flag.
    Drag a treat onto the dish, or tap a treat and then tap the dish to add as
    many as you like. Drag one on the dish to move it, or back to the tray to
@@ -40,12 +45,20 @@ A round goes like this:
    nothing, so a last excited tap from the final step doesn't skip it. Up to 30
    treats fit on a dish; another one replaces the oldest. Decorations start
    fresh every round.
-4. **The end card**: the dish with its decorations, the stars, Chef Bunny's
+5. **The end card**: the dish with its decorations, the stars, Chef Bunny's
    verdict and the points. If the dish earned its first sticker, or more stars
    than its sticker had, a badge says **New sticker!** or **Sticker
    upgraded!** after the stars, and Chef Bunny says so too. After a short
    pause, tap **Cook again!** for another dish, never the same one twice in a
-   row.
+   row, picked on the spinner again.
+
+While you cook, a badge shows the dish you're making: its finished picture
+and its name. On the page it sits in the strip above the recipe; on a phone
+held sideways it stands in the kitchen to the left of the cooking (or above
+it, if there's no room at the side); held upright it hangs on the wall
+between the score and the recipe, big when there's room and small between
+the buttons and the score when there isn't. Tap it and Chef Bunny says
+"We're making ...!": a tap on the badge never counts as a cooking tap.
 
 ### The recipe book
 
@@ -564,9 +577,15 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
 - `chef.ts`: Chef Bunny's reactions, lines and their cooldowns, and her idle
   blinks, ear flicks and glances: plain functions, tested in `chef.test.ts`.
 - `bunny.ts`: drawing Chef Bunny in a pose (mood, blink, ear, gaze, lean).
-- `render.ts`: the kitchen, Chef Bunny's place and what she sees, the HUD, the card and popups,
-  particles, the title, decorating, end and recipe book screens. It asks the step being cooked to draw
+- `render.ts`: the kitchen, Chef Bunny's place and what she sees, the HUD (with the badge of the dish being made), the card and popups,
+  particles, the title, decorating, end and recipe book screens, and running the dish spinner. It asks the step being cooked to draw
   itself, and every started step to `observe`.
+- `spinner.ts`: the dish spinner's drawing, and its landing maths as plain
+  functions (`spinEnd`, `reelPosition`, `reelIndex`, `holdFor`), which
+  `spinner.test.ts` checks always land on the picked dish. The dish is picked
+  before the spin; the spinner only shows it. In `game.ts`, `newRound(dish?,
+{ spin })` starts a round: with no dish it picks one and spins; with a
+  dish it starts cooking it straight away unless `spin` is true.
 - `art.ts`: the drawing kit: palette, shapes, faces, text.
 - `sound.ts`: sound effects made with Web Audio (no files to load) and the
   voice that reads each step out loud, plus `chatter` for Chef Bunny's own
