@@ -317,6 +317,8 @@ export function wordNow(reading: Reading | null): number {
 /**
  * The question's bubble: a speaker button to hear it, and the text, the
  * word being read lit up. Used by the quiz; any learning step can use it.
+ * The text goes beside the speaker, or under it when a narrow bubble has
+ * more room there (as set-clock's on a phone held upright).
  */
 export function drawQuestion(
   g: G,
@@ -330,12 +332,16 @@ export function drawQuestion(
   fillStroke(g, C.white, 4, C.hotPink);
   const highlight = wordNow(reading);
   drawSpeaker(g, speaker.x, speaker.y, speaker.r, highlight >= 0, t);
-  const left = speaker.x + speaker.r + 12;
-  const width = box.x + box.w - 16 - left;
-  const fit = fitWords(g, text, width, 28, Math.max(1, Math.floor(box.h / 36)));
+  const beside = box.x + box.w - (speaker.x + speaker.r);
+  const below = box.y + box.h - (speaker.y + speaker.r);
+  const area =
+    beside >= below
+      ? { x: speaker.x + speaker.r + 12, y: box.y, w: beside - 28, h: box.h }
+      : { x: box.x + 16, y: speaker.y + speaker.r + 4, w: box.w - 32, h: below - 10 };
+  const fit = fitWords(g, text, area.w, 28, Math.max(1, Math.floor(area.h / 36)));
   const gap = fit.size * 1.3;
-  const top = box.y + box.h / 2 - ((fit.lines.length - 1) * gap) / 2;
-  drawWords(g, fit.lines, left + width / 2, top, fit.size, gap, { highlight, color: C.ink });
+  const top = area.y + area.h / 2 - ((fit.lines.length - 1) * gap) / 2;
+  drawWords(g, fit.lines, area.x + area.w / 2, top, fit.size, gap, { highlight, color: C.ink });
 }
 
 /** One answer button: plain, tried (greyed), shown (glowing) or right (mint, with a tick). */
@@ -385,7 +391,7 @@ export function drawChoice(
 
 /**
  * Draws the quiz: the question's bubble, then the answers. Draw any
- * picture first (in QUIZ_PICTURE for 'side' answers).
+ * picture first (in `quizPlaces(view.shape).picture` for 'side' answers).
  */
 export function drawQuiz(view: StepView<StepBasics, QuizState, QuizFx>): void {
   const { g, t, state: s, fx, taking, shape } = view;

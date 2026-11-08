@@ -459,33 +459,42 @@ the next empty slot. A card dropped near a slot counts for it; one let go
 away from the slots just slides back. A card in the wrong slot slides
 gently back with "Hmm! What do we do next?", and after two wrong tries the
 card that comes next glows. Each card is read out as it's picked up (unless
-"Read it myself" is on). Then she cooks the dish, in that order. On a phone
+"Read it myself" is on). While she does, the recipe along the top shows a
+"?" for each step, so it doesn't give the order away. Then she cooks the
+dish, in that order. On a phone
 held upright each card has its own row, slot at the left and tray at the
 right.
 
 **On a phone**, everything a finger taps in a learning moment is at least
-about 60 CSS pixels: answer buttons, the 🔊 speaker, **Let's cook!** and the
-jars. Held sideways, the side answers fill the room at the right two to a
-row; held upright, the question spans the screen with the picture under it
-and the answers beside it. The recipe cards are the one exception: four of
+about 60 CSS pixels: answer buttons, the 🔊 speaker (and the step card's,
+for "Read it myself"), **Let's cook!**, the jars, **Check!**, the coins in
+the bank and the clock's hands (a touch near a hand's knob grabs it). Held
+sideways, the side answers fill the room at the right two to a row; held
+upright, the question spans the screen with the picture under it and the
+answers beside it. Setting the clock, the clock is as big as fits: held
+upright it fills the left of the screen from the question down (about 220
+pixels across), with the question and **Check!** stacked beside it; held
+sideways it's at the right under the question, with **Check!** at the left.
+Paying held upright, the tray spans the screen, the bank's coins are bigger,
+and the total and **Check!** sit either side of the progress pill. The recipe cards are the one exception: four of
 them on an upright phone are about 50 pixels tall (and 168 wide), with a
 generous drop zone.
 
 ### How it's built
 
-| Piece                   | What it is                                                                                                      |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `activities/`           | One file per activity, default export an `Activity`; `activities/index.ts` finds them and has `planRound`.      |
-| `kit/learn.ts`          | Settings (`settingsFrom`, `DEFAULT_SETTINGS`), `Activity`, `RoundPlan`, answering (`answer`), `smartChef`.      |
+| Piece                   | What it is                                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `activities/`           | One file per activity, default export an `Activity`; `activities/index.ts` finds them and has `planRound`.                |
+| `kit/learn.ts`          | Settings (`settingsFrom`, `DEFAULT_SETTINGS`), `Activity`, `RoundPlan`, answering (`answer`), `smartChef`.                |
 | `kit/quiz.ts`           | The quiz mini-game: a question with answer buttons, its drawing, voice and Chef Bunny reactions, and `quizPlaces(shape)`. |
-| `kit/words.ts`          | Reading: `wordsOf`, `numberWord`, `fitWords`, `drawWords` (with the word being read lit up), `drawSpeaker`.     |
-| `kit/clock.ts`          | Kitchen time: `stepMinutes`, `roundTime`, `startTime`, `drawClock`, and the maths for dragging a clock's hands. |
-| `kit/order.ts`          | Order tickets: `Order`, `drawOrderNote`.                                                                        |
-| `kit/measure.ts`        | Real amounts: `parseAmount`, `amountText`, `measureScale`, `measureTarget`, `drawMeasuringCup`.                 |
-| `kit/picture-quiz.ts`   | `pictureQuiz(kind, picture)`: a step that plays like `ask` with a picture of its own (the cup and tray steps).  |
-| `steps/ask.ts`          | A question step with a picture of the step before. Most activities use it as is.                                |
-| `steps/ticket.ts`       | The order ticket step.                                                                                          |
-| `sound.ts` `read(text)` | Reads out loud like `say`, and follows the word being said (or times it), for lighting words up.                |
+| `kit/words.ts`          | Reading: `wordsOf`, `numberWord`, `fitWords`, `drawWords` (with the word being read lit up), `drawSpeaker`.               |
+| `kit/clock.ts`          | Kitchen time: `stepMinutes`, `roundTime`, `startTime`, `drawClock`, and the maths for dragging a clock's hands.           |
+| `kit/order.ts`          | Order tickets: `Order`, `drawOrderNote`.                                                                                  |
+| `kit/measure.ts`        | Real amounts: `parseAmount`, `amountText`, `measureScale`, `measureTarget`, `drawMeasuringCup`.                           |
+| `kit/picture-quiz.ts`   | `pictureQuiz(kind, picture)`: a step that plays like `ask` with a picture of its own (the cup and tray steps).            |
+| `steps/ask.ts`          | A question step with a picture of the step before. Most activities use it as is.                                          |
+| `steps/ticket.ts`       | The order ticket step.                                                                                                    |
+| `sound.ts` `read(text)` | Reads out loud like `say`, and follows the word being said (or times it), for lighting words up.                          |
 
 A round's steps can include **learning steps** (a `Step` with
 `learning: true`): they're not in the recipe along the top, their card says
@@ -566,8 +575,18 @@ An activity is one new file, `activities/<id>.ts`, and usually that's all.
    (`view.shape`) and pressing (`turn.shape`, which the game passes to
    `press`, `move` and `release`; it's undefined, meaning 'page', in most
    tests), so a tap hits what's drawn. `QUIZ_BUBBLE` and `QUIZ_PICTURE` are
-   the computer's. `steps/find.ts` and `steps/sequence.ts` are learning
-   steps of their own, with jars and drag-and-drop cards.
+   the computer's. A picture beside the answers (`pictureQuiz` in
+   `kit/picture-quiz.ts`, the read-clock's clock, `drawQuestion` for the
+   bubble) goes in `quizPlaces(view.shape)` too. A step with a layout of
+   its own has a pure function of the shape for its places, used by both
+   its `press` and its `draw`, and tested like `kit/quiz.test.ts` (clear of
+   `keepClear(shape)`, and at least 60 CSS pixels via `cssScale(shape)` from
+   `test-kit.ts`): `jarBoxes` (`steps/find.ts`), `sequencePlaces`
+   (`steps/sequence.ts`, drag-and-drop cards), `setClockPlaces`
+   (`steps/set-clock.ts`, the clock and Check!) and `payPlaces`
+   (`steps/pay.ts`, the tray, the coin bank and Check!).
+   `steps/learning-places.test.ts` checks the clocks, paying and the cut,
+   cup and tray pictures on every shape.
 5. **Time activities** build on `drawClock(g, x, y, r, time, { glow })`
    (any size) and the plain maths in `kit/clock.ts`: `angleAt` (a drag to an
    angle), `minuteFromAngle(angle, 5)` (snapped), `hourFromAngle`,
@@ -688,8 +707,9 @@ The details:
 
    Every step can also take `minutes` (on the kitchen clock), a pour
    `amounts` (one per pour: "1 cup") and a season step `amount` ("¼
-   teaspoon"): see "Learning". The learning steps `ticket` and `ask` are
-   woven in by activities, not written in recipes.
+   teaspoon"): see "Learning". The learning steps (`ticket`, `ask`,
+   `find`, `sequence`, `cup`, `tray`, `cut`, `read-clock`, `set-clock` and
+   `pay`) are woven in by activities, not written in recipes.
 
    In brackets is the art role each ingredient must have (see "Adding an
    ingredient"). The ones there today:

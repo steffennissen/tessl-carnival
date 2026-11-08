@@ -10,10 +10,9 @@ import {
   stickerText,
   vertical,
 } from '../art';
+import type { Shape } from '../layout';
 import {
-  QUIZ_BUBBLE,
   QUIZ_OUTRO,
-  QUIZ_SPEAKER,
   SMART_BONUS,
   angleAt,
   answer,
@@ -24,6 +23,8 @@ import {
   finishStep,
   handAngles,
   inCircle,
+  middleOf,
+  quizPlaces,
   sameClockTime,
   sayTime,
   startAnswer,
@@ -32,6 +33,7 @@ import {
   withMinuteHand,
   type AnswerState,
   type Box,
+  type Disc,
   type Feedback,
   type Step,
   type StepBasics,
@@ -71,9 +73,59 @@ declare module '../kit/types' {
   }
 }
 
-/** The big clock and the Check! button, in scene units. Clear of Chef Bunny and the HUD. */
-export const SET_CLOCK = { x: 340, y: 354, r: 104 } as const;
+/** The big clock and the Check! button on a computer, in scene units. */
+export const SET_CLOCK: Disc = { x: 340, y: 354, r: 104 };
 export const CHECK: Box = { x: 482, y: 296, w: 200, h: 104 };
+
+/** Where the question, its speaker, the clock and Check! go. */
+export interface SetClockPlaces {
+  bubble: Box;
+  speaker: Disc;
+  clock: Disc;
+  check: Box;
+}
+
+/**
+ * Where everything goes for the canvas's shape, clear of Chef Bunny, the
+ * HUD and the progress pill. On a computer, the quiz's bubble with the clock
+ * under it and Check! beside. On a phone held sideways the clock fills the
+ * room at the right, under the bubble, and Check! is at the left. Held
+ * upright the clock is as big as the screen's width allows, at the left,
+ * from the top, with the question and Check! stacked beside it.
+ */
+export function setClockPlaces(shape: Shape = 'page'): SetClockPlaces {
+  if (shape === 'tall') {
+    return {
+      bubble: { x: 466, y: 100, w: 224, h: 300 },
+      speaker: { x: 578, y: 154, r: 47 },
+      clock: { x: 286, y: 276, r: 170 },
+      check: { x: 466, y: 410, w: 224, h: 134 },
+    };
+  }
+  const { bubble, speaker } = quizPlaces(shape);
+  if (shape === 'wide') {
+    return {
+      bubble,
+      speaker,
+      clock: { x: 672, y: 362, r: 114 },
+      check: { x: 250, y: 290, w: 240, h: 120 },
+    };
+  }
+  return { bubble, speaker, clock: SET_CLOCK, check: CHECK };
+}
+
+/** The knobs on the hands' ends, to grab: where they are, and how big, on `clock`. */
+export function knobsOf(clock: Disc, time: number) {
+  const hands = handAngles(time);
+  const at = (angle: number, length: number) => ({
+    x: clock.x + Math.sin(angle) * length,
+    y: clock.y - Math.cos(angle) * length,
+  });
+  return {
+    hour: { ...at(hands.hour, clock.r * 0.45), r: clock.r * 0.145 },
+    minute: { ...at(hands.minute, clock.r * 0.74), r: clock.r * 0.125 },
+  };
+}
 
 /** Which hand a touch is off: for the hint. */
 export type HandOff = 'hour' | 'minute' | 'both';
@@ -115,15 +167,25 @@ function apart(a: number, b: number): number {
 }
 
 /**
- * The hand a touch at (x, y) grabs, or null off the clock. Near a hand's
- * line, that hand (both near: the outer part of the face is the minute
- * hand's); anywhere else on the face, the outer ring is the minute hand's
- * and the middle the hour hand's.
+ * The hand a touch at (x, y) grabs, or null off the clock. On or near a
+ * hand's knob, that hand (the nearer knob, if both); near a hand's line,
+ * that hand (both near: the outer part of the face is the minute hand's);
+ * anywhere else on the face, the outer ring is the minute hand's and the
+ * middle the hour hand's.
  */
-export function grabHand(time: number, x: number, y: number): 'hour' | 'minute' | null {
-  const { x: cx, y: cy, r } = SET_CLOCK;
+export function grabHand(
+  time: number,
+  x: number,
+  y: number,
+  clock: Disc = SET_CLOCK,
+): 'hour' | 'minute' | null {
+  const { x: cx, y: cy, r } = clock;
   const d = Math.hypot(x - cx, y - cy);
   if (d > r * 1.25) return null;
+  const knobs = knobsOf(clock, time);
+  const toHour = Math.hypot(x - knobs.hour.x, y - knobs.hour.y);
+  const toMinute = Math.hypot(x - knobs.minute.x, y - knobs.minute.y);
+  if (Math.min(toHour, toMinute) <= r * 0.35) return toHour < toMinute ? 'hour' : 'minute';
   const angle = angleAt(cx, cy, x, y);
   const hands = handAngles(time);
   const nearHour = apart(angle, hands.hour) < 0.45;
@@ -148,7 +210,8 @@ const inBox = (b: Box, x: number, y: number) =>
 function turnHand(turn: Turn<SetClockOptions, SetClockState>, x: number, y: number) {
   const s = turn.state;
   if (!s.holding) return;
-  const angle = angleAt(SET_CLOCK.x, SET_CLOCK.y, x, y);
+  const { clock } = setClockPlaces(turn.shape);
+  const angle = angleAt(clock.x, clock.y, x, y);
   if (s.holding === 'hour') s.time = withHourHand(s.time, angle);
   else s.time = turn.options.geared ? turnMinuteHand(s.time, angle) : withMinuteHand(s.time, angle);
   s.moved = true;
@@ -161,11 +224,12 @@ export function pressSetClock(
 ): boolean {
   const s = turn.state;
   if (s.done) return true;
-  if (inCircle(QUIZ_SPEAKER.x, QUIZ_SPEAKER.y, QUIZ_SPEAKER.r, x, y)) {
+  const { speaker, clock, check } = setClockPlaces(turn.shape);
+  if (inCircle(speaker.x, speaker.y, speaker.r, x, y)) {
     s.reads += 1;
     return true;
   }
-  if (inBox(CHECK, x, y)) {
+  if (inBox(check, x, y)) {
     const off = handOff(s.time, turn.options.target);
     const result = answer(turn.round, s, off === null);
     if (result === 'right') s.done = true;
@@ -178,7 +242,7 @@ export function pressSetClock(
   }
   // Once she's been shown the time, the hands stay put.
   if (s.shown) return true;
-  s.holding = grabHand(s.time, x, y);
+  s.holding = grabHand(s.time, x, y, clock);
   turnHand(turn, x, y);
   return true;
 }
@@ -235,7 +299,8 @@ const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
   },
   solve(turn) {
     turn.state.time = turn.options.target;
-    pressSetClock(turn, CHECK.x + CHECK.w / 2, CHECK.y + CHECK.h / 2);
+    const middle = middleOf(setClockPlaces(turn.shape).check);
+    pressSetClock(turn, middle.x, middle.y);
     setClock.update?.(turn, QUIZ_OUTRO);
   },
 
@@ -250,7 +315,8 @@ const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
     time: null,
   }),
 
-  observe({ state: s, options, fx, effects, round, taking, dt }) {
+  observe({ state: s, options, fx, effects, round, taking, dt, shape }) {
+    const places = setClockPlaces(shape);
     const { sound } = effects;
     const settings = round.learn.settings;
     const delay = autoReadDelay(settings);
@@ -273,7 +339,7 @@ const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
       fx.shownTime +=
         Math.sign(gap) * Math.min(Math.abs(gap), dt * Math.max(60, Math.abs(gap) * 2));
     } else fx.shownTime = s.time;
-    const middle = { x: CHECK.x + CHECK.w / 2, y: CHECK.y + CHECK.h / 2 };
+    const middle = middleOf(places.check);
     if (s.wrong > fx.wrong && !s.shown) {
       fx.wrong = s.wrong;
       sound.boop();
@@ -294,24 +360,33 @@ const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
     if (s.done && !fx.done) {
       fx.done = true;
       sound.chime([1046.5, 1318.5, 1568, 2093], 0.07, 0.16);
-      effects.burst(SET_CLOCK.x, SET_CLOCK.y, 20, ['star', 'heart', 'star', 'dot'], CONFETTI, 280);
+      effects.burst(
+        places.clock.x,
+        places.clock.y,
+        20,
+        ['star', 'heart', 'star', 'dot'],
+        CONFETTI,
+        280,
+      );
       effects.celebrate(middle.x, middle.y, CHEER);
       sound.say(`Yes! It's ${sayTime(options.target)}!`);
     }
   },
 
-  draw({ g, t, state: s, options, fx, taking }) {
+  draw({ g, t, state: s, options, fx, taking, shape }) {
     if (!taking && s.age === 0) return;
+    const places = setClockPlaces(shape);
     const appear = easeOutBack(clamp01(s.age / 0.4));
+    const mid = middleOf(places.bubble);
     g.save();
-    g.translate(450, 200);
+    g.translate(mid.x, mid.y);
     g.scale(appear, appear);
-    g.translate(-450, -200);
-    drawQuestion(g, options.text, QUIZ_BUBBLE, QUIZ_SPEAKER, fx.reading, t);
+    g.translate(-mid.x, -mid.y);
+    drawQuestion(g, options.text, places.bubble, places.speaker, fx.reading, t);
     g.restore();
 
     // The clock, with big knobs on the hands' ends to grab.
-    const { x, y, r } = SET_CLOCK;
+    const { x, y, r } = places.clock;
     const time = s.shown ? (fx.shownTime ?? s.time) : s.time;
     const pop = easeOutBack(clamp01((s.age - 0.1) / 0.4));
     g.save();
@@ -319,29 +394,27 @@ const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
     g.scale(pop, pop);
     g.translate(-x, -y);
     drawClock(g, x, y, r, time, { t, glow: s.holding ?? (s.shown ? 'minute' : null) });
-    const hands = handAngles(time);
-    const knob = (angle: number, length: number, size: number, color: string, held: boolean) => {
-      const kx = x + Math.sin(angle) * length;
-      const ky = y - Math.cos(angle) * length;
-      circle(g, kx, ky, size * (held ? 1.25 : 1));
+    const knobs = knobsOf(places.clock, time);
+    const knob = (at: Disc, color: string, held: boolean) => {
+      circle(g, at.x, at.y, at.r * (held ? 1.25 : 1));
       fillStroke(g, color, 3.5);
-      circle(g, kx - size * 0.3, ky - size * 0.3, size * 0.28);
+      circle(g, at.x - at.r * 0.3, at.y - at.r * 0.3, at.r * 0.28);
       g.fillStyle = 'rgba(255, 255, 255, 0.7)';
       g.fill();
     };
-    knob(hands.hour, r * 0.45, 15, C.hotPink, s.holding === 'hour');
-    knob(hands.minute, r * 0.74, 13, C.purple, s.holding === 'minute');
+    knob(knobs.hour, C.hotPink, s.holding === 'hour');
+    knob(knobs.minute, C.purple, s.holding === 'minute');
     g.restore();
     if (taking && !s.moved && !s.shown) {
       const bob = Math.sin(t * 5) * 6;
       g.fillStyle = C.ink;
-      emoji(g, '👆', x + 22, y - r * 0.74 + 34 + bob, 40);
+      emoji(g, '👆', x + 22 * (r / 104), y - r * 0.74 + 34 * (r / 104) + bob, 40 * (r / 104));
     }
 
     // Check!
     const glow = s.shown && !s.done;
     const press = s.done ? 1 + 0.1 * Math.sin(clamp01(s.after / 0.4) * Math.PI) : 1;
-    const b = CHECK;
+    const b = places.check;
     g.save();
     g.translate(b.x + b.w / 2, b.y + b.h / 2);
     const throb = glow ? 1 + Math.sin(t * 6) * 0.05 : press;
@@ -354,7 +427,7 @@ const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
     }
     rounded(g, -b.w / 2, -b.h / 2, b.w, b.h, 26);
     fillStroke(g, vertical(g, -b.h / 2, b.h / 2, [C.cabinetLight, C.mint]), 4);
-    stickerText(g, 'Check! ✔', 0, 2, 36, C.hotPink, 'center', b.w - 20);
+    stickerText(g, 'Check! ✔', 0, 2, Math.min(44, b.h * 0.35), C.hotPink, 'center', b.w - 20);
     g.restore();
     if (s.done) {
       const up = easeOutBack(clamp01(s.after / 0.35));
