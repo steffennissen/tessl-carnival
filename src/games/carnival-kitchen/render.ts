@@ -1225,6 +1225,17 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.stroke();
     g.setLineDash([]);
 
+    // The dish, with what's on it so far.
+    const { dish } = p;
+    shadow(g, dish.x, dish.y + 70 * dish.scale, 150 * dish.scale, 18);
+    g.save();
+    g.translate(dish.x, dish.y);
+    g.scale(dish.scale, dish.scale);
+    state.dish.draw(g, t, state);
+    drawDecorations(g, decor.placed);
+    g.restore();
+
+    // The title on top, so a tall dish (a smoothie's straw) never hides it.
     stickerText(
       g,
       'Decorate your dish!',
@@ -1235,16 +1246,6 @@ export function createRenderer(ctx: G, sound: Sound) {
       'center',
       panel.w - 60,
     );
-
-    // The dish, with what's on it so far.
-    const { dish } = p;
-    shadow(g, dish.x, dish.y + 70 * dish.scale, 150 * dish.scale, 18);
-    g.save();
-    g.translate(dish.x, dish.y);
-    g.scale(dish.scale, dish.scale);
-    state.dish.draw(g, t, state);
-    drawDecorations(g, decor.placed);
-    g.restore();
 
     // The tray of treats.
     const r = p.trayRadius;
