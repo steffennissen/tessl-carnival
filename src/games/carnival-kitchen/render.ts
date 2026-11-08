@@ -1,4 +1,3 @@
-import { DISHES } from './dishes';
 import {
   BAKE_TARGET,
   BANNER_TIME,
@@ -413,6 +412,90 @@ function drawBunny(g: G, t: number, mood: Mood, moodAge: number, at: Spot) {
     circle(g, px, py, 12);
     fillStroke(g, C.white, 3.5);
   }
+}
+
+/**
+ * A plate under a shiny lid with a big "?" on it, for the title screen. The
+ * lid wobbles and now and then peeks open a crack, with a puff of steam, but
+ * never shows what's inside: the kitchen picks the dish when you tap.
+ */
+function drawMysteryDish(g: G, x: number, y: number, t: number) {
+  // The plate.
+  shadow(g, x, y + 16, 140, 14);
+  oval(g, x, y, 132, 24);
+  fillStroke(g, C.white);
+  oval(g, x, y - 2, 108, 15);
+  g.strokeStyle = C.sky;
+  g.lineWidth = 3;
+  g.stroke();
+
+  // Every 3 seconds the lid lifts a little, then settles.
+  const cycle = t % 3;
+  const peek = cycle > 2.2 ? Math.sin(((cycle - 2.2) / 0.8) * Math.PI) : 0;
+  const lift = peek * 16;
+  const wobble = Math.sin(t * 2.4) * 0.03 + peek * 0.08;
+
+  // Steam and sparkles escaping through the crack.
+  if (peek > 0) {
+    for (let i = 0; i < 3; i++) {
+      g.strokeStyle = `rgba(255, 255, 255, ${0.9 * peek})`;
+      g.lineWidth = 5;
+      g.lineCap = 'round';
+      g.beginPath();
+      for (let k = 0; k <= 6; k++) {
+        g.lineTo(x + 70 + i * 16 + Math.sin(k + t * 6 + i) * 4, y - 10 - k * 6 - peek * 10);
+      }
+      g.stroke();
+    }
+    starPath(g, x - 104, y - 20 - peek * 14, 9 * peek, t);
+    fillStroke(g, C.gold, 2.5);
+  }
+
+  g.save();
+  g.translate(x + 110, y - 4 - lift);
+  g.rotate(-wobble);
+  g.translate(-110, 0);
+  // The dome.
+  g.beginPath();
+  g.ellipse(0, 0, 112, 104, 0, Math.PI, 0);
+  g.closePath();
+  fillStroke(g, vertical(g, -104, 0, [C.white, C.steel, C.steelDark]), 4);
+  // A pink band with hearts round its rim.
+  g.save();
+  g.beginPath();
+  g.ellipse(0, 0, 112, 104, 0, Math.PI, 0);
+  g.closePath();
+  g.clip();
+  g.fillStyle = C.pink;
+  g.fillRect(-120, -26, 240, 26);
+  g.restore();
+  g.strokeStyle = C.ink;
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(-109, -26);
+  g.lineTo(109, -26);
+  g.stroke();
+  for (const hx of [-70, 0, 70]) {
+    heartPath(g, hx, -15, 6);
+    fillStroke(g, C.white, 2);
+  }
+  // A shine, and the knob on top.
+  g.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  g.lineWidth = 7;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.ellipse(0, 0, 86, 80, 0, Math.PI * 1.18, Math.PI * 1.38);
+  g.stroke();
+  circle(g, 0, -114, 13);
+  fillStroke(g, C.hotPink, 3.5);
+  rounded(g, -14, -108, 28, 8, 4);
+  fillStroke(g, C.hotPink, 3);
+  // The question.
+  stickerText(g, '?', 0, -58 + Math.sin(t * 4) * 3, 56, C.hotPink);
+  // The rim, tilting with the dome as it lifts.
+  oval(g, 0, 0, 114, 9);
+  fillStroke(g, C.steelDark, 3.5);
+  g.restore();
 }
 
 /**
@@ -2274,18 +2357,8 @@ export function createRenderer(ctx: G, sound: Sound) {
       fillStroke(g, C.gold, 3);
     }
 
-    // Every dish the kitchen can make, hopping in turn: which one will it be?
-    const spread = Math.min(170, 500 / DISHES.length);
-    DISHES.forEach((dish, i) => {
-      const x = cx + (i - (DISHES.length - 1) / 2) * spread;
-      const hop = Math.max(0, Math.sin(t * 3 - i * 1.2)) * 12;
-      g.save();
-      g.translate(x, 282 - hop);
-      g.scale(0.42, 0.42);
-      dish.draw(g, t, null);
-      g.restore();
-    });
-    stickerText(g, '?', cx + 4, 232 + Math.sin(t * 4) * 4, 40, C.hotPink);
+    // A covered dish: what's under the lid is a surprise until you tap.
+    drawMysteryDish(g, cx, 322, t);
 
     // One big button: the dish is a surprise.
     const pulse = 1 + Math.sin(t * 4) * 0.05;

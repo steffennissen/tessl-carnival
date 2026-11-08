@@ -17,7 +17,9 @@ switches between the two. On a computer the game stays in the page as before.
 
 ## How to play
 
-Tap **Tap to cook!** on the title screen. A ribbon says what we're making, a
+Tap **Tap to cook!** on the title screen. There's nothing to choose: the dish
+waits under a lid with a "?" on it, and the kitchen picks it when you tap. A
+ribbon says what we're making, a
 card names each step, a voice reads it out, and Chef Bunny's speech bubble
 keeps the hint on screen. Tap **Cook again!** on the end screen for another
 dish, never the same one twice in a row. The speaker button in the corner turns
@@ -107,8 +109,7 @@ without touching each other or any shared list:
 
 1. Add `dishes/<id>.ts` whose default export is a `Dish` (see `game.ts`): its
    `id` (the file name), `name`, `steps`, what it `chop`s, how many `pours`,
-   and `draw`, which draws the finished dish for the end card and the title
-   screen. Draw with the helpers in `art.ts`; `dishes/pizza.ts` is a good one
+   and `draw`, which draws the finished dish for the end card. Draw with the helpers in `art.ts`; `dishes/pizza.ts` is a good one
    to copy.
 2. That's it: `dishes/index.ts` finds every file in the folder, and the dish
    joins the random pick.
