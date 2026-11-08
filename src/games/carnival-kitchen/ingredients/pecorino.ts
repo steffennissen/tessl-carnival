@@ -1,5 +1,7 @@
 import { C, face, fillStroke, heartPath, oval, palette, shadow, vertical } from '../art';
-import type { Ingredient } from '../kit';
+import { findStep, type HoldState, type Ingredient } from '../kit';
+import { ingredient } from './index';
+import { SEASON_X, specksOf, type SeasonOptions } from '../steps/season';
 import { drawCheeseBlock } from './cheddar';
 
 export const PECORINO = palette({
@@ -80,6 +82,35 @@ const pecorino: Ingredient = {
       oval(g, x, 336, 112, 9);
       g.fillStyle = PECORINO.cheese;
       g.fill();
+    },
+  },
+
+  /**
+   * The same bowl of cheese, for pouring into: peppered as much as the
+   * season step left it, with what's poured pooling round the heap.
+   */
+  pourInto: {
+    mouth: { x: SEASON_X + 26, y: 274 },
+    draw(g, { t, round, poured }) {
+      const season = findStep<HoldState, SeasonOptions>(round, 'season');
+      const seasoned = pecorino.seasoned;
+      if (!seasoned) return;
+      seasoned.draw(g, {
+        x: SEASON_X,
+        t,
+        specks: season ? specksOf(season.state) : 0,
+        speck: season ? ingredient(season.options.shaker).colors[0] : C.ink,
+      });
+      for (const { art, amount } of poured) {
+        if (amount <= 0) continue;
+        const grow = 0.45 + 0.55 * amount;
+        oval(g, SEASON_X, 336, 112 * grow, 9 * grow);
+        g.fillStyle = art.color;
+        g.fill();
+        g.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        oval(g, SEASON_X - 30, 334, 30 * amount, 3 * amount);
+        g.fill();
+      }
     },
   },
 };

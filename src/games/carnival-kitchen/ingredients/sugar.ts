@@ -13,6 +13,7 @@ const sugar: Ingredient = {
     stream: 'rgba(255, 255, 255, 0.9)',
     grains: C.pink,
     meter: [C.pink, C.white],
+    color: C.white,
     liquid: false,
     /** A round pink jar with a lid and a sugar-cube sticker. */
     drawContainer(g, pouring) {

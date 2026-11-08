@@ -62,7 +62,13 @@ declare module '../kit/types' {
 
 export const SHAKES = 3;
 /** Where the food and the shaker stand. */
-const X = 380;
+export const SEASON_X = 380;
+const X = SEASON_X;
+
+/** How many grains of seasoning are on the food so far. */
+export function specksOf(state: HoldState): number {
+  return state.index * 12 + Math.floor(state.level * 14);
+}
 
 interface SeasonFx {
   index: number;
@@ -130,7 +136,7 @@ const season: Step<SeasonOptions, HoldState, SeasonFx> = {
     artOf(options.food, 'seasoned').draw(g, {
       x: X,
       t,
-      specks: s.index * 12 + Math.floor(s.level * 14),
+      specks: specksOf(s),
       speck: shaker.colors[0],
     });
 
