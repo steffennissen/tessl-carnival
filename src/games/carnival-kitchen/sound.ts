@@ -1,4 +1,4 @@
-import type { Grade } from './game';
+import type { Grade } from './kit/types';
 
 /**
  * Sound effects, made on the fly with Web Audio so there are no files to load,
@@ -27,11 +27,39 @@ export interface Sound {
   star(index: number): void;
   fanfare(): void;
   say(text: string): void;
+  /**
+   * A new sound from scratch, for a step that needs one of its own: a note
+   * (`freq` in Hz, see NOTE) that can slide to another.
+   */
+  tone(freq: number, duration: number, options?: ToneOptions): void;
+  /** Filtered noise: chops, cracks, sizzles, shakes and whooshes. */
+  hiss(duration: number, options?: HissOptions): void;
+  /** Notes one after another, `gap` seconds apart, like a little bell. */
+  chime(notes: number[], gap: number, volume?: number): void;
   close(): void;
 }
 
-// Notes of a C major scale, so every chime sounds happy together.
-const NOTE = {
+export interface ToneOptions {
+  type?: OscillatorType;
+  volume?: number;
+  /** Seconds to wait before it starts. */
+  delay?: number;
+  /** A frequency to slide to by the end. */
+  slideTo?: number;
+}
+
+export interface HissOptions {
+  volume?: number;
+  delay?: number;
+  filter?: BiquadFilterType;
+  /** The filter's frequency at the start, in Hz. */
+  from?: number;
+  /** And at the end, if it sweeps. */
+  to?: number;
+}
+
+/** Notes of a C major scale, so every chime sounds happy together. */
+export const NOTE = {
   C5: 523.25,
   D5: 587.33,
   E5: 659.25,
@@ -58,17 +86,7 @@ export function createSound(): Sound {
   function tone(
     freq: number,
     duration: number,
-    {
-      type = 'sine',
-      volume = 0.25,
-      delay = 0,
-      slideTo,
-    }: {
-      type?: OscillatorType;
-      volume?: number;
-      delay?: number;
-      slideTo?: number;
-    } = {},
+    { type = 'sine', volume = 0.25, delay = 0, slideTo }: ToneOptions = {},
   ) {
     const a = audio();
     if (!a) return;
@@ -88,19 +106,7 @@ export function createSound(): Sound {
 
   function hiss(
     duration: number,
-    {
-      volume = 0.2,
-      delay = 0,
-      filter = 'bandpass',
-      from = 2000,
-      to,
-    }: {
-      volume?: number;
-      delay?: number;
-      filter?: BiquadFilterType;
-      from?: number;
-      to?: number;
-    } = {},
+    { volume = 0.2, delay = 0, filter = 'bandpass', from = 2000, to }: HissOptions = {},
   ) {
     const a = audio();
     if (!a || !noise) return;
@@ -261,6 +267,9 @@ export function createSound(): Sound {
         // No speech in this browser.
       }
     },
+    tone,
+    hiss,
+    chime,
     close() {
       try {
         window.speechSynthesis.cancel();

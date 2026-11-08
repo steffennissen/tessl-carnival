@@ -1,13 +1,15 @@
 import { C, circle, face, fillStroke, heartPath, oval, vertical } from '../art';
-import type { Dish } from '../game';
+import type { Dish } from '../kit';
 
 const pancakes: Dish = {
   id: 'pancakes',
   name: 'Fluffy Pancakes',
-  steps: ['crack', 'pour', 'mix', 'flip'],
-  chop: 'carrot',
-  // Two pours into the bowl: flour, then milk.
-  pours: 2,
+  steps: [
+    { kind: 'crack', item: 'egg' },
+    { kind: 'pour', pours: ['flour', 'milk'] },
+    { kind: 'mix', vessel: 'mixing-bowl', contents: 'batter' },
+    { kind: 'flip', item: 'pancake' },
+  ],
 
   draw(g) {
     // A stack on a plate, with cream and strawberry hearts on top.

@@ -1,4 +1,4 @@
-import type { Dish } from '../game';
+import type { Dish } from '../kit';
 
 /**
  * Every dish in the kitchen: each file in this folder whose default export is

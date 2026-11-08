@@ -1,11 +1,9 @@
 import { theme } from '../../carnival';
-import type { Topping, ToppingSpot } from './game';
-import { BAKE_TARGET, PIZZA_VIEW } from './pizza-shape';
 
 /**
- * The kitchen's drawing kit: its palette, shapes, faces and text, and the
- * pizza. render.ts draws the kitchen and each step with these, and each dish
- * in dishes/ draws its finished dish with them.
+ * The kitchen's drawing kit: its palette, shapes, faces and text. render.ts
+ * draws the kitchen with these, and every step, ingredient and dish draws
+ * with them too.
  *
  * This game is made for young cooks, so it goes beyond the carnival theme
  * for a softer, brighter look.
@@ -82,7 +80,20 @@ export const C = {
   glass: '#5b3b4f',
   glassLight: '#86607a',
   ember: '#ff8a3d',
+  oven: '#ffe3ef',
+  starEdge: '#d9c8ef',
 };
+
+/**
+ * More colours for one file, such as a new ingredient's: the one sanctioned
+ * place for colour codes outside this file. Pick soft, bright colours that sit
+ * with C, and reuse C where one fits.
+ *
+ *     const K = palette({ shell: '#f0dcc6' });
+ */
+export function palette<T extends Record<string, string>>(colors: T): Readonly<T> {
+  return colors;
+}
 export const CONFETTI = [C.hotPink, C.gold, C.mint, C.sky, C.lavender, C.pink, C.butter];
 
 export const FONT =
@@ -91,13 +102,6 @@ export const EMOJI = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
 export const font = (size: number) => `bold ${size}px ${FONT}`;
 
 export type G = CanvasRenderingContext2D;
-
-/** Where each topping's pieces sit around its spot. */
-export const PIECES = [
-  [-20, -5],
-  [18, -9],
-  [2, 11],
-] as const;
 
 // ---------------------------------------------------------------------------
 // Small drawing helpers
@@ -163,8 +167,11 @@ export function eggPath(g: G, x: number, y: number, w: number, h: number) {
   g.closePath();
 }
 
+/** A face's mood: smiling, eyes closed with joy, or surprised. */
+export type Mood = 'happy' | 'joy' | 'wow';
+
 /** A kawaii face: eyes with a glint, rosy cheeks and a smile. */
-export function face(g: G, x: number, y: number, s: number, mood: 'happy' | 'joy' | 'wow') {
+export function face(g: G, x: number, y: number, s: number, mood: Mood) {
   g.save();
   g.translate(x, y);
   g.scale(s, s);
@@ -272,7 +279,7 @@ export function shadow(g: G, x: number, y: number, rx: number, ry: number) {
 }
 
 // ---------------------------------------------------------------------------
-// Pizza
+// Colours
 
 /** Reads '#rrggbb', or the 'rgb(r, g, b)' that `blend` returns. */
 export function rgb(color: string): [number, number, number] {
@@ -296,205 +303,4 @@ export function blend(colors: string[], t: number): string {
   const b = rgb(colors[i + 1]);
   const mixed = a.map((v, k) => Math.round(v + (b[k] - v) * f));
   return `rgb(${mixed.join(', ')})`;
-}
-
-/** One piece of a topping, about 14px across at scale 1, centred on (x, y). */
-export function toppingPiece(g: G, kind: Topping, x: number, y: number, s: number, rot = 0) {
-  g.save();
-  g.translate(x, y);
-  g.rotate(rot);
-  g.scale(s, s);
-  if (kind === 'pepperoni') {
-    circle(g, 0, 0, 13);
-    fillStroke(g, vertical(g, -13, 13, [C.pepperoni, C.pepperoniDark]), 2.5);
-    g.fillStyle = 'rgba(255, 255, 255, 0.35)';
-    for (const [dx, dy] of [
-      [-5, -4],
-      [4, 3],
-      [5, -6],
-      [-3, 6],
-    ]) {
-      circle(g, dx, dy, 1.8);
-      g.fill();
-    }
-  } else if (kind === 'mushroom') {
-    g.beginPath();
-    g.moveTo(-13, 1);
-    g.bezierCurveTo(-13, -15, 13, -15, 13, 1);
-    g.lineTo(5, 1);
-    g.lineTo(6, 12);
-    g.quadraticCurveTo(0, 15, -6, 12);
-    g.lineTo(-5, 1);
-    g.closePath();
-    fillStroke(g, vertical(g, -12, 14, [C.mushroom, C.mushroomDark]), 2.5);
-  } else if (kind === 'pineapple') {
-    g.beginPath();
-    g.moveTo(0, -12);
-    g.lineTo(12, 9);
-    g.quadraticCurveTo(0, 14, -12, 9);
-    g.closePath();
-    fillStroke(g, vertical(g, -12, 12, [C.butter, C.pineapple]), 2.5);
-  } else if (kind === 'olive') {
-    circle(g, 0, 0, 10);
-    g.lineWidth = 9;
-    g.strokeStyle = C.ink;
-    g.stroke();
-    g.lineWidth = 5;
-    g.strokeStyle = C.olive;
-    g.stroke();
-  } else if (kind === 'tomato') {
-    circle(g, 0, 0, 12);
-    fillStroke(g, vertical(g, -12, 12, [C.sauceLight, C.berry]), 2.5);
-    g.fillStyle = 'rgba(255, 230, 160, 0.9)';
-    for (let k = 0; k < 4; k++) {
-      const a = (k / 4) * Math.PI * 2 + 0.4;
-      oval(g, Math.cos(a) * 6, Math.sin(a) * 6, 2.6, 1.6, a);
-      g.fill();
-    }
-  } else {
-    g.beginPath();
-    g.ellipse(0, 0, 13, 10, 0, 0, Math.PI * 2);
-    g.lineWidth = 8;
-    g.strokeStyle = C.ink;
-    g.stroke();
-    g.lineWidth = 4.5;
-    g.strokeStyle = C.pepper;
-    g.stroke();
-  }
-  g.restore();
-}
-
-export interface PizzaLook {
-  /** How much of the dough the sauce covers, 0 to 1. */
-  sauce: number;
-  cheese: boolean;
-  /** The toppings that are on. */
-  toppings: readonly ToppingSpot[];
-  /** How baked it is: 0 raw, BAKE_TARGET golden, 1 crispy. */
-  baked: number;
-  /** Turns the sauce swirl. */
-  swirl?: number;
-}
-
-/**
- * A pizza centred on (x, y). With ry smaller than rx it's seen a little from
- * the side; toppings sit where their spots are on PIZZA_VIEW, scaled.
- */
-export function drawPizza(g: G, x: number, y: number, rx: number, ry: number, look: PizzaLook) {
-  const squash = ry / rx;
-  const golden = look.baked / BAKE_TARGET;
-  const crisp = (look.baked - BAKE_TARGET) / (1 - BAKE_TARGET);
-  const crust =
-    look.baked <= BAKE_TARGET
-      ? blend([C.dough, C.crustGold], golden)
-      : blend([C.crustGold, C.crustBrown], crisp);
-  const crustLight =
-    look.baked <= BAKE_TARGET
-      ? blend([C.doughLight, C.dough], golden)
-      : blend([C.dough, C.crustGold], crisp);
-
-  // The crust's side, then its top.
-  shadow(g, x + 6, y + ry * 0.35 + 10 * squash, rx * 0.98, ry * 0.75);
-  oval(g, x, y + 9 * squash + 2, rx, ry);
-  fillStroke(g, blend([crust, C.crustBrown], 0.35), 3.5);
-  oval(g, x, y, rx, ry);
-  const top = g.createRadialGradient(x - rx * 0.3, y - ry * 0.4, 4, x, y, rx);
-  top.addColorStop(0, crustLight);
-  top.addColorStop(1, crust);
-  fillStroke(g, top, 3.5);
-
-  // The middle, where the sauce goes.
-  const inner = 0.86;
-  oval(g, x, y, rx * inner, ry * inner);
-  g.fillStyle = blend([C.doughLight, crustLight], 0.5);
-  g.fill();
-  g.strokeStyle = 'rgba(184, 114, 58, 0.35)';
-  g.lineWidth = 2;
-  g.stroke();
-
-  if (look.sauce > 0) {
-    const cover = 0.22 + 0.78 * clamp01(look.sauce);
-    g.beginPath();
-    for (let i = 0; i <= 48; i++) {
-      const a = (i / 48) * Math.PI * 2;
-      const wobble = look.sauce < 1 ? 1 + Math.sin(a * 7 + (look.swirl ?? 0)) * 0.05 : 1;
-      const r = cover * inner * 0.96 * wobble;
-      g.lineTo(x + Math.cos(a) * rx * r, y + Math.sin(a) * ry * r);
-    }
-    g.closePath();
-    const sauce = g.createRadialGradient(x - rx * 0.2, y - ry * 0.2, 2, x, y, rx * cover);
-    sauce.addColorStop(0, C.sauceLight);
-    sauce.addColorStop(1, look.baked > BAKE_TARGET ? C.sauceDark : C.sauce);
-    g.fillStyle = sauce;
-    g.fill();
-    // A swirl in the sauce while it's being spread.
-    if (look.swirl !== undefined) {
-      g.strokeStyle = 'rgba(255, 170, 140, 0.8)';
-      g.lineWidth = 4;
-      g.lineCap = 'round';
-      for (let j = 0; j < 3; j++) {
-        const r = (0.2 + j * 0.22) * cover;
-        g.beginPath();
-        g.ellipse(x, y, rx * r, ry * r, 0, look.swirl + j * 2.1, look.swirl + j * 2.1 + 1.5);
-        g.stroke();
-      }
-    }
-  }
-
-  if (look.cheese) {
-    // Melty cheese in soft blobs, turning golden in the oven.
-    const cheese =
-      look.baked <= BAKE_TARGET
-        ? blend([C.cheese, C.cheeseGold], golden * 0.8)
-        : blend([C.cheeseGold, C.cheeseBrown], crisp);
-    g.fillStyle = cheese;
-    const blobs = [
-      [0, 0, 0.42],
-      [-0.42, -0.2, 0.26],
-      [0.42, -0.18, 0.27],
-      [-0.36, 0.3, 0.27],
-      [0.38, 0.3, 0.26],
-      [0, -0.48, 0.24],
-      [0.02, 0.5, 0.24],
-      [-0.6, 0.05, 0.18],
-      [0.6, 0.05, 0.18],
-    ];
-    for (const [bx, by, r] of blobs) {
-      oval(g, x + bx * rx, y + by * ry, r * rx, r * ry);
-      g.fill();
-    }
-    // Toasty spots once it's golden.
-    if (look.baked > BAKE_TARGET * 0.8) {
-      g.fillStyle = `rgba(200, 120, 40, ${0.25 + 0.35 * clamp01(crisp)})`;
-      for (const [bx, by] of [
-        [-0.25, -0.1],
-        [0.3, 0.12],
-        [0.05, 0.32],
-        [-0.45, 0.22],
-        [0.2, -0.36],
-      ]) {
-        oval(g, x + bx * rx, y + by * ry, 0.05 * rx, 0.05 * ry);
-        g.fill();
-      }
-    }
-    g.fillStyle = 'rgba(255, 255, 255, 0.45)';
-    oval(g, x - rx * 0.2, y - ry * 0.22, rx * 0.12, ry * 0.06, -0.3);
-    g.fill();
-  }
-
-  // Toppings, flattened to match the pizza's tilt.
-  const scale = rx / PIZZA_VIEW.rx;
-  look.toppings.forEach((spot, i) => {
-    const nx = (spot.x - PIZZA_VIEW.x) / PIZZA_VIEW.rx;
-    const ny = (spot.y - PIZZA_VIEW.y) / PIZZA_VIEW.ry;
-    PIECES.forEach(([dx, dy], k) => {
-      const tx = x + nx * rx + dx * scale;
-      const ty = y + ny * ry + dy * scale * (squash / (PIZZA_VIEW.ry / PIZZA_VIEW.rx));
-      g.save();
-      g.translate(tx, ty);
-      g.scale(1, Math.min(1, squash * 1.6));
-      toppingPiece(g, spot.kind, 0, 0, scale, i + k * 2.1);
-      g.restore();
-    });
-  });
 }
