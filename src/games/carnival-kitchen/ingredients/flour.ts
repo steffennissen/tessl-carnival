@@ -12,6 +12,7 @@ const flour: Ingredient = {
     stream: 'rgba(255, 247, 236, 0.95)',
     grains: C.white,
     meter: [C.woodLight, C.cream],
+    color: C.white,
     liquid: false,
     /** A paper flour bag with a heart. */
     drawContainer(g, pouring) {

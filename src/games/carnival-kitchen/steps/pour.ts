@@ -2,6 +2,7 @@ import { type G, circle, rounded } from '../art';
 import { artOf, ingredient } from '../ingredients';
 import {
   BOWL,
+  type KitchenState,
   POUR_RULES,
   TARGET_HIGH,
   TARGET_LOW,
@@ -19,18 +20,30 @@ import {
   type Step,
   type StepBasics,
 } from '../kit';
+import { smoothness, type BlendOptions, type BlendedArt } from './blend';
 import { drawCrackedEggs, type CrackFx, type CrackOptions, type CrackState } from './crack';
 
 /**
- * Pour: hold to pour each ingredient into the mixing bowl, and let go when
- * the meter reaches the star. Any eggs cracked earlier in the round are
- * already in the bowl.
+ * Pour: hold to pour each ingredient into something (the mixing bowl, the
+ * pot, the blender), and let go when the meter reaches the star. In the
+ * mixing bowl, any eggs cracked earlier in the round are already there.
  */
 
 export interface PourOptions extends StepBasics {
   kind: 'pour';
   /** What's poured, in order: each an ingredient with `pour` art. One pour each. */
   pours: string[];
+  /**
+   * What it's poured into: an ingredient with `pourInto` art, such as 'pot'
+   * or 'blender'. The mixing bowl if left out.
+   */
+  into?: string;
+  /**
+   * What's already in it from earlier steps: an ingredient with `blended`
+   * art, such as 'smoothie' (the chopped fruit). It's chunky, or smooth once
+   * a blend step earlier in the round has blended it.
+   */
+  inside?: string;
   /** Where the stars may sit, low to high. Defaults to TARGET_LOW to TARGET_HIGH. */
   targets?: [number, number];
 }
@@ -43,6 +56,8 @@ export interface PourArt {
   grains?: string;
   /** The meter's gradient, top to bottom. */
   meter: string[];
+  /** Its colour once it's in a pot or blender: a C colour or a palette one. */
+  color: string;
   /** Liquids fill the bowl under everything; anything else heaps up on top. */
   liquid: boolean;
   /**
@@ -54,13 +69,63 @@ export interface PourArt {
   drawInBowl(g: G, amount: number): void;
 }
 
+/** Something poured so far: its art, and how much of it is in (0 to 1). */
+export interface Poured {
+  art: PourArt;
+  amount: number;
+}
+
+/** Something you pour into other than the mixing bowl, seen from the side. */
+export interface PourIntoArt {
+  /**
+   * Where the stream lands, in scene units: inside its opening. The stream
+   * falls from y POUR_TOP, and the bag or jug tips over it from just above
+   * and to the left, so keep the opening below that.
+   */
+  mouth: { x: number; y: number };
+  /**
+   * Draws it on the counter with what's in it: `inside` (from earlier steps,
+   * `smooth` 0 chunky to 1 blended) under the pours so far, each in its
+   * `color`. `round` is there for anything else earlier steps did.
+   */
+  draw(
+    g: G,
+    look: {
+      t: number;
+      round: KitchenState;
+      inside: { art: BlendedArt; smooth: number } | null;
+      poured: Poured[];
+    },
+  ): void;
+}
+
 declare module '../kit/types' {
   interface StepKinds {
     pour: PourOptions;
   }
   interface IngredientArt {
     pour: PourArt;
+    pourInto: PourIntoArt;
   }
+}
+
+/** Where the stream starts falling, just under the tipped bag or jug. */
+export const POUR_TOP = 200;
+/** Where the stream lands in the mixing bowl. */
+const BOWL_MOUTH = { x: BOWL.x + 26, y: 335 };
+
+/** Where the stream lands for these options. */
+export function mouthOf(options: PourOptions): { x: number; y: number } {
+  return options.into ? artOf(options.into, 'pourInto').mouth : BOWL_MOUTH;
+}
+
+/**
+ * How blended `inside` is: 1 once a blend step earlier in the round has
+ * blended it smooth, 0 (chunky) before.
+ */
+export function insideSmoothness(round: KitchenState, inside: string): number {
+  const blend = findStep<HoldState, BlendOptions>(round, 'blend');
+  return blend && blend.options.contents === inside ? smoothness(blend.state) : 0;
 }
 
 interface PourFx {
@@ -70,7 +135,11 @@ interface PourFx {
 
 const pour: Step<PourOptions, HoldState, PourFx> = {
   kind: 'pour',
-  uses: (o) => o.pours.map((id) => [id, 'pour']),
+  uses: (o) => [
+    ...o.pours.map((id): [string, 'pour'] => [id, 'pour']),
+    ...(o.into ? [[o.into, 'pourInto'] as [string, 'pourInto']] : []),
+    ...(o.inside ? [[o.inside, 'blended'] as [string, 'blended']] : []),
+  ],
 
   start: (o, random) => {
     const [low, high] = o.targets ?? [TARGET_LOW, TARGET_HIGH];
@@ -89,10 +158,11 @@ const pour: Step<PourOptions, HoldState, PourFx> = {
 
   fx: () => ({ index: 0, timer: 0 }),
 
-  observe({ state: s, fx, dt, effects }) {
+  observe({ state: s, options, fx, dt, effects }) {
     if (s.index > fx.index) {
+      const mouth = mouthOf(options);
       effects.sound.pop();
-      effects.celebrate(BOWL.x, 290);
+      effects.celebrate(mouth.x - 26, mouth.y - 45);
     }
     fx.index = s.index;
     // Pouring glugs softly.
@@ -116,44 +186,60 @@ const pour: Step<PourOptions, HoldState, PourFx> = {
       Math.min(1, s.index > i ? 1 : s.index === i ? s.level / Math.max(0.2, target) : 0),
     );
 
-    // The stream, behind the container and into the bowl.
+    // The stream, behind the container and into its opening.
+    const mouth = mouthOf(options);
+    const fall = mouth.y - POUR_TOP;
     if (s.holding) {
-      const sx = BOWL.x + 26;
+      const sx = mouth.x;
       g.fillStyle = art.stream;
       g.strokeStyle = 'rgba(91, 59, 79, 0.25)';
       g.lineWidth = 2;
       const wob = Math.sin(t * 20) * 2;
-      rounded(g, sx - 7 + wob, 200, 14, 135, 7);
+      rounded(g, sx - 7 + wob, POUR_TOP, 14, fall, 7);
       g.fill();
       g.stroke();
       if (art.grains) {
         g.fillStyle = art.grains;
         for (let i = 0; i < 6; i++) {
-          const y = 200 + ((t * 300 + i * 23) % 135);
+          const y = POUR_TOP + ((t * 300 + i * 23) % fall);
           circle(g, sx + Math.sin(i * 2 + t * 9) * 9, y, 3);
           g.fill();
         }
       }
     }
 
-    // The bowl: liquids first, then any eggs cracked earlier, then the rest.
-    drawMixingBowl(g);
     const poured = options.pours.map((id, i) => ({ art: artOf(id, 'pour'), amount: amounts[i] }));
-    for (const p of poured) if (p.art.liquid && p.amount > 0) p.art.drawInBowl(g, p.amount);
-    const crack = findStep<CrackState, CrackOptions>(round, 'crack');
-    if (crack) {
-      drawCrackedEggs(
-        g,
-        crack.state,
-        artOf(crack.options.item, 'crack'),
-        view.fxOf<CrackFx>(crack),
-      );
+    if (options.into) {
+      artOf(options.into, 'pourInto').draw(g, {
+        t,
+        round,
+        inside: options.inside
+          ? {
+              art: artOf(options.inside, 'blended'),
+              smooth: insideSmoothness(round, options.inside),
+            }
+          : null,
+        poured,
+      });
+    } else {
+      // The bowl: liquids first, then any eggs cracked earlier, then the rest.
+      drawMixingBowl(g);
+      for (const p of poured) if (p.art.liquid && p.amount > 0) p.art.drawInBowl(g, p.amount);
+      const crack = findStep<CrackState, CrackOptions>(round, 'crack');
+      if (crack) {
+        drawCrackedEggs(
+          g,
+          crack.state,
+          artOf(crack.options.item, 'crack'),
+          view.fxOf<CrackFx>(crack),
+        );
+      }
+      for (const p of poured) if (!p.art.liquid && p.amount > 0) p.art.drawInBowl(g, p.amount);
     }
-    for (const p of poured) if (!p.art.liquid && p.amount > 0) p.art.drawInBowl(g, p.amount);
 
-    // The bag or jug, tipping over the bowl while you hold.
+    // The bag or jug, tipping over the opening while you hold.
     g.save();
-    g.translate(BOWL.x - 10, s.holding ? 168 : 160 + Math.sin(t * 2.5) * 3);
+    g.translate(mouth.x - 36, s.holding ? POUR_TOP - 32 : POUR_TOP - 40 + Math.sin(t * 2.5) * 3);
     g.rotate(s.holding ? 1.15 + Math.sin(t * 16) * 0.04 : Math.sin(t * 2) * 0.05);
     art.drawContainer(g, s.holding);
     g.restore();

@@ -15,9 +15,10 @@ const lobsterBisque: Dish = {
       contents: 'lobster-shells',
       title: 'Stir the shells and veggies!',
     },
-    { kind: 'pour', pours: ['sunset-splash'] },
+    { kind: 'pour', pours: ['sunset-splash'], into: 'pot', inside: 'bisque' },
     { kind: 'blend', blender: 'blender', contents: 'bisque' },
-    { kind: 'pour', pours: ['cream'] },
+    // Back in the pot, blended smooth, for a swirl of cream.
+    { kind: 'pour', pours: ['cream'], into: 'pot', inside: 'bisque' },
   ],
 
   draw(g, t) {

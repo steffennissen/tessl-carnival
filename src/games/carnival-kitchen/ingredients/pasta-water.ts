@@ -17,6 +17,7 @@ const pastaWater: Ingredient = {
   pour: {
     stream: 'rgba(223, 242, 255, 0.95)',
     meter: [C.sky, C.skyLight],
+    color: K.cloudy,
     liquid: true,
     /** A glass measuring jug of steamy water, with a spout and a handle. */
     drawContainer(g, pouring) {

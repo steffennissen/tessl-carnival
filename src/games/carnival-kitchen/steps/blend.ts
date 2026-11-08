@@ -49,8 +49,11 @@ export interface BlenderArt {
    * at about y 60, about 170 wide, with a face. `whirr` is whether it's on.
    */
   drawBase(g: G, look: { whirr: boolean; t: number; done: boolean }): void;
-  /** Draws the jar's glass, lid and handle over what's inside. */
-  drawJar(g: G, look: { whirr: boolean; t: number }): void;
+  /**
+   * Draws the jar's glass, lid and handle over what's inside. `open` leaves
+   * the lid off, for pouring in.
+   */
+  drawJar(g: G, look: { whirr: boolean; t: number; open?: boolean }): void;
 }
 
 /** What's in the blender: colours only. */
@@ -134,17 +137,20 @@ export function smoothness(state: HoldState): number {
   return clamp01(state.level / target);
 }
 
-/** Draws what's in the jar: chunky bits swirling, melting into one smooth colour. */
-function drawContents(
+/**
+ * Draws what's in the jar, standing on its foot at the origin: chunky bits
+ * swirling, melting into one smooth colour. `fill` is how full the jar is,
+ * 0 to 1: about two thirds while it blends. Clip to the jar first.
+ */
+export function drawBlended(
   g: G,
   jar: BlenderArt['jar'],
   art: BlendedArt,
-  look: { smooth: number; spin: number; shake: number; t: number },
+  look: { smooth: number; spin: number; shake: number; t: number; fill: number },
 ) {
   const { smooth, spin, shake, t } = look;
   const h = jar.height;
-  // It fills about two thirds of the jar, and swirls up the sides while it spins.
-  const fill = h * (0.62 + 0.06 * shake);
+  const fill = h * look.fill;
   const top = -fill;
   const widthAt = (y: number) => jar.bottom + (jar.top - jar.bottom) * (-y / h);
   const dip = 16 * shake;
@@ -329,7 +335,14 @@ const blendStep: Step<BlendOptions, HoldState, BlendFx> = {
     g.lineTo(bottom / 2, 0);
     g.closePath();
     g.clip();
-    drawContents(g, art.jar, contents, { smooth, spin: fx.spin, shake, t });
+    // It fills about two thirds of the jar, and swirls up the sides while it spins.
+    drawBlended(g, art.jar, contents, {
+      smooth,
+      spin: fx.spin,
+      shake,
+      t,
+      fill: 0.62 + 0.06 * shake,
+    });
     g.restore();
 
     art.drawJar(g, { whirr: s.holding, t });

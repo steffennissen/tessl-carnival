@@ -33,7 +33,8 @@ const cacioEPepe: Dish = {
   steps: [
     { kind: 'grate', item: 'pecorino' },
     { kind: 'season', shaker: 'black-pepper', food: 'pecorino', shakes: 3 },
-    { kind: 'pour', pours: ['pasta-water'], targets: [0.25, 0.45] },
+    // Into the bowl of peppery cheese, to mix into a cream.
+    { kind: 'pour', pours: ['pasta-water'], into: 'pecorino', targets: [0.25, 0.45] },
     { kind: 'mix', vessel: 'mixing-bowl', contents: 'cheese-cream' },
     { kind: 'toss', item: 'spaghetti' },
   ],
