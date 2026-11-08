@@ -226,7 +226,7 @@ framework and no native dependencies, so `npm ci` is the whole setup.
 - `src/midway/`: the walkable midway. Every registered game gets a booth along
   the avenue.
 - `src/carnival/`: the shared base every game uses: the game registry, scores,
-  prizes and theme.
+  stickers, preferences, prizes and theme.
 - `src/games/<game-id>/`: one folder per game. The water cannon is the pattern
   to copy.
 - `skills/`: skills that help an agent work on the carnival, such as adding a
