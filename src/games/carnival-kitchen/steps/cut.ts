@@ -1,15 +1,15 @@
 import { C, type G, circle, clamp01, easeOutBack, fillStroke, rounded, stickerText } from '../art';
 import {
-  QUIZ_BUBBLE,
-  QUIZ_SPEAKER,
   SMART_BONUS,
   choiceBoxes,
   drawChoice,
   drawQuestion,
+  middleOf,
   observeQuiz,
   pressQuiz,
   quizBubble,
   quizFx,
+  quizPlaces,
   solveQuiz,
   startQuiz,
   updateQuiz,
@@ -231,7 +231,7 @@ const cut: Step<CutOptions, QuizState, QuizFx> = {
   observe: (view) => observeQuiz(view),
 
   draw(view) {
-    const { g, t, options, state: s, fx, taking, round } = view;
+    const { g, t, options, state: s, fx, taking, round, shape } = view;
     const current = round.phase === 'playing' && round.steps[round.stepIndex]?.state === s;
     if (!current) {
       // Drawn after it's done (an ask step's picture): the food, big, cut right.
@@ -248,14 +248,17 @@ const cut: Step<CutOptions, QuizState, QuizFx> = {
     }
     if (!taking && s.age === 0) return;
     const q = options.question;
+    const { bubble, speaker } = quizPlaces(shape);
     const appear = easeOutBack(clamp01(s.age / 0.4));
+    const mid = middleOf(bubble);
     g.save();
-    g.translate(450, 200);
+    g.translate(mid.x, mid.y);
     g.scale(appear, appear);
-    g.translate(-450, -200);
-    drawQuestion(g, q.text, QUIZ_BUBBLE, QUIZ_SPEAKER, fx.reading, t);
+    g.translate(-mid.x, -mid.y);
+    drawQuestion(g, q.text, bubble, speaker, fx.reading, t);
     g.restore();
-    const boxes = choiceBoxes(q.choices.length, 'row');
+    // The quiz's own answer boxes for the shape, so a tap (pressQuiz) hits what's drawn.
+    const boxes = choiceBoxes(q.choices.length, q.layout, shape);
     boxes.forEach((b, i) => {
       const look =
         s.picked === i

@@ -25,7 +25,7 @@ import type { TopOptions } from '../steps/top';
  * a counting question about what she put on, with a picture of it: how many
  * in all, or (adding) how many with some more.
  *
- * Level 1: digits on the ticket, one or two kinds, up to 5 things; count
+ * Level 1: digits on the ticket, usually two kinds, up to 5 things; count
  * them, or add up to 3 more (within 10). Level 2: number words, two or
  * three kinds and something the customer doesn't want ("No tomatoes!");
  * add 3 to 9 more (within 20).
@@ -123,7 +123,9 @@ export function makeOrder(dish: Dish, level: Level, random: () => number): Order
   const most = level === 1 ? 2 : 3;
   // A burger has a patty and at least one more kind of layer.
   const fewest = target.kind === 'stack' ? 2 : must.length;
-  const want = Math.min(target.kinds.length, Math.max(fewest, between(random, level, most)));
+  // Level 1 usually asks for two kinds (four times in five), now and then one.
+  const kinds = level === 1 ? (random() < 0.8 ? 2 : 1) : between(random, level, most);
+  const want = Math.min(target.kinds.length, Math.max(fewest, kinds));
   const chosen = [...must];
   const pool = [...others];
   while (chosen.length < want && pool.length) {

@@ -1,6 +1,6 @@
 import { C, circle, clamp01, easeOutBack, fillStroke, rounded } from '../art';
+import type { Shape } from '../layout';
 import {
-  QUIZ_PICTURE,
   drawClock,
   drawQuiz,
   handAngles,
@@ -8,6 +8,7 @@ import {
   pressQuiz,
   quizBubble,
   quizFx,
+  quizPlaces,
   solveQuiz,
   startQuiz,
   updateQuiz,
@@ -44,12 +45,19 @@ declare module '../kit/types' {
   }
 }
 
-/** The big clock, in the middle of the quiz's picture. */
-export const READ_CLOCK = {
-  x: QUIZ_PICTURE.x + QUIZ_PICTURE.w / 2,
-  y: QUIZ_PICTURE.y + QUIZ_PICTURE.h / 2,
-  r: 100,
-} as const;
+/**
+ * The big clock, in the middle of the quiz's picture for the canvas's shape,
+ * as big as fits with a little room round it.
+ */
+export function readClockAt(shape: Shape = 'page') {
+  const box = quizPlaces(shape).picture;
+  return {
+    box,
+    x: box.x + box.w / 2,
+    y: box.y + box.h / 2,
+    r: Math.min(box.w, box.h) / 2 - 6,
+  };
+}
 
 const readClock: Step<ReadClockOptions, QuizState, QuizFx> = {
   kind: 'read-clock',
@@ -68,15 +76,15 @@ const readClock: Step<ReadClockOptions, QuizState, QuizFx> = {
   observe: (view) => observeQuiz(view),
 
   draw(view) {
-    const { g, t, options, state, taking } = view;
+    const { g, t, options, state, taking, shape } = view;
     if (!taking && state.age === 0) return;
-    const { x, y, r } = READ_CLOCK;
+    const { box, x, y, r } = readClockAt(shape);
     const pop = easeOutBack(clamp01(state.age / 0.4));
     g.save();
     g.translate(x, y);
     g.scale(pop, pop);
     g.translate(-x, -y);
-    rounded(g, QUIZ_PICTURE.x, QUIZ_PICTURE.y, QUIZ_PICTURE.w, QUIZ_PICTURE.h, 24);
+    rounded(g, box.x, box.y, box.w, box.h, 24);
     g.fillStyle = 'rgba(255, 255, 255, 0.55)';
     g.fill();
     drawClock(g, x, y, r, options.time, { t });

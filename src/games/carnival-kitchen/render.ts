@@ -76,7 +76,7 @@ import {
   type StepRun,
   type StepView,
 } from './kit';
-import { type Layout, layoutFor } from './layout';
+import { type Layout, type Shape, layoutFor } from './layout';
 import { NOTE, type Reading, type Sound } from './sound';
 import { SPINNER_DISH, SPIN_TIME, drawSpinner, reelPosition, spinEnd, spinTime } from './spinner';
 import { hintOf, iconOf, stepOf, titleOf } from './steps';
@@ -178,6 +178,22 @@ export function placesFor(layout: Layout) {
     bunny: { x: sx + 86, y: sy + 392 },
     speech: { x: sx + 12, y: sy + 230, w: 188, tail: 'down' } as Bubble,
   };
+}
+
+/**
+ * The step card's speaker button ("Read it myself"), in scene units: at the
+ * card's lower left, and on a phone at least about 60 CSS pixels across.
+ */
+export function cardSpeakerAt(shape: Shape) {
+  return { x: W / 2 - 200, y: 250 + 52, r: shape === 'tall' ? 48 : shape === 'wide' ? 40 : 28 };
+}
+
+/**
+ * Whether the recipe along the top hides its steps' pictures: while she puts
+ * the recipe in order (a `sequence` step), so it doesn't give the order away.
+ */
+export function recipeVeiled(state: KitchenState): boolean {
+  return state.phase === 'playing' && currentRun(state).kind === 'sequence';
 }
 
 /**
@@ -950,9 +966,11 @@ export function createRenderer(ctx: G, sound: Sound) {
     const g = ctx;
     const t = fx.time;
 
-    // The recipe: one bubble per cooking step (learning steps aren't in it).
+    // The recipe: one bubble per cooking step (learning steps aren't in it),
+    // each a question mark while she puts the recipe in order.
     const cooking = cookingSteps(state);
     const n = cooking.length;
+    const veiled = recipeVeiled(state);
     cooking.forEach((i, k) => {
       const run = state.steps[i];
       const x = places.recipe.x + (k - (n - 1) / 2) * 78;
@@ -976,8 +994,11 @@ export function createRenderer(ctx: G, sound: Sound) {
       circle(g, x, y, 25);
       fillStroke(g, done ? C.mint : current ? C.white : 'rgba(255, 255, 255, 0.6)', 3.5);
       g.globalAlpha = done || current ? 1 : 0.55;
-      g.fillStyle = C.ink;
-      emoji(g, iconOf(run), x, y + 2, 26);
+      if (veiled) plainText(g, '?', x, y + 1, 30, C.purple);
+      else {
+        g.fillStyle = C.ink;
+        emoji(g, iconOf(run), x, y + 2, 26);
+      }
       g.globalAlpha = 1;
       if (done) {
         circle(g, x + 18, y - 18, 10);
@@ -1113,9 +1134,6 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.globalAlpha = 1;
   }
 
-  /** The card's speaker button, in scene units ("Read it myself" only). */
-  const CARD_SPEAKER = { x: W / 2 - 200, y: 250 + 52, r: 28 };
-
   /** What a card says under its title: the step's number and minutes, or Smart Chef. */
   function cardLine(state: KitchenState): string {
     if (isLearning(state, state.stepIndex)) return '🎓 Smart Chef!';
@@ -1156,14 +1174,8 @@ export function createRenderer(ctx: G, sound: Sound) {
     if (reader) {
       const reading = cardReading() && card ? card.reading : null;
       const word = wordNow(reading);
-      drawSpeaker(
-        g,
-        CARD_SPEAKER.x - W / 2,
-        CARD_SPEAKER.y - 250,
-        CARD_SPEAKER.r,
-        word >= 0,
-        fx.time,
-      );
+      const speaker = cardSpeakerAt(layout.shape);
+      drawSpeaker(g, speaker.x - W / 2, speaker.y - 250, speaker.r, word >= 0, fx.time);
       const title = fitWords(g, titleOf(run), 360, 34, 1);
       drawWords(g, title.lines, 50, -62, title.size, 0, { highlight: word, color: C.hotPink });
       const hint = hintOf(run);
@@ -1870,9 +1882,10 @@ export function createRenderer(ctx: G, sound: Sound) {
 
     /** Whether a canvas point is on the step card's speaker ("Read it myself"). */
     hitCardSpeaker(x: number, y: number) {
-      const sx = CARD_SPEAKER.x + layout.sceneX;
-      const sy = CARD_SPEAKER.y + layout.sceneY;
-      return Math.hypot(x - sx, y - sy) <= CARD_SPEAKER.r + 10;
+      const speaker = cardSpeakerAt(layout.shape);
+      const sx = speaker.x + layout.sceneX;
+      const sy = speaker.y + layout.sceneY;
+      return Math.hypot(x - sx, y - sy) <= speaker.r + 10;
     },
 
     /** Reads the step's card out loud, its words lighting up as they're said. */

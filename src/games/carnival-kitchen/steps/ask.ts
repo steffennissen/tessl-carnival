@@ -1,11 +1,11 @@
 import { C, plainText, rounded, stickerText } from '../art';
 import {
-  QUIZ_PICTURE,
   drawQuiz,
   observeQuiz,
   pressQuiz,
   quizBubble,
   quizFx,
+  quizPlaces,
   solveQuiz,
   startQuiz,
   updateQuiz,
@@ -41,13 +41,13 @@ declare module '../kit/types' {
   }
 }
 
-/** The part of the scene the picture shows, scaled into QUIZ_PICTURE. */
+/** The part of the scene the picture shows, scaled into the quiz's picture box. */
 const SOURCE = { x: 200, y: 170, w: 400, h: 290 };
 
 /** Draws an earlier step as it was left, scaled down into the picture's box. */
 function drawPrevious(view: StepView<AskOptions, QuizState, QuizFx>, run: StepRun) {
   const { g } = view;
-  const box = QUIZ_PICTURE;
+  const box = quizPlaces(view.shape).picture;
   const step = stepOf(run.kind);
   const scale = Math.min(box.w / SOURCE.w, box.h / SOURCE.h);
   rounded(g, box.x, box.y, box.w, box.h, 24);
@@ -86,8 +86,9 @@ const ask: Step<AskOptions, QuizState, QuizFx> = {
   observe: (view) => observeQuiz(view),
 
   draw(view) {
-    const { g, options, round, state, taking } = view;
+    const { g, options, round, state, taking, shape } = view;
     if (!taking && state.age === 0) return;
+    const picture = quizPlaces(shape).picture;
     const side = (options.question.layout ?? 'side') === 'side';
     if (side && options.picture !== 'none') {
       const index = round.steps.findIndex((run) => run.state === state);
@@ -96,7 +97,7 @@ const ask: Step<AskOptions, QuizState, QuizFx> = {
     }
     if (side && options.tag) {
       g.save();
-      g.translate(QUIZ_PICTURE.x + QUIZ_PICTURE.w - 70, QUIZ_PICTURE.y + 30);
+      g.translate(picture.x + picture.w - 70, picture.y + 30);
       g.rotate(0.1);
       rounded(g, -62, -24, 124, 48, 24);
       g.fillStyle = C.butter;
@@ -104,7 +105,7 @@ const ask: Step<AskOptions, QuizState, QuizFx> = {
       stickerText(g, options.tag, 0, 1, 26, C.hotPink, 'center', 116);
       g.restore();
     } else if (side && options.picture === 'none') {
-      plainText(g, '🤔', QUIZ_PICTURE.x + QUIZ_PICTURE.w / 2, QUIZ_PICTURE.y + 100, 80, C.ink);
+      plainText(g, '🤔', picture.x + picture.w / 2, picture.y + 100, 80, C.ink);
     }
     drawQuiz(view);
   },

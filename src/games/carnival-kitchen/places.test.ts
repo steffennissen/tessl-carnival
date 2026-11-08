@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import recipeOrder from './activities/recipe-order';
+import { dishById } from './dishes';
+import { createState } from './game';
+import { plainPlan } from './kit';
 import { layoutFor } from './layout';
-import { placesFor } from './render';
+import { cardSpeakerAt, placesFor, recipeVeiled } from './render';
+import { cssScale, nextStep, playThrough, seeded } from './test-kit';
 
 interface Box {
   x: number;
@@ -53,4 +58,31 @@ describe('the badge of the dish being made', () => {
       for (const box of blocked) expect(overlaps(badge, box)).toBe(false);
     });
   }
+});
+
+describe("the step card's speaker (Read it myself)", () => {
+  it('is at least 60 CSS pixels across on a phone, and as it was on a computer', () => {
+    expect(cardSpeakerAt('page')).toEqual({ x: 200, y: 302, r: 28 });
+    for (const shape of ['wide', 'tall'] as const) {
+      expect(cardSpeakerAt(shape).r * 2 * cssScale(shape), shape).toBeGreaterThanOrEqual(60);
+    }
+  });
+});
+
+describe('the recipe along the top', () => {
+  it('hides its pictures while she puts the recipe in order, and only then', () => {
+    const soup = dishById('soup');
+    const steps = recipeOrder.weave({ dish: soup, level: 1, random: seeded(), start: 900 });
+    const dish = { ...soup, steps };
+    const state = createState(dish, seeded(), plainPlan(dish));
+    expect(state.steps[0].kind).toBe('sequence');
+    expect(recipeVeiled(state)).toBe(true);
+    nextStep(state);
+    expect(recipeVeiled(state)).toBe(true);
+    const seen: boolean[] = [];
+    playThrough(state, () => seen.push(recipeVeiled(state)));
+    expect(seen).toContain(false);
+    expect(state.phase).not.toBe('playing');
+    expect(recipeVeiled(state)).toBe(false);
+  });
 });

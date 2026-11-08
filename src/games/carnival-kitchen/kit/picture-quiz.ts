@@ -1,6 +1,5 @@
 import { C, type G, rounded } from '../art';
 import {
-  QUIZ_PICTURE,
   type Box,
   type Question,
   type QuizFx,
@@ -10,6 +9,7 @@ import {
   pressQuiz,
   quizBubble,
   quizFx,
+  quizPlaces,
   solveQuiz,
   startQuiz,
   updateQuiz,
@@ -19,9 +19,11 @@ import type { Step, StepBasics, StepView } from './types';
 /**
  * A question with a picture of its own beside the answers: a measuring cup,
  * a tray of cupcakes. It plays exactly like the `ask` step (steps/ask.ts);
- * only the picture differs, drawn by `picture` into QUIZ_PICTURE. A step file
- * makes one with `pictureQuiz('tray', drawTray)`; `more` replaces any of
- * the step's members, such as `uses` or `icon`.
+ * only the picture differs, drawn by `picture` into the quiz's picture box
+ * for the canvas's shape (`quizPlaces(shape).picture`), so it sits beside
+ * the answers on a phone too. A step file makes one with
+ * `pictureQuiz('tray', drawTray)`; `more` replaces any of the step's
+ * members, such as `uses` or `icon`.
  */
 
 /** What every picture question's recipe options have. */
@@ -50,11 +52,12 @@ export function pictureQuiz<O extends PictureQuizOptions>(
     fx: quizFx,
     observe: (view) => observeQuiz(view),
     draw(view) {
-      const { g, state, taking } = view;
+      const { g, state, taking, shape } = view;
       if (!taking && state.age === 0) return;
-      drawPictureCard(g, QUIZ_PICTURE);
+      const box = quizPlaces(shape).picture;
+      drawPictureCard(g, box);
       g.save();
-      picture(view, QUIZ_PICTURE);
+      picture(view, box);
       g.restore();
       drawQuiz(view);
     },

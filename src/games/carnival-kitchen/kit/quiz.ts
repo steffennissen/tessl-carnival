@@ -10,6 +10,7 @@ import {
   stickerText,
   vertical,
 } from '../art';
+import type { Shape } from '../layout';
 import type { Reading } from '../sound';
 import { type AnswerState, SMART_BONUS, answer, autoReadDelay, startAnswer } from './learn';
 import { finishStep } from './rules';
@@ -53,16 +54,100 @@ export interface Question {
 /** Seconds a right answer is cheered before the step moves on. */
 export const QUIZ_OUTRO = 1.6;
 
-/** Where the question's bubble goes, and its speaker button. Clear of the HUD in every layout. */
+/** A round button, such as the speaker: its middle and radius, in scene units. */
+export interface Disc {
+  x: number;
+  y: number;
+  r: number;
+}
+
+/**
+ * Where the question's bubble goes, and its speaker button, on a computer
+ * ('page'). Clear of the HUD in every layout. A phone gets bigger ones: use
+ * `quizPlaces(view.shape)`, which has these for the page.
+ */
 export const QUIZ_BUBBLE: Box = { x: 215, y: 150, w: 470, h: 88 };
-export const QUIZ_SPEAKER = { x: 254, y: 194, r: 24 };
-/** Where a picture goes beside 'side' answers. */
+export const QUIZ_SPEAKER: Disc = { x: 254, y: 194, r: 24 };
+/**
+ * Where a picture goes beside 'side' answers on a computer and a phone held
+ * sideways. A phone held upright has its own: `quizPlaces('tall').picture`.
+ */
 export const QUIZ_PICTURE: Box = { x: 215, y: 248, w: 315, h: 212 };
 
-/** The answer buttons for `count` choices, in scene units. */
-export function choiceBoxes(count: number, layout: Question['layout'] = 'side'): Box[] {
-  const gap = 10;
+/** Where a question's pieces go for a canvas shape (see `quizPlaces`). */
+export interface QuizPlaces {
+  bubble: Box;
+  speaker: Disc;
+  /** A picture beside 'side' answers. */
+  picture: Box;
+  /** One big button under the question, such as "Let's cook!" or "Check!". */
+  button: Box;
+}
+
+/**
+ * Where the question's bubble, speaker, picture and a big button go, for the
+ * canvas's shape. On a computer they're as they always were; on a phone
+ * everything a finger taps is at least about 60 CSS pixels: the speaker is
+ * bigger, and held upright the bubble spans the screen with the picture
+ * under it at the left.
+ */
+export function quizPlaces(shape: Shape = 'page'): QuizPlaces {
+  if (shape === 'tall') {
+    return {
+      bubble: { x: 110, y: 100, w: 580, h: 104 },
+      speaker: { x: 169, y: 152, r: 47 },
+      picture: { x: 110, y: 214, w: 340, h: 246 },
+      button: { x: 220, y: 350, w: 360, h: 106 },
+    };
+  }
+  return {
+    bubble: QUIZ_BUBBLE,
+    speaker: shape === 'wide' ? { x: 268, y: 194, r: 40 } : QUIZ_SPEAKER,
+    picture: QUIZ_PICTURE,
+    button:
+      shape === 'wide' ? { x: 320, y: 378, w: 260, h: 84 } : { x: 340, y: 400, w: 220, h: 58 },
+  };
+}
+
+/** `count` boxes filling `area` in `cols` columns, row by row; a last odd one is centred. */
+function grid(area: Box, count: number, cols: number, gap: number): Box[] {
+  const rows = Math.ceil(count / cols);
+  const w = (area.w - gap * (cols - 1)) / cols;
+  const h = (area.h - gap * (rows - 1)) / rows;
+  return Array.from({ length: count }, (_, i) => {
+    const row = Math.floor(i / cols);
+    const inRow = Math.min(cols, count - row * cols);
+    const left = area.x + (area.w - (inRow * w + gap * (inRow - 1))) / 2;
+    return { x: left + (i % cols) * (w + gap), y: area.y + row * (h + gap), w, h };
+  });
+}
+
+/**
+ * The answer buttons for `count` choices, in scene units, for the canvas's
+ * shape. On a computer: down the right of the picture, or a row under the
+ * question. On a phone held sideways the side buttons fill the room at the
+ * right, two to a row; held upright they're stacked beside the picture (two
+ * to a row for four), and a row's buttons are much taller. Clear of the
+ * bubble, the picture, Chef Bunny and the HUD in every shape.
+ */
+export function choiceBoxes(
+  count: number,
+  layout: Question['layout'] = 'side',
+  shape: Shape = 'page',
+): Box[] {
   if (layout === 'row') {
+    if (shape === 'tall') {
+      const gap = 14;
+      const w = Math.min(190, (580 - gap * (count - 1)) / count);
+      const left = 400 - (count * w + gap * (count - 1)) / 2;
+      return Array.from({ length: count }, (_, i) => ({
+        x: left + i * (w + gap),
+        y: 250,
+        w,
+        h: 170,
+      }));
+    }
+    const gap = 10;
     const w = Math.min(150, (470 - gap * (count - 1)) / count);
     const left = 450 - (count * w + gap * (count - 1)) / 2;
     return Array.from({ length: count }, (_, i) => ({
@@ -72,6 +157,13 @@ export function choiceBoxes(count: number, layout: Question['layout'] = 'side'):
       h: 110,
     }));
   }
+  if (shape === 'wide') {
+    return grid({ x: 545, y: 248, w: 245, h: 214 }, count, count <= 2 ? 1 : 2, 12);
+  }
+  if (shape === 'tall') {
+    return grid({ x: 460, y: 214, w: 230, h: 326 }, count, count <= 3 ? 1 : 2, 12);
+  }
+  const gap = 10;
   const top = QUIZ_PICTURE.y;
   const h = (QUIZ_PICTURE.h - gap * (count - 1)) / count;
   return Array.from({ length: count }, (_, i) => ({ x: 545, y: top + i * (h + gap), w: 145, h }));
@@ -105,12 +197,13 @@ const inBox = (b: Box, x: number, y: number) =>
 export function pressQuiz(turn: Turn<StepBasics, QuizState>, x: number, y: number): boolean {
   const s = turn.state;
   if (s.picked !== null) return true;
-  if (inCircle(QUIZ_SPEAKER.x, QUIZ_SPEAKER.y, QUIZ_SPEAKER.r, x, y)) {
+  const { speaker } = quizPlaces(turn.shape);
+  if (inCircle(speaker.x, speaker.y, speaker.r, x, y)) {
     s.reads += 1;
     return true;
   }
   const q = s.question;
-  const i = choiceBoxes(q.choices.length, q.layout).findIndex((b) => inBox(b, x, y));
+  const i = choiceBoxes(q.choices.length, q.layout, turn.shape).findIndex((b) => inBox(b, x, y));
   if (i < 0 || s.tried.includes(i) || (s.shown && i !== q.answer)) return true;
   const result = answer(turn.round, s, i === q.answer);
   if (result === 'right') s.picked = i;
@@ -140,7 +233,7 @@ export function quizBubble(s: QuizState): [string, string] | null {
 /** For tests: taps the right answer and waits for the step to end. */
 export function solveQuiz(turn: Turn<StepBasics, QuizState>): void {
   const q = turn.state.question;
-  const b = choiceBoxes(q.choices.length, q.layout)[q.answer];
+  const b = choiceBoxes(q.choices.length, q.layout, turn.shape)[q.answer];
   pressQuiz(turn, b.x + b.w / 2, b.y + b.h / 2);
   updateQuiz(turn, QUIZ_OUTRO);
 }
@@ -183,7 +276,7 @@ export function observeQuiz(
   const { sound } = effects;
   const settings = round.learn.settings;
   const q = s.question;
-  const boxes = choiceBoxes(q.choices.length, q.layout);
+  const boxes = choiceBoxes(q.choices.length, q.layout, view.shape);
   const delay = autoReadDelay(settings, pause);
   if (taking && !fx.autoRead && delay !== null && s.age >= delay && s.picked === null) {
     fx.autoRead = true;
@@ -224,6 +317,8 @@ export function wordNow(reading: Reading | null): number {
 /**
  * The question's bubble: a speaker button to hear it, and the text, the
  * word being read lit up. Used by the quiz; any learning step can use it.
+ * The text goes beside the speaker, or under it when a narrow bubble has
+ * more room there (as set-clock's on a phone held upright).
  */
 export function drawQuestion(
   g: G,
@@ -237,12 +332,16 @@ export function drawQuestion(
   fillStroke(g, C.white, 4, C.hotPink);
   const highlight = wordNow(reading);
   drawSpeaker(g, speaker.x, speaker.y, speaker.r, highlight >= 0, t);
-  const left = speaker.x + speaker.r + 12;
-  const width = box.x + box.w - 16 - left;
-  const fit = fitWords(g, text, width, 28, Math.max(1, Math.floor(box.h / 36)));
+  const beside = box.x + box.w - (speaker.x + speaker.r);
+  const below = box.y + box.h - (speaker.y + speaker.r);
+  const area =
+    beside >= below
+      ? { x: speaker.x + speaker.r + 12, y: box.y, w: beside - 28, h: box.h }
+      : { x: box.x + 16, y: speaker.y + speaker.r + 4, w: box.w - 32, h: below - 10 };
+  const fit = fitWords(g, text, area.w, 28, Math.max(1, Math.floor(area.h / 36)));
   const gap = fit.size * 1.3;
-  const top = box.y + box.h / 2 - ((fit.lines.length - 1) * gap) / 2;
-  drawWords(g, fit.lines, left + width / 2, top, fit.size, gap, { highlight, color: C.ink });
+  const top = area.y + area.h / 2 - ((fit.lines.length - 1) * gap) / 2;
+  drawWords(g, fit.lines, area.x + area.w / 2, top, fit.size, gap, { highlight, color: C.ink });
 }
 
 /** One answer button: plain, tried (greyed), shown (glowing) or right (mint, with a tick). */
@@ -292,20 +391,23 @@ export function drawChoice(
 
 /**
  * Draws the quiz: the question's bubble, then the answers. Draw any
- * picture first (in QUIZ_PICTURE for 'side' answers).
+ * picture first (in `quizPlaces(view.shape).picture` for 'side' answers).
  */
 export function drawQuiz(view: StepView<StepBasics, QuizState, QuizFx>): void {
-  const { g, t, state: s, fx, taking } = view;
+  const { g, t, state: s, fx, taking, shape } = view;
   const q = s.question;
   const appear = easeOutBack(clamp01(s.age / 0.4));
   if (!taking && s.age === 0) return;
+  const { bubble, speaker } = quizPlaces(shape);
+  const boxes = choiceBoxes(q.choices.length, q.layout, shape);
+  const mid = middleOf(bubble);
   g.save();
-  g.translate(450, 200);
+  g.translate(mid.x, mid.y);
   g.scale(appear, appear);
-  g.translate(-450, -200);
-  drawQuestion(g, q.text, QUIZ_BUBBLE, QUIZ_SPEAKER, fx.reading, t);
+  g.translate(-mid.x, -mid.y);
+  drawQuestion(g, q.text, bubble, speaker, fx.reading, t);
   g.restore();
-  choiceBoxes(q.choices.length, q.layout).forEach((b, i) => {
+  boxes.forEach((b, i) => {
     const look =
       s.picked === i
         ? 'right'
@@ -324,7 +426,7 @@ export function drawQuiz(view: StepView<StepBasics, QuizState, QuizFx>): void {
     g.restore();
   });
   if (s.picked !== null) {
-    const b = choiceBoxes(q.choices.length, q.layout)[s.picked];
+    const b = boxes[s.picked];
     const pop = easeOutBack(clamp01(s.after / 0.35));
     g.save();
     g.translate(b.x + b.w / 2, b.y - 18);

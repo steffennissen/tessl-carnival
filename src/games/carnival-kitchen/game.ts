@@ -38,7 +38,7 @@ import {
   type Pointer,
   type RoundPlan,
 } from './kit';
-import { NARROW, layoutFor, sameLayout, toScene } from './layout';
+import { NARROW, layoutFor, sameLayout, toScene, type Shape } from './layout';
 import { createRenderer } from './render';
 import { createSound } from './sound';
 import { stepOf } from './steps';
@@ -181,25 +181,26 @@ function taking(state: KitchenState): boolean {
  * on a press. Returns false for a tap that came too early ("Not yet!"): the
  * egg, the topping or the heart wasn't near its spot yet, so nothing happened.
  */
-export function press(state: KitchenState, x: number, y: number): boolean {
+export function press(state: KitchenState, x: number, y: number, shape?: Shape): boolean {
   if (!taking(state)) return true;
-  return stepOf(currentKind(state)).press?.(currentTurn(state), x, y) !== false;
+  return stepOf(currentKind(state)).press?.({ ...currentTurn(state), shape }, x, y) !== false;
 }
 
 /** Moves the held-down pointer to (x, y): stirring, mostly. */
-export function move(state: KitchenState, x: number, y: number): void {
+export function move(state: KitchenState, x: number, y: number, shape?: Shape): void {
   if (!taking(state)) return;
-  stepOf(currentKind(state)).move?.(currentTurn(state), x, y);
+  stepOf(currentKind(state)).move?.({ ...currentTurn(state), shape }, x, y);
 }
 
 /**
  * Lets go of the pointer: lifts the spoon, stops pouring, takes the pizza
  * out. Returns the points that scored, 'not yet' for a let-go that came too
- * soon ("Not yet!"), or null.
+ * soon ("Not yet!"), or null. `shape` (on press and move too) is the
+ * canvas's, for steps whose buttons are bigger on a phone.
  */
-export function release(state: KitchenState): number | 'not yet' | null {
+export function release(state: KitchenState, shape?: Shape): number | 'not yet' | null {
   if (!taking(state)) return null;
-  return stepOf(currentKind(state)).release?.(currentTurn(state)) ?? null;
+  return stepOf(currentKind(state)).release?.({ ...currentTurn(state), shape }) ?? null;
 }
 
 /** Advances the game by `dt` seconds. */
@@ -458,7 +459,8 @@ export const carnivalKitchen: CarnivalGame = {
         saveScore();
         newRound();
       } else {
-        if (!press(state, pointer.x, pointer.y)) renderer.notYet(pointer.x, pointer.y);
+        if (!press(state, pointer.x, pointer.y, layout.shape))
+          renderer.notYet(pointer.x, pointer.y);
       }
     };
     const onMove = (event: PointerEvent) => {
@@ -466,7 +468,7 @@ export const carnivalKitchen: CarnivalGame = {
       track(event);
       if (!pointer.down) return;
       if (decorating()) decorMove(decor, pointer.x, pointer.y);
-      else move(state, pointer.x, pointer.y);
+      else move(state, pointer.x, pointer.y, layout.shape);
     };
     const onUp = (event: PointerEvent) => {
       if (event.pointerId !== activePointer) return;
@@ -481,7 +483,7 @@ export const carnivalKitchen: CarnivalGame = {
         if (did === 'place') renderer.sparkle(pointer.x, pointer.y);
         if (did === 'select' || did === 'unselect') sound.pop();
         if (did === 'remove') sound.whoosh();
-      } else if (release(state) === 'not yet') {
+      } else if (release(state, layout.shape) === 'not yet') {
         renderer.notYet(pointer.x, pointer.y);
       }
       saveScore();

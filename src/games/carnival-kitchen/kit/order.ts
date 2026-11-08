@@ -1,4 +1,5 @@
 import { C, type G, emoji, fillStroke, plainText, rounded } from '../art';
+import type { Shape } from '../layout';
 
 /**
  * An order ticket: what a customer asked for, such as "One pizza with 2
@@ -35,28 +36,63 @@ export function orderCounts(order: Order, placed: readonly string[]): number[] {
   return order.lines.map((line) => placed.filter((id) => id === line.id).length);
 }
 
-/** Where the pinned note goes: at the right, clear of the cooking and the HUD in every layout. */
+/**
+ * Where the pinned note goes on a phone held upright: at the right, clear of
+ * the cooking and the HUD.
+ */
 export const NOTE_SPOT = { x: 606, y: 168, w: 88 } as const;
 
 /**
- * The order's note, pinned up at NOTE_SPOT: each line's emoji and how many
- * are on of how many, with a tick once it's done, and anything the customer
- * doesn't want crossed out. `placed` is the ids put on so far.
+ * Where the note goes for the canvas's shape. On a computer and a phone held
+ * sideways it hangs from a little ticket rail at the right, under the
+ * kitchen clock and the shelf (so it covers neither) and below the lane the
+ * toppings float along; held upright it's pinned at NOTE_SPOT.
  */
-export function drawOrderNote(g: G, order: Order, placed: readonly string[], t: number): void {
-  const { x, y, w } = NOTE_SPOT;
+export function noteSpot(shape: Shape = 'page'): {
+  x: number;
+  y: number;
+  w: number;
+  rail: boolean;
+} {
+  return shape === 'tall' ? { ...NOTE_SPOT, rail: false } : { x: 704, y: 252, w: 88, rail: true };
+}
+
+/**
+ * The order's note, pinned up (see `noteSpot`): each line's emoji and how
+ * many are on of how many, with a tick once it's done, and anything the
+ * customer doesn't want crossed out. `placed` is the ids put on so far.
+ */
+export function drawOrderNote(
+  g: G,
+  order: Order,
+  placed: readonly string[],
+  t: number,
+  shape: Shape = 'page',
+): void {
+  const { x, y, w, rail } = noteSpot(shape);
   const rows = order.lines.length + (order.without ? 1 : 0);
   const h = 40 + rows * 38;
   const counts = orderCounts(order, placed);
+  if (rail) {
+    // A short steel rail on the wall, like a diner's ticket rail.
+    rounded(g, x - 10, y - 10, w + 20, 12, 6);
+    fillStroke(g, C.steel, 3, C.steelDark);
+  }
   g.save();
   g.translate(x + w / 2, y);
-  g.rotate(Math.sin(t * 1.3) * 0.02 + 0.03);
+  g.rotate(Math.sin(t * 1.3) * 0.02 + (rail ? 0 : 0.03));
   rounded(g, -w / 2, 0, w, h, 10);
   fillStroke(g, C.cream, 3);
-  // A pin at the top.
-  g.beginPath();
-  g.arc(0, 2, 7, 0, Math.PI * 2);
-  fillStroke(g, C.hotPink, 2.5);
+  if (rail) {
+    // A clip holding it to the rail.
+    rounded(g, -14, -8, 28, 16, 5);
+    fillStroke(g, C.hotPink, 2.5);
+  } else {
+    // A pin at the top.
+    g.beginPath();
+    g.arc(0, 2, 7, 0, Math.PI * 2);
+    fillStroke(g, C.hotPink, 2.5);
+  }
   plainText(g, 'Order', 0, 22, 16, C.purple);
   order.lines.forEach((line, i) => {
     const ly = 56 + i * 38;

@@ -205,7 +205,7 @@ const top: Step<TopOptions, TopState, TopFx> = {
     fx.prevX = state.x;
   },
 
-  draw({ g, t, state: top, options, fx, taking, round }) {
+  draw({ g, t, state: top, options, fx, taking, round, shape }) {
     const spots = top.spots;
     const placed = top.results.length - (fx.drop ? 1 : 0);
     // The order's note, while it's being filled (not in a picture of it later).
@@ -215,6 +215,7 @@ const top: Step<TopOptions, TopState, TopFx> = {
         options.order,
         spots.slice(0, placed).map((s) => s.id),
         t,
+        shape,
       );
     }
     artOf(options.base, 'toppingBase').draw(g, { toppings: spots.slice(0, placed), t, round });

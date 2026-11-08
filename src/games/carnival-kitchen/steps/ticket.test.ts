@@ -3,8 +3,8 @@ import { press, tick } from '../game';
 import { dishById } from '../dishes';
 import { middleOf, type Order } from '../kit';
 import { createState } from '../game';
-import { current, drawRound, nextStep, seeded } from '../test-kit';
-import { TICKET, TICKET_READY, type TicketOptions, type TicketState } from './ticket';
+import { cssScale, current, drawRound, keepClear, nextStep, overlaps, seeded } from '../test-kit';
+import { TICKET, TICKET_READY, ticketPlaces, type TicketOptions, type TicketState } from './ticket';
 import { plainPlan } from '../kit';
 
 const ORDER: Order = {
@@ -48,6 +48,26 @@ describe('ticket', () => {
       const state = onTicket();
       tick(state, 0.3);
       drawRound(state, new Map(), 1 / 60, shape);
+    }
+  });
+
+  it("has a big speaker and Let's cook! on a phone, which a tap there hits", () => {
+    expect(ticketPlaces('page')).toBe(TICKET);
+    for (const shape of ['wide', 'tall'] as const) {
+      const { paper, speaker, button } = ticketPlaces(shape);
+      const scale = cssScale(shape);
+      expect(speaker.r * 2 * scale).toBeGreaterThanOrEqual(60);
+      expect(button.h * scale).toBeGreaterThanOrEqual(60);
+      expect(overlaps(button, paper)).toBe(false);
+      for (const clear of keepClear(shape)) {
+        expect(overlaps(button, clear)).toBe(false);
+        expect(overlaps(paper, clear)).toBe(false);
+      }
+      const state = onTicket();
+      tick(state, TICKET_READY);
+      const at = middleOf(button);
+      expect(press(state, at.x, at.y, shape)).toBe(true);
+      expect(current<TicketState>(state).done).toBe(true);
     }
   });
 });

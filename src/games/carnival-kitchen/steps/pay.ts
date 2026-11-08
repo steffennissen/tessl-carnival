@@ -12,19 +12,21 @@ import {
   stickerText,
   vertical,
 } from '../art';
+import type { Shape } from '../layout';
 import {
-  QUIZ_BUBBLE,
   QUIZ_OUTRO,
-  QUIZ_SPEAKER,
   SMART_BONUS,
   answer,
   autoReadDelay,
   drawQuestion,
   finishStep,
   inCircle,
+  middleOf,
+  quizPlaces,
   startAnswer,
   type AnswerState,
   type Box,
+  type Disc,
   type Feedback,
   type Step,
   type StepBasics,
@@ -81,29 +83,98 @@ declare module '../kit/types' {
   }
 }
 
-/** Where everything goes, in scene units: clear of Chef Bunny and the HUD in every layout. */
+/** The tray, the total paid and Check! on a computer, in scene units. */
 export const TRAY: Box = { x: 215, y: 250, w: 330, h: 110 };
 export const PAID: Box = { x: 558, y: 250, w: 132, h: 50 };
 export const PAY_CHECK: Box = { x: 558, y: 308, w: 132, h: 56 };
 /** The most coins the tray holds. */
 export const TRAY_MOST = 16;
-const BANK_Y = 414;
-const TRAY_GAP = 40;
 
-/** Where the bank's coins sit, in order. */
-export function bankSpots(
-  coins: readonly CoinId[],
-): { id: CoinId; x: number; y: number; r: number }[] {
-  const gap = 475 / coins.length;
-  return coins.map((id, i) => ({ id, x: 215 + gap * (i + 0.5), y: BANK_Y, r: COINS[id].r }));
+/** Where the paying's pieces go, for a canvas shape (see `payPlaces`). */
+export interface PayPlaces {
+  bubble: Box;
+  speaker: Disc;
+  tray: Box;
+  paid: Box;
+  check: Box;
+  /** The tray's first coin, the gaps to the next one (8 to a row) and the next row, and the coins' size. */
+  trayCoins: { x: number; y: number; dx: number; dy: number; r: number };
+  /**
+   * The bank's row of coins: across `x` to `x + w` at height `y`, drawn
+   * `scale` times their size in COINS, and a tap within `reach` of one (or
+   * just off its edge) taps it.
+   */
+  bank: { x: number; w: number; y: number; scale: number; reach: number };
 }
 
-/** Where the `i`th coin in the tray sits: two rows of 8. */
-export function traySpot(i: number): { x: number; y: number } {
+/**
+ * Where everything goes for the canvas's shape, clear of Chef Bunny, the
+ * HUD and the progress pill. On a computer: the tray under the question,
+ * the total and Check! beside it, and the bank along the bottom. On a phone
+ * held sideways the tray's coins are bigger and Check! is big at the right.
+ * Held upright the tray spans the screen under the question, then the bank
+ * with bigger coins, then the total and Check! either side of the pill.
+ * Everything a finger taps is at least about 60 CSS pixels.
+ */
+export function payPlaces(shape: Shape = 'page'): PayPlaces {
+  if (shape === 'tall') {
+    const { bubble, speaker } = quizPlaces('tall');
+    return {
+      bubble,
+      speaker,
+      tray: { x: 110, y: 214, w: 580, h: 118 },
+      paid: { x: 110, y: 450, w: 240, h: 94 },
+      check: { x: 450, y: 450, w: 240, h: 94 },
+      trayCoins: { x: 155, y: 244, dx: 70, dy: 58, r: 27 },
+      bank: { x: 110, w: 580, y: 388, scale: 1.2, reach: 48 },
+    };
+  }
+  const { bubble, speaker } = quizPlaces(shape);
+  if (shape === 'wide') {
+    return {
+      bubble,
+      speaker,
+      tray: { x: 215, y: 250, w: 380, h: 110 },
+      paid: { x: 607, y: 250, w: 178, h: 62 },
+      check: { x: 607, y: 328, w: 178, h: 102 },
+      trayCoins: { x: 240, y: 280, dx: 46, dy: 50, r: 22 },
+      bank: { x: 215, w: 385, y: 420, scale: 1, reach: 44 },
+    };
+  }
   return {
-    x: TRAY.x + 25 + (i % 8) * TRAY_GAP,
-    y: TRAY.y + 32 + Math.floor(i / 8) * 46,
+    bubble,
+    speaker,
+    tray: TRAY,
+    paid: PAID,
+    check: PAY_CHECK,
+    trayCoins: { x: 240, y: 282, dx: 40, dy: 46, r: 19 },
+    bank: { x: 215, w: 475, y: 414, scale: 1, reach: 44 },
   };
+}
+
+/** A coin in the bank: where it sits, how big it's drawn, and how far off it a tap still taps it. */
+export interface BankSpot {
+  id: CoinId;
+  x: number;
+  y: number;
+  r: number;
+  reach: number;
+}
+
+/** Where the bank's coins sit, in order. */
+export function bankSpots(coins: readonly CoinId[], shape: Shape = 'page'): BankSpot[] {
+  const { bank } = payPlaces(shape);
+  const gap = bank.w / coins.length;
+  return coins.map((id, i) => {
+    const r = COINS[id].r * bank.scale;
+    return { id, x: bank.x + gap * (i + 0.5), y: bank.y, r, reach: Math.max(bank.reach, r + 8) };
+  });
+}
+
+/** Where the `i`th coin in the tray sits, and its size: two rows of 8. */
+export function traySpot(i: number, shape: Shape = 'page'): { x: number; y: number; r: number } {
+  const { trayCoins: c } = payPlaces(shape);
+  return { x: c.x + (i % 8) * c.dx, y: c.y + Math.floor(i / 8) * c.dy, r: c.r };
 }
 
 /** What coins add up to, in cents. */
@@ -181,11 +252,12 @@ export function pressPay(turn: Turn<PayOptions, PayState>, x: number, y: number)
   const s = turn.state;
   const { price, coins } = turn.options;
   if (s.done) return true;
-  if (inCircle(QUIZ_SPEAKER.x, QUIZ_SPEAKER.y, QUIZ_SPEAKER.r, x, y)) {
+  const places = payPlaces(turn.shape);
+  if (inCircle(places.speaker.x, places.speaker.y, places.speaker.r, x, y)) {
     s.reads += 1;
     return true;
   }
-  if (inBox(PAY_CHECK, x, y)) {
+  if (inBox(places.check, x, y)) {
     // An empty tray isn't a try: nothing happens.
     if (s.tray.length) check(turn);
     return true;
@@ -194,13 +266,13 @@ export function pressPay(turn: Turn<PayOptions, PayState>, x: number, y: number)
   if (s.shown) return true;
   // A coin in the tray goes back.
   for (let i = s.tray.length - 1; i >= 0; i--) {
-    const at = traySpot(i);
-    if (Math.hypot(x - at.x, y - at.y) <= 22) {
+    const at = traySpot(i, turn.shape);
+    if (Math.hypot(x - at.x, y - at.y) <= at.r + 3) {
       s.tray.splice(i, 1);
       return true;
     }
   }
-  const coin = bankSpots(coins).find((c) => Math.hypot(x - c.x, y - c.y) <= Math.max(44, c.r + 8));
+  const coin = bankSpots(coins, turn.shape).find((c) => Math.hypot(x - c.x, y - c.y) <= c.reach);
   if (!coin) return true;
   if (s.tray.length >= TRAY_MOST) return false;
   s.tray.push(coin.id);
@@ -274,7 +346,8 @@ const pay: Step<PayOptions, PayState, PayFx> = {
   },
   solve(turn) {
     turn.state.tray = fewestCoins(turn.options.price, turn.options.coins);
-    pressPay(turn, PAY_CHECK.x + PAY_CHECK.w / 2, PAY_CHECK.y + PAY_CHECK.h / 2);
+    const middle = middleOf(payPlaces(turn.shape).check);
+    pressPay(turn, middle.x, middle.y);
     pay.update?.(turn, QUIZ_OUTRO);
   },
 
@@ -290,7 +363,8 @@ const pay: Step<PayOptions, PayState, PayFx> = {
     done: false,
   }),
 
-  observe({ state: s, options, fx, effects, round, taking }) {
+  observe({ state: s, options, fx, effects, round, taking, shape }) {
+    const { tray, check } = payPlaces(shape);
     const { sound } = effects;
     const settings = round.learn.settings;
     const delay = autoReadDelay(settings);
@@ -319,11 +393,11 @@ const pay: Step<PayOptions, PayState, PayFx> = {
         sound.say('Oops, too much! Tap a coin in the tray to give it back.');
     }
     fx.over = over;
-    const check = { x: PAY_CHECK.x + PAY_CHECK.w / 2, y: PAY_CHECK.y + PAY_CHECK.h / 2 };
+    const middle = middleOf(check);
     if (s.wrong > fx.wrong && !s.shown) {
       fx.wrong = s.wrong;
       sound.boop();
-      effects.celebrate(check.x, check.y, ENCOURAGE);
+      effects.celebrate(middle.x, middle.y, ENCOURAGE);
       if (!settings.readMyself) {
         sound.say(
           s.short > 0
@@ -341,67 +415,70 @@ const pay: Step<PayOptions, PayState, PayFx> = {
       fx.done = true;
       sound.chime([1046.5, 1318.5, 1568, 2093], 0.07, 0.16);
       effects.burst(
-        TRAY.x + TRAY.w / 2,
-        TRAY.y + 40,
+        tray.x + tray.w / 2,
+        tray.y + 40,
         20,
         ['star', 'heart', 'star', 'dot'],
         CONFETTI,
         280,
       );
-      effects.celebrate(check.x, check.y, CHEER);
+      effects.celebrate(middle.x, middle.y, CHEER);
       sound.say(`Yes! ${options.price} cents. Thank you!`);
     }
   },
 
-  draw({ g, t, state: s, options, fx, taking }) {
+  draw({ g, t, state: s, options, fx, taking, shape }) {
     if (!taking && s.age === 0) return;
+    const { bubble, speaker, tray, paid, check } = payPlaces(shape);
     const appear = easeOutBack(clamp01(s.age / 0.4));
+    const mid = middleOf(bubble);
     g.save();
-    g.translate(450, 200);
+    g.translate(mid.x, mid.y);
     g.scale(appear, appear);
-    g.translate(-450, -200);
-    drawQuestion(g, options.text, QUIZ_BUBBLE, QUIZ_SPEAKER, fx.reading, t);
+    g.translate(-mid.x, -mid.y);
+    drawQuestion(g, options.text, bubble, speaker, fx.reading, t);
     g.restore();
 
     // The tray, with the coins tapped in.
-    rounded(g, TRAY.x, TRAY.y, TRAY.w, TRAY.h, 22);
-    fillStroke(g, vertical(g, TRAY.y, TRAY.y + TRAY.h, [C.woodLight, C.wood]), 4);
-    rounded(g, TRAY.x + 8, TRAY.y + 8, TRAY.w - 16, TRAY.h - 16, 16);
+    rounded(g, tray.x, tray.y, tray.w, tray.h, 22);
+    fillStroke(g, vertical(g, tray.y, tray.y + tray.h, [C.woodLight, C.wood]), 4);
+    rounded(g, tray.x + 8, tray.y + 8, tray.w - 16, tray.h - 16, 16);
     g.fillStyle = 'rgba(255, 255, 255, 0.35)';
     g.fill();
     if (!s.tray.length)
       plainText(
         g,
         'Tap coins to put them here',
-        TRAY.x + TRAY.w / 2,
-        TRAY.y + TRAY.h / 2,
-        18,
+        tray.x + tray.w / 2,
+        tray.y + tray.h / 2,
+        Math.round(traySpot(0, shape).r * 0.95),
         C.woodDark,
       );
     s.tray.forEach((id, i) => {
-      const at = traySpot(i);
-      drawCoin(g, id, at.x, at.y, 19, false);
+      const at = traySpot(i, shape);
+      drawCoin(g, id, at.x, at.y, at.r, false);
     });
 
     // How much is in the tray: pink while short, mint when it's right, lavender if too much.
     const total = coinTotal(s.tray);
     const color = total === options.price ? C.mint : total > options.price ? C.lavender : C.white;
-    rounded(g, PAID.x, PAID.y, PAID.w, PAID.h, 16);
+    const k = paid.h / PAID.h;
+    rounded(g, paid.x, paid.y, paid.w, paid.h, 16 * k);
     fillStroke(g, color, 3.5);
-    plainText(g, 'Paid', PAID.x + 32, PAID.y + PAID.h / 2 + 1, 18, C.ink);
+    plainText(g, 'Paid', paid.x + 32 * k, paid.y + paid.h / 2 + 1, 18 * k, C.ink);
     stickerText(
       g,
       `${total}¢`,
-      PAID.x + PAID.w - 42,
-      PAID.y + PAID.h / 2 + 1,
-      30,
+      paid.x + paid.w - 42 * k,
+      paid.y + paid.h / 2 + 1,
+      30 * k,
       C.hotPink,
       'center',
-      80,
+      80 * k,
     );
 
     // Check!
-    const b = PAY_CHECK;
+    const b = check;
     const glow = s.shown && !s.done;
     g.save();
     g.translate(b.x + b.w / 2, b.y + b.h / 2);
@@ -416,12 +493,12 @@ const pay: Step<PayOptions, PayState, PayFx> = {
     g.globalAlpha = s.tray.length ? 1 : 0.5;
     rounded(g, -b.w / 2, -b.h / 2, b.w, b.h, 22);
     fillStroke(g, vertical(g, -b.h / 2, b.h / 2, [C.cabinetLight, C.mint]), 4);
-    stickerText(g, 'Check! ✔', 0, 2, 28, C.hotPink, 'center', b.w - 16);
+    stickerText(g, 'Check! ✔', 0, 2, Math.min(44, b.h / 2), C.hotPink, 'center', b.w - 16);
     g.restore();
     g.globalAlpha = 1;
 
     // The bank: one of each coin, tap as many as you like.
-    bankSpots(options.coins).forEach((c, i) => {
+    bankSpots(options.coins, shape).forEach((c, i) => {
       const pop = easeOutBack(clamp01((s.age - 0.15 - i * 0.08) / 0.35));
       if (pop <= 0.01) return;
       g.save();
@@ -436,7 +513,7 @@ const pay: Step<PayOptions, PayState, PayFx> = {
     if (s.done) {
       const up = easeOutBack(clamp01(s.after / 0.35));
       g.save();
-      g.translate(TRAY.x + TRAY.w / 2, TRAY.y + TRAY.h / 2);
+      g.translate(tray.x + tray.w / 2, tray.y + tray.h / 2);
       g.scale(up, up);
       g.rotate(-0.08);
       stickerText(g, s.outcome === 'right' ? `Yes! +${SMART_BONUS}` : 'Yes!', 0, 0, 40, C.hotPink);

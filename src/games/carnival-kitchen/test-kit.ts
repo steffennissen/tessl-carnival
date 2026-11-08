@@ -1,4 +1,5 @@
 import type { G } from './art';
+import { layoutFor, type Shape } from './layout';
 import { dishById } from './dishes';
 import { createState, move, press, release, tick } from './game';
 import {
@@ -13,6 +14,7 @@ import {
   type KitchenState,
   type StepRun,
   type StepView,
+  type Box,
 } from './kit';
 import type { Reading, Sound } from './sound';
 import { stepOf } from './steps';
@@ -203,4 +205,45 @@ export function drawRound(
   }
   const run = currentRun(state);
   stepOf(run.kind).draw(view(run));
+}
+
+// ---------------------------------------------------------------------------
+// Sizes on a phone, for steps with big buttons
+
+/** CSS pixels per scene unit on a 390×844 phone (upright) or 844×390 (sideways). */
+export function cssScale(shape: Shape): number {
+  if (shape === 'page') return 1;
+  const [w, h] = shape === 'tall' ? [390, 844] : [844, 390];
+  const layout = layoutFor(w, h, true);
+  if (layout.shape !== shape) throw new Error(`${w}×${h} is ${layout.shape}, not ${shape}`);
+  return Math.min(w / layout.width, h / layout.height);
+}
+
+/** Whether two boxes overlap. */
+export const overlaps = (a: Box, b: Box) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/**
+ * What must stay clear on each shape, in scene units: Chef Bunny, the HUD
+ * and the progress pill at the bottom, for a step with `stars` stars.
+ */
+export function keepClear(shape: Shape, stars = 1): Box[] {
+  const pill = { x: 400 - stars * 15 - 14, y: 466, w: stars * 30 + 28, h: 34 };
+  if (shape === 'tall') {
+    return [
+      { x: -100, y: 0, w: 210, h: 1000 }, // off the left of the screen
+      { x: 690, y: 0, w: 300, h: 1000 }, // off the right
+      { x: 0, y: -200, w: 800, h: 300 }, // recipe and streak at the top
+      { x: 0, y: 546, w: 800, h: 400 }, // Chef Bunny and her bubble
+      pill,
+    ];
+  }
+  return [
+    { x: 0, y: 230, w: 210, h: 270 }, // Chef Bunny and her bubble
+    { x: 0, y: 0, w: 125, h: 105 }, // sound and home buttons
+    { x: 200, y: 50, w: 400, h: 60 }, // the recipe along the top
+    { x: 630, y: 55, w: 155, h: 90 }, // score and streak
+    { x: 800, y: 0, w: 200, h: 500 }, // off the scene
+    pill,
+  ];
 }
