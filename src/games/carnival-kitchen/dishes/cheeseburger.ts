@@ -17,7 +17,6 @@ const cheeseburger: Dish = {
       base: 'burger-plate',
       layers: LAYERS,
       title: 'Stack the burger!',
-      hint: ['Tap to drop each layer', 'in the middle!'],
     },
   ],
 
