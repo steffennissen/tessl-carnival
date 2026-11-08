@@ -9,6 +9,7 @@ import {
   emoji,
   face,
   fillStroke,
+  font,
   heartPath,
   horizontal,
   oval,
@@ -19,7 +20,16 @@ import {
   stickerText,
   vertical,
 } from './art';
-import { liveScore, maxScore, ratingFor, starsFor, totalScore } from './game';
+import { type Box, bookButtonFor, bookPlaces, countLine, starsOf, twoLines } from './book';
+import {
+  DECORATIONS,
+  type DecorState,
+  decorPlaces,
+  drawDecoration,
+  drawDecorations,
+} from './decorate';
+import { DISHES } from './dishes';
+import { type StickerNews, liveScore, maxScore, ratingFor, starsFor, totalScore } from './game';
 import {
   BANNER_TIME,
   FEEDBACK_TIME,
@@ -34,7 +44,7 @@ import {
   type StepView,
 } from './kit';
 import { type Layout, layoutFor } from './layout';
-import type { Sound } from './sound';
+import { NOTE, type Sound } from './sound';
 import { hintOf, iconOf, stepOf, titleOf } from './steps';
 
 /**
@@ -101,6 +111,12 @@ export function placesFor(layout: Layout) {
 }
 
 type BunnyMood = 'idle' | 'cheer' | 'nod';
+
+/** What the end of a round shows besides the round: decorating, and sticker news. */
+export interface RoundEnd {
+  decor: DecorState;
+  sticker: StickerNews;
+}
 
 // ---------------------------------------------------------------------------
 // The kitchen behind everything, drawn once
@@ -504,6 +520,9 @@ export function createRenderer(ctx: G, sound: Sound) {
     mood: 'idle' as BunnyMood,
     moodAge: 9,
     overAge: -1,
+    /** Seconds since decorating started, or -1 before it. */
+    decorAge: -1,
+    stickerShown: false,
     starsPlayed: 0,
     shownScore: 0,
     notYet: null as { x: number; y: number; age: number } | null,
@@ -577,7 +596,7 @@ export function createRenderer(ctx: G, sound: Sound) {
   }
 
   /** Watches the state for things that just happened. */
-  function observe(state: KitchenState, pointer: Pointer, dt: number) {
+  function observe(state: KitchenState, pointer: Pointer, dt: number, end: RoundEnd) {
     if (fx.seen !== state) {
       const keep = fx.particles;
       fx = fresh();
@@ -606,12 +625,28 @@ export function createRenderer(ctx: G, sound: Sound) {
       stepOf(run.kind).observe?.(viewFor(state, run, pointer, dt));
     }
 
-    if (state.phase === 'over') {
+    // Decorating comes first, then the stars.
+    if (state.phase === 'over' && !end.decor.done) {
+      if (fx.decorAge < 0) {
+        fx.decorAge = 0;
+        sound.banner();
+        sound.say('Decorate your dish! Drag the treats onto it.');
+      }
+      fx.decorAge += dt;
+    }
+
+    if (state.phase === 'over' && end.decor.done) {
       if (fx.overAge < 0) {
         fx.overAge = 0;
         sound.fanfare();
         const dish = state.dish.name;
-        sound.say(`${ratingFor(totalScore(state), maxScore(state))} You made ${dish}!`);
+        const news =
+          end.sticker === 'new'
+            ? ' A new sticker for your recipe book!'
+            : end.sticker === 'better'
+              ? ' Your sticker got more stars!'
+              : '';
+        sound.say(`${ratingFor(totalScore(state), maxScore(state))} You made ${dish}!${news}`);
       }
       fx.overAge += dt;
       fx.mood = 'cheer';
@@ -902,7 +937,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.globalAlpha = 1;
   }
 
-  function drawEnd(state: KitchenState) {
+  function drawEnd(state: KitchenState, end: RoundEnd) {
     const g = ctx;
     const t = fx.time;
     const age = fx.overAge;
@@ -937,6 +972,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.save();
     g.translate(0, -66);
     state.dish.draw(g, t, state);
+    drawDecorations(g, end.decor.placed);
     g.restore();
 
     rounded(g, -200, -226, 400, 58, 29);
@@ -980,6 +1016,241 @@ export function createRenderer(ctx: G, sound: Sound) {
     plainText(g, 'Cook again! 🔁', 0, 1, 24, C.ink);
     g.restore();
 
+    // The sticker news pops on after the stars.
+    const newsAt = 0.9 + stars * 0.45 + 0.3;
+    if (end.sticker && age >= newsAt) {
+      if (!fx.stickerShown) {
+        fx.stickerShown = true;
+        sound.chime([NOTE.C6, NOTE.E6, NOTE.G6, NOTE.C7], 0.08, 0.16);
+        burst(400 + 176, 250 - 112, 14, ['star', 'heart'], CONFETTI, 200);
+      }
+      const s = easeOutBack(clamp01((age - newsAt) / 0.4));
+      g.save();
+      g.translate(176, -112);
+      g.rotate(0.2 + Math.sin(t * 3) * 0.05);
+      g.scale(s, s);
+      starPath(g, 0, 0, 66, t * 0.2);
+      fillStroke(g, vertical(g, -60, 60, [C.butter, C.gold]), 4);
+      circle(g, 0, 0, 42);
+      fillStroke(g, C.white, 3);
+      const [top, bottom] = end.sticker === 'new' ? ['New', 'sticker!'] : ['Sticker', 'upgraded!'];
+      stickerText(g, top, 0, -10, 19, C.hotPink, 'center', 76);
+      stickerText(g, bottom, 0, 12, 17, C.purple, 'center', 80);
+      g.restore();
+    }
+
+    g.restore();
+  }
+
+  // -------------------------------------------------------------------------
+  // Decorating the finished dish
+
+  function drawDecorate(state: KitchenState, decor: DecorState) {
+    const g = ctx;
+    const t = fx.time;
+    const p = decorPlaces(layout.shape);
+    dim(0.28 * clamp01(fx.decorAge / 0.4));
+
+    const pop = easeOutBack(clamp01(fx.decorAge / 0.45));
+    const { panel } = p;
+    g.save();
+    g.translate(panel.x + panel.w / 2, panel.y + panel.h / 2);
+    g.scale(pop, pop);
+    g.translate(-(panel.x + panel.w / 2), -(panel.y + panel.h / 2));
+
+    // A cloth to decorate on.
+    rounded(g, panel.x, panel.y, panel.w, panel.h, 36);
+    fillStroke(g, C.cream, 5, C.hotPink);
+    g.setLineDash([10, 9]);
+    rounded(g, panel.x + 12, panel.y + 12, panel.w - 24, panel.h - 24, 26);
+    g.lineWidth = 3;
+    g.strokeStyle = C.lavender;
+    g.stroke();
+    g.setLineDash([]);
+
+    stickerText(
+      g,
+      'Decorate your dish!',
+      p.title.x,
+      p.title.y,
+      34,
+      vertical(g, p.title.y - 20, p.title.y + 20, [C.hotPink, C.purple]),
+      'center',
+      panel.w - 60,
+    );
+
+    // The dish, with what's on it so far.
+    const { dish } = p;
+    shadow(g, dish.x, dish.y + 70 * dish.scale, 150 * dish.scale, 18);
+    g.save();
+    g.translate(dish.x, dish.y);
+    g.scale(dish.scale, dish.scale);
+    state.dish.draw(g, t, state);
+    drawDecorations(g, decor.placed);
+    g.restore();
+
+    // The tray of treats.
+    const r = p.trayRadius;
+    const first = p.tray[0];
+    const lastSpot = p.tray[p.tray.length - 1];
+    rounded(
+      g,
+      first.x - r - 12,
+      first.y - r - 10,
+      lastSpot.x - first.x + 2 * r + 24,
+      2 * r + 20,
+      r + 10,
+    );
+    fillStroke(g, C.white, 3.5);
+    p.tray.forEach((spot, i) => {
+      const kind = DECORATIONS[i];
+      const chosen = decor.selected === kind;
+      if (chosen) {
+        g.strokeStyle = C.gold;
+        g.lineWidth = 5;
+        circle(g, spot.x, spot.y, r + 3 + Math.sin(t * 6) * 2);
+        g.stroke();
+      }
+      circle(g, spot.x, spot.y, r - 2);
+      fillStroke(g, chosen ? C.butter : C.lavenderLight, 2.5);
+      const bob = Math.sin(t * 2.5 + i) * 2;
+      drawDecoration(g, kind, spot.x, spot.y + bob, 1.35);
+    });
+
+    // Done! It nudges a little more once some treats are on.
+    const { done } = p;
+    const pulse = 1 + Math.sin(t * 4) * (decor.placed.length > 0 ? 0.06 : 0.03);
+    g.save();
+    g.translate(done.x, done.y);
+    g.scale(pulse, pulse);
+    rounded(g, -done.w / 2, -done.h / 2, done.w, done.h, done.h / 2);
+    fillStroke(g, vertical(g, -done.h / 2, done.h / 2, [C.cabinetLight, C.mint]), 4);
+    stickerText(g, 'Done!', 0, 2, 28, C.hotPink, 'center', done.w - 16);
+    g.restore();
+
+    g.restore();
+  }
+
+  /** The treat under the finger, a little bigger, as if lifted. */
+  function drawHeld(decor: DecorState) {
+    const held = decor.held;
+    if (!held) return;
+    const scale = decorPlaces(layout.shape).dish.scale * 1.2;
+    shadow(ctx, held.x + 6, held.y + 16, 16, 6);
+    drawDecoration(ctx, held.kind, held.x, held.y - 4, scale);
+  }
+
+  // -------------------------------------------------------------------------
+  // The recipe book
+
+  /** Text that shrinks to fit `maxWidth`. */
+  function fitted(
+    text: string,
+    x: number,
+    y: number,
+    size: number,
+    color: string,
+    maxWidth: number,
+  ) {
+    const g = ctx;
+    g.font = font(size);
+    const wide = g.measureText(text).width;
+    plainText(g, text, x, y, wide > maxWidth ? (size * maxWidth) / wide : size, color);
+  }
+
+  /** A dish nobody has cooked yet: under a little lid with a "?". */
+  function drawCovered(g: G, x: number, y: number, s: number) {
+    oval(g, x, y + 22 * s, 50 * s, 10 * s);
+    fillStroke(g, C.white, 3);
+    g.beginPath();
+    g.ellipse(x, y + 20 * s, 42 * s, 40 * s, 0, Math.PI, 0);
+    g.closePath();
+    fillStroke(g, vertical(g, y - 20 * s, y + 20 * s, [C.white, C.steel, C.steelDark]), 3);
+    circle(g, x, y - 24 * s, 6 * s);
+    fillStroke(g, C.pink, 2.5);
+    stickerText(g, '?', x, y + 2 * s, 30 * s, C.lavender);
+  }
+
+  function drawBookPage(stickers: Record<string, number>) {
+    const g = ctx;
+    const t = fx.time;
+    const b = bookPlaces(layout, DISHES.length);
+    const tall = layout.shape === 'tall';
+    dim(0.3);
+    rounded(g, b.page.x, b.page.y, b.page.w, b.page.h, 32);
+    fillStroke(g, C.cream, 5, C.hotPink);
+    g.setLineDash([10, 9]);
+    rounded(g, b.page.x + 10, b.page.y + 10, b.page.w - 20, b.page.h - 20, 24);
+    g.lineWidth = 3;
+    g.strokeStyle = C.lavender;
+    g.stroke();
+    g.setLineDash([]);
+
+    stickerText(
+      g,
+      'My Recipe Book',
+      b.title.x,
+      b.title.y,
+      tall ? 44 : 36,
+      vertical(g, b.title.y - 22, b.title.y + 22, [C.hotPink, C.purple]),
+      'center',
+      b.page.w - 170,
+    );
+    plainText(
+      g,
+      `📖 ${countLine(stickers, DISHES)}`,
+      b.count.x,
+      b.count.y,
+      tall ? 26 : 20,
+      C.purple,
+    );
+
+    // Close: or tap anywhere that isn't a dish you've cooked.
+    circle(g, b.close.x, b.close.y, b.close.r);
+    fillStroke(g, C.white, 3.5);
+    plainText(g, '✕', b.close.x, b.close.y + 1, 28, C.ink);
+
+    DISHES.forEach((dish, i) => {
+      const cell: Box = b.cells[i];
+      const s = b.scale;
+      const cx = cell.x + cell.w / 2;
+      const level = starsOf(stickers, dish.id);
+      rounded(g, cell.x + 4, cell.y + 4, cell.w - 8, cell.h - 8, 18 * s);
+      fillStroke(g, level ? C.white : C.lavenderLight, 3, level ? C.ink : C.lavender);
+      if (level) {
+        g.save();
+        g.translate(cx, cell.y + 47 * s);
+        g.scale(0.36 * s, 0.36 * s);
+        dish.draw(g, t, null);
+        g.restore();
+        const lines = twoLines(dish.name);
+        lines.forEach((line, k) => {
+          const y = cell.y + (lines.length === 1 ? 100 : 91 + k * 14) * s;
+          fitted(line, cx, y, 13 * s, C.ink, cell.w - 16);
+        });
+      } else {
+        drawCovered(g, cx, cell.y + 52 * s, s);
+      }
+      for (let k = 0; k < 3; k++) {
+        starPath(g, cx + (k - 1) * 20 * s, cell.y + 124 * s, 8 * s);
+        fillStroke(g, k < level ? C.gold : C.white, 2, k < level ? C.ink : C.starEdge);
+      }
+    });
+  }
+
+  /** The book button on the title screen. */
+  function drawBookButton() {
+    const g = ctx;
+    const box = bookButtonFor(layout);
+    const wiggle = Math.sin(fx.time * 2.2) * 0.03;
+    g.save();
+    g.translate(box.x + box.w / 2, box.y + box.h / 2);
+    g.rotate(wiggle);
+    rounded(g, -box.w / 2, -box.h / 2, box.w, box.h, box.h / 2);
+    fillStroke(g, vertical(g, -box.h / 2, box.h / 2, [C.white, C.lavenderLight]), 4);
+    g.fillStyle = C.ink;
+    emoji(g, '📖', -box.w / 2 + 32, 2, 30);
+    stickerText(g, 'Recipes', 22, 2, 24, C.purple, 'center', box.w - 70);
     g.restore();
   }
 
@@ -997,7 +1268,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.restore();
     for (const [dx, y, r] of [
       [-190, 100, 16],
-      [190, 96, 20],
+      [160, 96, 20],
       [220, 190, 12],
       [-200, 200, 12],
     ]) {
@@ -1018,6 +1289,8 @@ export function createRenderer(ctx: G, sound: Sound) {
     fillStroke(g, vertical(g, -35, 35, [C.pink, C.hotPink]), 5);
     stickerText(g, 'Tap to cook!', 0, 2, 34, C.white);
     g.restore();
+
+    onCanvas(drawBookButton);
   }
 
   return {
@@ -1070,8 +1343,23 @@ export function createRenderer(ctx: G, sound: Sound) {
       drawParticles();
     },
 
-    draw(state: KitchenState, pointer: Pointer, dt: number) {
-      observe(state, pointer, dt);
+    /** Draws the recipe book, with the stickers earned so far. */
+    drawBook(dt: number, stickers: Record<string, number>) {
+      update(dt);
+      begin();
+      onCanvas(() => drawBookPage(stickers));
+    },
+
+    /** Sparkles where a treat lands on the dish, and a happy Chef Bunny. */
+    sparkle(x: number, y: number) {
+      burst(x, y, 8, ['star', 'heart', 'dot'], CONFETTI, 150, 300);
+      sound.bloop();
+      fx.mood = 'cheer';
+      fx.moodAge = 0;
+    },
+
+    draw(state: KitchenState, pointer: Pointer, dt: number, end: RoundEnd) {
+      observe(state, pointer, dt, end);
       update(dt);
       fx.shownScore += (liveScore(state) - fx.shownScore) * Math.min(1, dt * 8);
 
@@ -1080,6 +1368,17 @@ export function createRenderer(ctx: G, sound: Sound) {
       // The step being cooked draws itself on the scene.
       const run = currentRun(state);
       stepOf(run.kind).draw(viewFor(state, run, pointer, dt));
+
+      // The finished dish, waiting to be decorated before the stars.
+      if (state.phase === 'over' && !end.decor.done) {
+        drawDecorate(state, end.decor);
+        bunny(fx.mood, fx.moodAge);
+        onCanvas(() => drawSpeech(ctx, ['Drag a treat', 'onto your dish!'], places.speech));
+        drawButtons();
+        drawParticles();
+        drawHeld(end.decor);
+        return;
+      }
 
       bunny(fx.mood, fx.moodAge);
       if (state.phase === 'playing' && state.banner === 0) {
@@ -1094,7 +1393,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       }
       if (state.phase === 'playing') drawNotYet();
       if (state.phase === 'over') {
-        drawEnd(state);
+        drawEnd(state, end);
         bunny('cheer', fx.overAge);
         drawParticles();
       }

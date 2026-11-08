@@ -12,6 +12,8 @@ import {
   ratingFor,
   release,
   starsFor,
+  stickerFor,
+  stickerNews,
   tick,
   totalScore,
 } from './game';
@@ -339,6 +341,26 @@ describe('carnival kitchen', () => {
     expect(titleOf(run)).toBe('Shake the pepper!');
     expect(hintOf(run)).toEqual(['Hold to grind,', 'let go at the star!']);
     expect(iconOf(run)).toBe('🌶️');
+  });
+
+  describe('stickers', () => {
+    it("earns the dish's sticker at the round's stars", () => {
+      const state = ready(soup);
+      chopPerfectly(state);
+      nextStep(state);
+      circleTurnsOf(state, CIRCLE_TURNS);
+      nextStep(state);
+      pourPerfectly(state);
+      expect(stickerFor(state)).toEqual({ id: 'soup', level: 3 });
+      state.scores = [0, 0, 100];
+      expect(stickerFor(state)).toEqual({ id: 'soup', level: 1 });
+    });
+
+    it('says whether the sticker is new, better, or nothing new', () => {
+      expect(stickerNews(undefined, true)).toBe('new');
+      expect(stickerNews(1, true)).toBe('better');
+      expect(stickerNews(3, false)).toBeNull();
+    });
   });
 
   describe('whole rounds through press', () => {
