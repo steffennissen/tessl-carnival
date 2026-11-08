@@ -22,6 +22,7 @@ import {
   type StepBasics,
   type Turn,
 } from '../kit';
+import type { Shape } from '../layout';
 import type { Reading } from '../sound';
 
 /**
@@ -68,17 +69,45 @@ interface TicketFx {
   done: boolean;
 }
 
-/** The ticket's paper, its speaker and its button, in scene units. */
+/** The ticket's paper, its speaker and its button, in scene units, on a computer. */
 export const TICKET = {
   paper: { x: 235, y: 150, w: 430, h: 236 },
   speaker: { x: 276, y: 192, r: 24 },
   button: { x: 340, y: 400, w: 220, h: 58 },
 } as const;
 
+/**
+ * The ticket's places for the canvas's shape: on a phone the speaker and
+ * "Let's cook!" are bigger (at least about 60 CSS pixels), and held upright
+ * the paper spans the screen.
+ */
+export function ticketPlaces(shape: Shape = 'page'): {
+  paper: { x: number; y: number; w: number; h: number };
+  speaker: { x: number; y: number; r: number };
+  button: { x: number; y: number; w: number; h: number };
+} {
+  if (shape === 'tall') {
+    return {
+      paper: { x: 110, y: 100, w: 580, h: 236 },
+      speaker: { x: 172, y: 154, r: 47 },
+      // Above the progress star at the bottom.
+      button: { x: 220, y: 350, w: 360, h: 106 },
+    };
+  }
+  if (shape === 'wide') {
+    return {
+      paper: { x: 235, y: 146, w: 430, h: 222 },
+      speaker: { x: 283, y: 188, r: 39 },
+      button: { x: 320, y: 378, w: 260, h: 84 },
+    };
+  }
+  return TICKET;
+}
+
 export function pressTicket(turn: Turn<TicketOptions, TicketState>, x: number, y: number) {
   const s = turn.state;
   if (s.done) return true;
-  const { speaker, button } = TICKET;
+  const { speaker, button } = ticketPlaces(turn.shape);
   if (inCircle(speaker.x, speaker.y, speaker.r, x, y)) {
     s.reads += 1;
     return true;
@@ -117,14 +146,14 @@ const ticket: Step<TicketOptions, TicketState, TicketFx> = {
   },
   solve(turn) {
     turn.state.age = Math.max(turn.state.age, TICKET_READY);
-    const b = TICKET.button;
+    const b = ticketPlaces(turn.shape).button;
     pressTicket(turn, b.x + b.w / 2, b.y + b.h / 2);
     ticket.update?.(turn, OUTRO);
   },
 
   fx: () => ({ reading: null, reads: 0, autoRead: false, done: false }),
 
-  observe({ state: s, options, fx, effects, round, taking }) {
+  observe({ state: s, options, fx, effects, round, taking, shape }) {
     const delay = autoReadDelay(round.learn.settings, true);
     if (taking && !fx.autoRead && delay !== null && s.age >= delay && !s.done) {
       fx.autoRead = true;
@@ -137,16 +166,16 @@ const ticket: Step<TicketOptions, TicketState, TicketFx> = {
     }
     if (s.done && !fx.done) {
       fx.done = true;
-      const b = TICKET.button;
+      const b = ticketPlaces(shape).button;
       effects.sound.pop();
       effects.burst(b.x + b.w / 2, b.y, 12, ['star', 'heart'], [C.gold, C.hotPink, C.mint], 220);
       effects.celebrate(b.x + b.w / 2, b.y, CHEER);
     }
   },
 
-  draw({ g, t, state: s, options, fx, taking }) {
+  draw({ g, t, state: s, options, fx, taking, shape }) {
     if (!taking && s.age === 0) return;
-    const { paper, speaker, button } = TICKET;
+    const { paper, speaker, button } = ticketPlaces(shape);
     const slide = easeOutBack(clamp01(s.age / 0.5));
     g.save();
     g.translate(0, (1 - slide) * -260);
@@ -167,18 +196,20 @@ const ticket: Step<TicketOptions, TicketState, TicketFx> = {
     stickerText(g, '🧾 Order', paper.x + paper.w / 2 + 10, paper.y + 40, 30, C.purple);
     const highlight = wordNow(fx.reading);
     drawSpeaker(g, speaker.x, speaker.y, speaker.r, highlight >= 0, t);
-    // Dashes under the heading, like a real ticket.
+    // Dashes under the heading (and the speaker), like a real ticket.
+    const rule = Math.max(paper.y + 72, speaker.y + speaker.r + 6);
     g.setLineDash([6, 6]);
     g.strokeStyle = C.lavender;
     g.lineWidth = 2.5;
     g.beginPath();
-    g.moveTo(paper.x + 20, paper.y + 72);
-    g.lineTo(paper.x + paper.w - 20, paper.y + 72);
+    g.moveTo(paper.x + 20, rule);
+    g.lineTo(paper.x + paper.w - 20, rule);
     g.stroke();
     g.setLineDash([]);
-    const fit = fitWords(g, options.order.text, paper.w - 50, 34, 3, 18);
+    const lines = Math.max(3, Math.floor((paper.y + paper.h - rule - 20) / 46));
+    const fit = fitWords(g, options.order.text, paper.w - 50, 34, lines, 18);
     const gap = fit.size * 1.35;
-    const middle = paper.y + 72 + (paper.h - 82) / 2;
+    const middle = (rule + paper.y + paper.h - 10) / 2;
     drawWords(
       g,
       fit.lines,
@@ -199,7 +230,7 @@ const ticket: Step<TicketOptions, TicketState, TicketFx> = {
     g.scale(pulse, pulse);
     rounded(g, -button.w / 2, -button.h / 2, button.w, button.h, button.h / 2);
     fillStroke(g, vertical(g, -button.h / 2, button.h / 2, [C.cabinetLight, C.mint]), 4);
-    plainText(g, "Let's cook! 👍", 0, 2, 26, C.ink);
+    plainText(g, "Let's cook! 👍", 0, 2, Math.min(36, button.h * 0.45), C.ink);
     g.restore();
     g.globalAlpha = 1;
   },

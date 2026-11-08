@@ -170,6 +170,12 @@ export interface Turn<O extends StepBasics = StepBasics, S = unknown> {
   round: KitchenState;
   options: O;
   state: S;
+  /**
+   * The canvas's shape, when the game knows it ('page' if left out, as in
+   * most tests): for a step whose buttons are bigger on a phone, so its
+   * `press` hits the same boxes its `draw` shows.
+   */
+  shape?: Shape;
 }
 
 /** The pointer, in scene units. */

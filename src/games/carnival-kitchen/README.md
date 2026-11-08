@@ -327,13 +327,15 @@ reads it (Level 1 reads itself out straight away; Level 2 waits 4 seconds
 first, so she gets the first go; 🔊 reads it any time) and taps **Let's
 cook!**. The toppings (or the burger's layers) are then exactly what the
 ticket says, one piece each so they can be counted, with the ticket's note
-pinned up at the right ticking each line off. Right after comes a counting
+ticking each line off: clipped to a little ticket rail under the kitchen
+clock and the shelf on a computer or a phone held sideways, pinned up at the
+right on a phone held upright. Right after comes a counting
 question with a picture of what she made: "How many toppings did you put
 on?", or "You put on 5 toppings. Add 2 more. How many is that?".
 
 | Level | Ticket                                                            | Question                                   |
 | ----- | ----------------------------------------------------------------- | ------------------------------------------ |
-| 1     | Digits, one or two kinds, 2 to 5 things                           | Count them, or add 1 to 3 more (within 10) |
+| 1     | Digits, usually two kinds (one now and then), 2 to 5 things       | Count them, or add 1 to 3 more (within 10) |
 | 2     | Number words, two or three kinds, up to 7, and "No tomatoes!" too | Add 3 to 9 more (within 20)                |
 
 Anything chopped earlier is always on the ticket (the pizza's pepperoni), and
@@ -423,13 +425,59 @@ checks, Chef Bunny lays out the fewest coins and counts them on.
   | 1     | Rows of 2, 5 or 10: "3 rows of 5 cupcakes. Count by 5s! How many?" | After a wrong try, each row but the last shows its running total (5, 10...) |
   | 2     | 2 to 5 rows of 2 to 5: "4 rows of 3 cookies. How many cookies?"    | Chef Bunny shows it as adding: "3 + 3 + 3 + 3 = 12"                         |
 
+**Find the ingredient** (`activities/find-word.ts`: phonics and sight
+words) fits dishes that use an ingredient from its word bank for sure.
+Just before the step that uses it, "Tap the CHEESE!": three jars with a word
+on each label and a "?" where the picture goes, so it takes reading, not
+matching pictures. Once she's found it the pictures pop in, and the step
+that uses it comes next ("Grate the cheese!"). The voice only ever says
+"Find the word!" by itself, never the word: tapping 🔊 reads "Tap the
+cheese!", and hearing it counts as help (a right answer then carries on
+without the bonus or the Smart Chef star; nothing is taken away). A wrong
+jar greys out with a hint about the letters ("Look at the letters: find ch
+and ee!").
+
+| Level | The jars                                                                                             |
+| ----- | ---------------------------------------------------------------------------------------------------- |
+| 1     | The word and two other ingredient words, all starting with different letters (cheese, rice, pancake) |
+| 2     | The word and two that look and sound like it (cheese, chess, cherry; shells, sells, bells)           |
+
+The word bank (`WORD_BANK`) has the ingredient labels that practise a 2nd-grade
+pattern (ch, sh, th, wh, ee, ea, oa, ai, ay, igh, ow, silent e): cheese,
+cherry, shells, cream, meatball, rice, pancake, cupcakes, sushi, smoothie,
+ketchup and whipped cream, each with its patterns and two look-alikes. A new
+ingredient whose label is in the bank can be found with no other change. The
+tests check every word has its patterns and is still an ingredient's label.
+
+**Put the recipe in order** (`activities/recipe-order.ts`: sequencing and
+reading) fits dishes with three or four cooking steps. The round starts with
+the dish's step cards ("Chop the pepperoni!", with its emoji at Level 1,
+words only at Level 2) shuffled in a tray, never with the first step first.
+She drags each card up into its slot (First, Next, Then, Last; three cards
+have First, Next, Last), or just taps the cards in order and each flies to
+the next empty slot. A card dropped near a slot counts for it; one let go
+away from the slots just slides back. A card in the wrong slot slides
+gently back with "Hmm! What do we do next?", and after two wrong tries the
+card that comes next glows. Each card is read out as it's picked up (unless
+"Read it myself" is on). Then she cooks the dish, in that order. On a phone
+held upright each card has its own row, slot at the left and tray at the
+right.
+
+**On a phone**, everything a finger taps in a learning moment is at least
+about 60 CSS pixels: answer buttons, the 🔊 speaker, **Let's cook!** and the
+jars. Held sideways, the side answers fill the room at the right two to a
+row; held upright, the question spans the screen with the picture under it
+and the answers beside it. The recipe cards are the one exception: four of
+them on an upright phone are about 50 pixels tall (and 168 wide), with a
+generous drop zone.
+
 ### How it's built
 
 | Piece                   | What it is                                                                                                      |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `activities/`           | One file per activity, default export an `Activity`; `activities/index.ts` finds them and has `planRound`.      |
 | `kit/learn.ts`          | Settings (`settingsFrom`, `DEFAULT_SETTINGS`), `Activity`, `RoundPlan`, answering (`answer`), `smartChef`.      |
-| `kit/quiz.ts`           | The quiz mini-game: a question with answer buttons, and its drawing, voice and Chef Bunny reactions.            |
+| `kit/quiz.ts`           | The quiz mini-game: a question with answer buttons, its drawing, voice and Chef Bunny reactions, and `quizPlaces(shape)`. |
 | `kit/words.ts`          | Reading: `wordsOf`, `numberWord`, `fitWords`, `drawWords` (with the word being read lit up), `drawSpeaker`.     |
 | `kit/clock.ts`          | Kitchen time: `stepMinutes`, `roundTime`, `startTime`, `drawClock`, and the maths for dragging a clock's hands. |
 | `kit/order.ts`          | Order tickets: `Order`, `drawOrderNote`.                                                                        |
@@ -510,9 +558,16 @@ An activity is one new file, `activities/<id>.ts`, and usually that's all.
    read itself out, `sound.read` and `drawWords` for lit-up words,
    `drawSpeaker` for its 🔊, and `effects.celebrate` to make Chef Bunny
    cheer (a 'Perfect!' feedback) or encourage ('Nice try!'). `steps/ask.ts`
-   and `kit/quiz.ts` show all of it. Scene space for questions: the bubble
-   at `QUIZ_BUBBLE`, a picture at `QUIZ_PICTURE`, the answers right of it:
-   clear of Chef Bunny and the HUD in every layout.
+   and `kit/quiz.ts` show all of it. Scene space for questions comes from
+   `quizPlaces(shape)`: the `bubble` and its `speaker`, a `picture`, and a
+   big `button` ("Check!"); `choiceBoxes(count, layout, shape)` has the
+   answers. They're clear of Chef Bunny and the HUD in every layout, and
+   on a phone big enough for a finger. Use the same shape when drawing
+   (`view.shape`) and pressing (`turn.shape`, which the game passes to
+   `press`, `move` and `release`; it's undefined, meaning 'page', in most
+   tests), so a tap hits what's drawn. `QUIZ_BUBBLE` and `QUIZ_PICTURE` are
+   the computer's. `steps/find.ts` and `steps/sequence.ts` are learning
+   steps of their own, with jars and drag-and-drop cards.
 5. **Time activities** build on `drawClock(g, x, y, r, time, { glow })`
    (any size) and the plain maths in `kit/clock.ts`: `angleAt` (a drag to an
    angle), `minuteFromAngle(angle, 5)` (snapped), `hourFromAngle`,
@@ -849,7 +904,7 @@ drawing. Each file says which step to copy.
 | Hold-meter (`kit/hold.ts`) | Hold to fill a meter, let go at the star; a full meter lets go by itself; too soon is "Not yet!".                        | `startHold(targets)`, `pressHold`, `releaseHold(turn, rules)`, `updateHold`, `holdProgress`, `drawMeter`, `POUR_RULES`, `TARGET_LOW`/`HIGH`, `GOLDEN` |
 | Float-tap (`kit/float.ts`) | Things drift left to right; tap when one is over its target x; too far is "Not yet!"; past the end it comes round again. | `startFloat`, `tapFloat(turn, targetX, count, rules)`, `updateFloat`, `floatProgress`, `drawGlowLane`, `drawFallArrows`                               |
 | Needle (`kit/needle.ts`)   | A heart swings along a gauge; tap in the gold; far off is "Not yet!".                                                    | `startNeedle`, `tapNeedle(turn, target, count, rules)`, `updateNeedle`, `drawGauge`                                                                   |
-| Quiz (`kit/quiz.ts`)       | A question with answer buttons; wrong greys out with a hint, two wrong shows it, right cheers then moves on.             | `startQuiz`, `pressQuiz`, `updateQuiz`, `quizBubble`, `solveQuiz`, `observeQuiz`, `drawQuiz`, `choiceBoxes`                                           |
+| Quiz (`kit/quiz.ts`)       | A question with answer buttons; wrong greys out with a hint, two wrong shows it, right cheers then moves on.             | `startQuiz`, `pressQuiz`, `updateQuiz`, `quizBubble`, `solveQuiz`, `observeQuiz`, `drawQuiz`, `choiceBoxes`, `quizPlaces`                             |
 
 Their states (`CircleState`, `HoldState`, `FloatState`, `NeedleState`) can be
 extended with more fields, as `CrackState extends FloatState` adds `speeds`.
@@ -913,8 +968,9 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
   progress stars at the bottom middle (y 465 to 500). The window and shelf
   are just the wall: draw over them if you need to.
 - **The kitchen clock** hangs at x 700 to 784, y 154 to 238 on a computer
-  (where the shelf would be); steps draw over it. The order note sits at x
-  606 to 694 from y 168.
+  (where the shelf would be); steps draw over it. The order note hangs at x
+  704 to 792 from y 252 (`noteSpot` in `kit/order.ts`; at x 606 on a phone
+  held upright).
 - **Phones held upright** ('tall') show only about x 100 to 700, with the
   recipe at the top of the scene (y 0 to 45, the streak at y 60 to 90) and
   Chef Bunny below it, so keep what matters between x 110 and 690 and below

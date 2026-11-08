@@ -45,6 +45,17 @@ describe('order tickets', () => {
     expect(level2).toMatch(/^One burger with (one|two) patt(y|ies)/);
   });
 
+  it('usually asks for two kinds of things at Level 1', () => {
+    for (const dish of ['pizza', 'tacos', 'cupcakes', 'cheeseburger']) {
+      let two = 0;
+      for (let seed = 1; seed <= 50; seed++) {
+        const order = makeOrder(dishById(dish), 1, seeded(seed));
+        if (order && order.lines.length === 2) two += 1;
+      }
+      expect(two, dish).toBeGreaterThanOrEqual(30);
+    }
+  });
+
   it('puts exactly the ticket on the pizza, its note pinned up, then asks about it', () => {
     const plan = ticket.weave({
       dish: dishById('pizza'),

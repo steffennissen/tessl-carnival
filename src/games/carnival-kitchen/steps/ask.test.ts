@@ -9,6 +9,7 @@ import {
   middleOf,
   plainPlan,
   quizBubble,
+  quizPlaces,
   type Question,
   type QuizState,
 } from '../kit';
@@ -94,6 +95,18 @@ describe('ask', () => {
       tap(state, 0);
       tap(state, 2);
       drawRound(state, memory, 1 / 60, shape);
+    }
+  });
+
+  it('takes taps on the bigger buttons and speaker of a phone', () => {
+    for (const shape of ['wide', 'tall'] as const) {
+      const state = onQuestion();
+      const { speaker } = quizPlaces(shape);
+      press(state, speaker.x, speaker.y, shape);
+      expect(current<QuizState>(state).reads).toBe(1);
+      const at = middleOf(choiceBoxes(3, 'side', shape)[1]);
+      press(state, at.x, at.y, shape);
+      expect(current<QuizState>(state).picked).toBe(1);
     }
   });
 });

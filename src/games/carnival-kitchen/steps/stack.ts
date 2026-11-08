@@ -312,7 +312,7 @@ const stack: Step<StackOptions, StackState, StackFx> = {
     fx.prevY = swingY(bottoms, s.index);
   },
 
-  draw({ g, t, state: s, options, fx, taking, round }) {
+  draw({ g, t, state: s, options, fx, taking, round, shape }) {
     const bottoms = layerBottoms(options);
     const total = s.layers.length;
     const landed = s.results.length - (fx.drop ? 1 : 0);
@@ -326,6 +326,7 @@ const stack: Step<StackOptions, StackState, StackFx> = {
         options.order,
         s.layers.slice(0, landed).map((l) => l.id),
         t,
+        shape,
       );
     }
 
