@@ -26,7 +26,17 @@ export interface Sound {
   grade(grade: Grade, combo: number): void;
   star(index: number): void;
   fanfare(): void;
+  /** One click of the dish spinner's reel; `pitch` above 1 sounds brighter. */
+  tick(pitch?: number): void;
+  /** The dish spinner landing: ta-da! */
+  tada(): void;
   say(text: string): void;
+  /**
+   * Chef Bunny's own chatter ("Wow, three in a row!"): said only if the voice
+   * isn't already reading something, and never cuts anything off. Returns
+   * whether it was free to speak (true when muted: nothing to talk over).
+   */
+  chatter(text: string): boolean;
   /**
    * A new sound from scratch, for a step that needs one of its own: a note
    * (`freq` in Hz, see NOTE) that can slide to another.
@@ -253,6 +263,18 @@ export function createSound(): Sound {
         at += lengths[i];
       });
     },
+    tick(pitch = 1) {
+      tone(1100 * pitch, 0.04, { type: 'square', volume: 0.05 });
+      hiss(0.025, { volume: 0.08, from: 5000, filter: 'highpass' });
+    },
+    tada() {
+      chime([NOTE.C5, NOTE.E5, NOTE.G5], 0.08, 0.14);
+      for (const note of [NOTE.C6, NOTE.E6, NOTE.G6]) {
+        tone(note, 0.7, { type: 'triangle', volume: 0.1, delay: 0.26 });
+      }
+      tone(NOTE.C5 / 2, 0.7, { type: 'sine', volume: 0.12, delay: 0.26 });
+      hiss(0.3, { volume: 0.06, from: 8000, filter: 'highpass', delay: 0.26 });
+    },
     say(text) {
       if (muted) return;
       try {
@@ -266,6 +288,21 @@ export function createSound(): Sound {
       } catch {
         // No speech in this browser.
       }
+    },
+    chatter(text) {
+      if (muted) return true;
+      try {
+        const synth = window.speechSynthesis;
+        if (synth.speaking || synth.pending) return false;
+        const line = new SpeechSynthesisUtterance(text);
+        if (voice) line.voice = voice;
+        line.rate = 1;
+        line.pitch = 1.45;
+        synth.speak(line);
+      } catch {
+        // No speech in this browser.
+      }
+      return true;
     },
     tone,
     hiss,

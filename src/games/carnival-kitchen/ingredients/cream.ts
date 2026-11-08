@@ -15,6 +15,7 @@ const cream: Ingredient = {
   pour: {
     stream: 'rgba(255, 250, 240, 0.97)',
     meter: [C.pink, K.cream],
+    color: K.cream,
     liquid: true,
     /** A small round jug with a spout, a handle and a pink heart. */
     drawContainer(g, pouring) {

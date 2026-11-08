@@ -7,8 +7,8 @@ import {
   clamp01,
   easeOutBack,
   emoji,
-  face,
   fillStroke,
+  font,
   heartPath,
   horizontal,
   oval,
@@ -19,12 +19,36 @@ import {
   stickerText,
   vertical,
 } from './art';
-import { liveScore, maxScore, ratingFor, starsFor, totalScore } from './game';
+import { type BunnyPose, drawBunny } from './bunny';
+import {
+  type BunnyMood,
+  blinking,
+  createChef,
+  earFlick,
+  gaze,
+  glancing,
+  instructionStarted,
+  isHolding,
+  react,
+  tickChef,
+  type ChefEvent,
+} from './chef';
+import { type Box, bookButtonFor, bookPlaces, countLine, starsOf, twoLines } from './book';
+import {
+  DECORATIONS,
+  type DecorState,
+  decorPlaces,
+  drawDecoration,
+  drawDecorations,
+} from './decorate';
+import { DISHES } from './dishes';
+import { type StickerNews, liveScore, maxScore, ratingFor, starsFor, totalScore } from './game';
 import {
   BANNER_TIME,
   FEEDBACK_TIME,
   currentRun,
   currentTurn,
+  type Dish,
   type Effects,
   type Feedback,
   type KitchenState,
@@ -34,7 +58,8 @@ import {
   type StepView,
 } from './kit';
 import { type Layout, layoutFor } from './layout';
-import type { Sound } from './sound';
+import { NOTE, type Sound } from './sound';
+import { SPINNER_DISH, SPIN_TIME, drawSpinner, reelPosition, spinEnd, spinTime } from './spinner';
 import { hintOf, iconOf, stepOf, titleOf } from './steps';
 
 /**
@@ -53,6 +78,9 @@ import { hintOf, iconOf, stepOf, titleOf } from './steps';
 const START_BUTTON = { x: W / 2 + 40, y: 392, w: 300, h: 70 };
 
 const BUTTON_RADIUS = 24;
+
+/** Seconds something Chef Bunny said stays in her bubble. */
+const SAID_TIME = 2;
 
 interface Spot {
   x: number;
@@ -77,7 +105,20 @@ export function placesFor(layout: Layout) {
     // The buttons and score stay at the top; the recipe sits just above the
     // cooking and Chef Bunny just below it, whatever the screen's height.
     const bunnyY = Math.min(height - 150, sy + 635);
+    // The dish being made: big on the wall between the score and the recipe
+    // when there's room, or small between the buttons and the score.
+    const room = sy - 24 - 84;
+    const badge: Box =
+      room >= 70
+        ? {
+            x: width / 2 - Math.min(210, width / 2 - 50),
+            y: 84 + (room - Math.min(room, 200)) / 2,
+            w: Math.min(420, width - 100),
+            h: Math.min(room, 200),
+          }
+        : { x: 134, y: 26, w: width - 134 - 180, h: 48 };
     return {
+      badge,
       home: { x: 40, y: 50 } as Spot | null,
       sound: { x: 100, y: 50 },
       score: { x: width - 168, y: 28 },
@@ -88,8 +129,18 @@ export function placesFor(layout: Layout) {
     };
   }
   // On the page the scene is the whole canvas, and there's a back link above
-  // it, so there's no home button.
+  // it, so there's no home button. The dish being made sits in the kitchen
+  // beside the scene when the screen is wide enough, above it when there's
+  // room there, and otherwise in the strip above the recipe.
+  const side = Math.min(220, sx - 20);
+  const badge: Box =
+    side >= 110
+      ? { x: (sx - side) / 2, y: sy + 110, w: side, h: Math.min(240, side * 1.8) }
+      : sy >= 90
+        ? { x: sx + W / 2 - 180, y: (sy - 80) / 2, w: 360, h: 80 }
+        : { x: sx + W / 2 - 165, y: sy + 4, w: 330, h: 40 };
   return {
+    badge,
     home: layout.shape === 'wide' ? { x: sx + 40, y: sy + 80 } : null,
     sound: { x: sx + (layout.shape === 'wide' ? 100 : 40), y: sy + 80 },
     score: { x: sx + W - 168, y: sy + 58 },
@@ -100,7 +151,11 @@ export function placesFor(layout: Layout) {
   };
 }
 
-type BunnyMood = 'idle' | 'cheer' | 'nod';
+/** What the end of a round shows besides the round: decorating, and sticker news. */
+export interface RoundEnd {
+  decor: DecorState;
+  sticker: StickerNews;
+}
 
 // ---------------------------------------------------------------------------
 // The kitchen behind everything, drawn once
@@ -265,71 +320,6 @@ function drawShelf(g: G, dx: number, dy: number) {
   g.restore();
 }
 
-// ---------------------------------------------------------------------------
-// Chef Bunny
-
-/** Chef Bunny, with her head at (x, y). */
-function drawBunny(g: G, t: number, mood: BunnyMood, moodAge: number, at: Spot) {
-  const cheering = mood === 'cheer';
-  const hop = cheering ? -Math.abs(Math.sin(moodAge * 9)) * 16 : Math.sin(t * 2) * 2;
-  const tilt = mood === 'nod' ? Math.sin(moodAge * 10) * 0.12 * Math.max(0, 1 - moodAge) : 0;
-  const x = at.x;
-  const y = at.y + hop;
-
-  // Body and apron.
-  oval(g, x, y + 82, 50, 46);
-  fillStroke(g, C.white);
-  rounded(g, x - 28, y + 54, 56, 60, 16);
-  fillStroke(g, C.pink, 3.5);
-  heartPath(g, x, y + 76, 9);
-  fillStroke(g, C.white, 2.5);
-
-  g.save();
-  g.translate(x, y);
-  g.rotate(tilt);
-
-  // Ears, splayed out from under the hat.
-  for (const side of [-1, 1]) {
-    const wiggle = cheering ? Math.sin(moodAge * 18) * 0.15 : Math.sin(t * 1.5 + side) * 0.04;
-    oval(g, side * 30, -46, 11, 30, side * 0.55 + wiggle);
-    fillStroke(g, C.white);
-    oval(g, side * 30, -46, 5, 20, side * 0.55 + wiggle);
-    g.fillStyle = C.pink;
-    g.fill();
-  }
-
-  circle(g, 0, 0, 42);
-  fillStroke(g, C.white);
-
-  // Chef's hat.
-  for (const [hx, hy, r] of [
-    [-18, -60, 15],
-    [18, -60, 15],
-    [0, -70, 19],
-  ]) {
-    circle(g, hx, hy, r);
-    fillStroke(g, C.white, 3.5);
-  }
-  rounded(g, -24, -52, 48, 16, 6);
-  fillStroke(g, C.white, 3.5);
-
-  const blink = mood === 'idle' && t % 3.4 < 0.14;
-  face(g, 0, 4, 1.3, cheering || blink ? 'joy' : 'happy');
-  g.fillStyle = C.hotPink;
-  oval(g, 0, 2, 3.4, 2.4);
-  g.fill();
-  g.restore();
-
-  // Paws: waving when cheering, resting on the counter otherwise.
-  for (const side of [-1, 1]) {
-    const wave = Math.sin(moodAge * 14 + side) * 8;
-    const px = cheering ? x + side * 50 : x + side * 32;
-    const py = cheering ? y - 12 + wave : y + 46;
-    circle(g, px, py, 12);
-    fillStroke(g, C.white, 3.5);
-  }
-}
-
 /**
  * A plate under a shiny lid with a big "?" on it, for the title screen. The
  * lid wobbles and now and then peeks open a crack, with a puff of steam, but
@@ -418,7 +408,7 @@ function drawMysteryDish(g: G, x: number, y: number, t: number) {
  * Chef Bunny's speech bubble. Above her head it points down; beside her (in
  * the tall layout) it points left, and the words are bigger.
  */
-function drawSpeech(g: G, lines: [string, string], bubble: Bubble) {
+function drawSpeech(g: G, lines: [string, string] | [string], bubble: Bubble) {
   const { x, y, w, tail } = bubble;
   const h = 82;
   rounded(g, x, y, w, h, 20);
@@ -451,8 +441,84 @@ function drawSpeech(g: G, lines: [string, string], bubble: Bubble) {
   });
   g.stroke();
   const size = tail === 'down' ? 16 : 22;
+  if (lines.length === 1) {
+    // Something she said herself, big and pink, shrunk to fit.
+    g.font = font(size * 1.3);
+    const fit = Math.min(1, (w - 24) / Math.max(1, g.measureText(lines[0]).width));
+    plainText(g, lines[0], x + w / 2, y + 41, size * 1.3 * fit, C.hotPink);
+    return;
+  }
   plainText(g, lines[0], x + w / 2, y + 27, size, C.ink);
   plainText(g, lines[1], x + w / 2, y + 54, size, C.hotPink);
+}
+
+/**
+ * The dish being made, on a little card: its finished picture and its name.
+ * A tall card has the picture on top; a short one has it on the left.
+ * `wiggle` (0 to 1) gives it a shake when it's tapped.
+ */
+function drawBadge(g: G, dish: Dish, box: Box, t: number, wiggle: number) {
+  const { x, y, w, h } = box;
+  g.save();
+  g.translate(x + w / 2, y + h / 2);
+  g.rotate(Math.sin(wiggle * 18) * 0.06 * wiggle);
+  g.translate(-w / 2, -h / 2);
+  rounded(g, 0, 0, w, h, Math.min(22, h / 2));
+  fillStroke(g, C.white, 3.5, C.ink);
+  g.save();
+  rounded(g, 0, 0, w, h, Math.min(22, h / 2));
+  g.clip();
+  const tall = h >= 100;
+  // A tall card's name goes on as many lines as it needs, up to three.
+  const name = tall ? wrapName(g, dish.name, w - 16, Math.min(24, w / 8)) : null;
+  const nameHeight = name ? name.lines.length * name.size * 1.15 + 12 : 0;
+  // The picture's space, and the name's.
+  const art = tall
+    ? { x: w / 2, y: (h - nameHeight) / 2 + 2, w: w - 16, h: h - nameHeight - 8 }
+    : { x: 8 + ((h - 6) * 1.5) / 2, y: h / 2, w: (h - 6) * 1.5, h: h - 6 };
+  const scale = Math.min(art.w / 250, art.h / 170);
+  g.translate(art.x, art.y);
+  g.scale(scale, scale);
+  dish.draw(g, t, null);
+  g.restore();
+  if (name) {
+    name.lines.forEach((line, i) => {
+      const y = h - nameHeight + 6 + (i + 0.5) * name.size * 1.15;
+      stickerText(g, line, w / 2, y, name.size, C.hotPink, 'center', w - 14);
+    });
+  } else {
+    // A short card's name goes beside the picture, on two lines if it's tall enough.
+    const left = 8 + art.w + 4;
+    const room = w - 8 - left;
+    const beside = wrapName(g, dish.name, room, Math.min(26, h * 0.5), h >= 60 ? 2 : 1);
+    beside.lines.forEach((line, i) => {
+      const y = h / 2 + 1 + (i - (beside.lines.length - 1) / 2) * beside.size * 1.15;
+      stickerText(g, line, (left + w - 8) / 2, y, beside.size, C.hotPink, 'center', room);
+    });
+  }
+  g.restore();
+}
+
+/**
+ * Splits a name into lines no wider than `width`, at the biggest size up to
+ * `size` that needs `most` lines at most.
+ */
+function wrapName(g: G, text: string, width: number, size: number, most = 3) {
+  const words = text.split(' ');
+  let lines: string[] = [text];
+  for (let s = size; s >= 10; s -= 1) {
+    g.font = font(s);
+    lines = [];
+    for (const word of words) {
+      const last = lines[lines.length - 1];
+      const joined = last === undefined ? word : `${last} ${word}`;
+      if (last !== undefined && g.measureText(joined).width + s * 0.3 > width) lines.push(word);
+      else lines[Math.max(0, lines.length - 1)] = joined;
+    }
+    const fits = lines.every((line) => g.measureText(line).width + s * 0.3 <= width);
+    if (lines.length <= most && fits) return { lines, size: s };
+  }
+  return { lines, size: 10 };
 }
 
 // ---------------------------------------------------------------------------
@@ -489,8 +555,65 @@ export function createRenderer(ctx: G, sound: Sound) {
     ctx.setTransform(pixels, 0, 0, pixels, layout.sceneX * pixels, layout.sceneY * pixels);
   }
 
-  function bunny(mood: BunnyMood, age: number) {
-    onCanvas(() => drawBunny(ctx, fx.time, mood, age, places.bunny));
+  // -------------------------------------------------------------------------
+  // Chef Bunny: chef.ts decides how she feels, bunny.ts draws her.
+
+  /** Where she looks: what just happened, the pointer, or now and then at you. */
+  function lookTarget(): Spot | null {
+    const focus = fx.focus;
+    if (focus && focus.age < 1.5) return focus;
+    if (glancing(fx.chef)) return null;
+    if (fx.pointer) {
+      return { x: fx.pointer.x + layout.sceneX, y: fx.pointer.y + layout.sceneY };
+    }
+    return null;
+  }
+
+  function bunny(mood?: BunnyMood, age?: number) {
+    const chef = fx.chef;
+    const at = places.bunny;
+    const target = lookTarget();
+    const look = target ? gaze({ x: at.x, y: at.y + 4 }, target, 3.2) : { x: 0, y: 0.6 };
+    const ease = Math.min(1, fx.dt * 10);
+    fx.look.x += (look.x - fx.look.x) * ease;
+    fx.look.y += (look.y - fx.look.y) * ease;
+    // She leans toward the cooking: right, unless what she's looking at is left of her.
+    const side = target && target.x < at.x - 20 ? -1 : 1;
+    const pose: BunnyPose = {
+      mood: mood ?? chef.mood,
+      age: age ?? chef.moodAge,
+      t: fx.time,
+      blink: blinking(chef),
+      ear: earFlick(chef),
+      look: fx.look,
+      lean: chef.lean * side,
+    };
+    onCanvas(() => drawBunny(ctx, at, pose));
+  }
+
+  /**
+   * Chef Bunny reacts to something at (x, y) on the scene, and may say a
+   * line about it: only while the step is taking input and the voice is free,
+   * so she never talks over an instruction.
+   */
+  function chefReacts(event: ChefEvent, x: number, y: number) {
+    const state = fx.seen;
+    fx.focus = { x: x + layout.sceneX, y: y + layout.sceneY, age: 0 };
+    const open = !!state && state.phase === 'playing' && state.banner === 0;
+    const line = react(fx.chef, event, fx.time, open);
+    if (fx.chef.mood === 'party' && fx.chef.moodAge === 0) {
+      // A milestone streak: she jumps for joy in a shower of stars.
+      burst(
+        places.bunny.x - layout.sceneX,
+        places.bunny.y - layout.sceneY - 20,
+        16,
+        ['star', 'heart', 'star'],
+        [C.gold, C.hotPink, C.butter, C.white],
+        280,
+      );
+      sound.chime([NOTE.G6, NOTE.C7, NOTE.G6, NOTE.C7], 0.09, 0.08);
+    }
+    if (line && sound.chatter(line)) fx.said = { text: line, age: 0 };
   }
 
   const fresh = () => ({
@@ -501,14 +624,53 @@ export function createRenderer(ctx: G, sound: Sound) {
     feedback: null as Feedback | null,
     /** Each step's own effect memory, from its `fx`. */
     runs: new Map<StepRun, unknown>(),
-    mood: 'idle' as BunnyMood,
-    moodAge: 9,
+    chef: createChef(),
+    /** What she said on her own, shown in her bubble for a moment. */
+    said: null as { text: string; age: number } | null,
+    /** Where something just happened, in canvas units, for her to look at. */
+    focus: null as { x: number; y: number; age: number } | null,
+    pointer: null as Pointer | null,
+    look: { x: 0, y: 0 },
+    dt: 0,
     overAge: -1,
+    /** Seconds since decorating started, or -1 before it. */
+    decorAge: -1,
+    stickerShown: false,
     starsPlayed: 0,
     shownScore: 0,
     notYet: null as { x: number; y: number; age: number } | null,
   });
   let fx = fresh();
+
+  /** The dish spinner while it runs (see spinner.ts), or null. */
+  let spin: {
+    dish: Dish;
+    start: number;
+    end: number;
+    age: number;
+    pos: number;
+    ticked: number;
+    tickAge: number;
+    landed: boolean;
+  } | null = null;
+  /** The dish the spinner already said "Let's make..." for. */
+  let announced: Dish | null = null;
+  /**
+   * Where the spinner goes on the canvas: on the scene, or bigger on a tall
+   * screen, in the space above Chef Bunny. `x`, `y` is its middle.
+   */
+  function spinnerSpot() {
+    if (layout.shape !== 'tall') {
+      return { x: layout.sceneX + W / 2, y: layout.sceneY + 250, scale: 1 };
+    }
+    const top = 90;
+    const bottom = places.bunny.y - 84;
+    const scale = Math.min((layout.width - 70) / 380, (bottom - top) / 430);
+    return { x: layout.width / 2, y: (top + bottom) / 2, scale };
+  }
+
+  /** Seconds since the dish badge was tapped. */
+  let badgeAge = 9;
 
   const burst: Effects['burst'] = (x, y, count, shapes, colors, speed = 220, gravity = 380) => {
     for (let i = 0; i < count; i++) {
@@ -537,8 +699,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     const shapes: Particle['shape'][] =
       feedback.grade === 'Nice try!' ? ['heart'] : ['star', 'heart', 'star', 'dot'];
     burst(x, y, counts[feedback.grade], shapes, CONFETTI);
-    fx.mood = feedback.grade === 'Perfect!' || feedback.grade === 'Great!' ? 'cheer' : 'nod';
-    fx.moodAge = 0;
+    chefReacts({ kind: 'hit', grade: feedback.grade, combo: feedback.combo }, x, y);
   }
 
   /** What steps can set off: sounds, sparkles, and Chef Bunny's mood. */
@@ -553,7 +714,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       fx.particles.push(particle);
     },
     calm() {
-      fx.mood = 'idle';
+      fx.chef.mood = 'idle';
     },
   };
 
@@ -577,7 +738,7 @@ export function createRenderer(ctx: G, sound: Sound) {
   }
 
   /** Watches the state for things that just happened. */
-  function observe(state: KitchenState, pointer: Pointer, dt: number) {
+  function observe(state: KitchenState, pointer: Pointer, dt: number, end: RoundEnd) {
     if (fx.seen !== state) {
       const keep = fx.particles;
       fx = fresh();
@@ -589,9 +750,12 @@ export function createRenderer(ctx: G, sound: Sound) {
       fx.stepIndex = state.stepIndex;
       const run = currentRun(state);
       sound.banner();
-      // The first step also says what we're making.
-      const intro = state.stepIndex === 0 ? `Let's make ${state.dish.name}! ` : '';
+      // The first step also says what we're making, unless the spinner did.
+      const intro =
+        state.stepIndex === 0 && announced !== state.dish ? `Let's make ${state.dish.name}! ` : '';
       sound.say(`${intro}${titleOf(run)} ${hintOf(run).join(' ')}`);
+      instructionStarted(fx.chef, fx.time);
+      fx.said = null;
     }
 
     if (state.feedback && state.feedback !== fx.feedback) {
@@ -606,15 +770,31 @@ export function createRenderer(ctx: G, sound: Sound) {
       stepOf(run.kind).observe?.(viewFor(state, run, pointer, dt));
     }
 
-    if (state.phase === 'over') {
+    // Decorating comes first, then the stars.
+    if (state.phase === 'over' && !end.decor.done) {
+      if (fx.decorAge < 0) {
+        fx.decorAge = 0;
+        sound.banner();
+        sound.say('Decorate your dish! Drag the treats onto it.');
+      }
+      fx.decorAge += dt;
+    }
+
+    if (state.phase === 'over' && end.decor.done) {
       if (fx.overAge < 0) {
         fx.overAge = 0;
         sound.fanfare();
         const dish = state.dish.name;
-        sound.say(`${ratingFor(totalScore(state), maxScore(state))} You made ${dish}!`);
+        const news =
+          end.sticker === 'new'
+            ? ' A new sticker for your recipe book!'
+            : end.sticker === 'better'
+              ? ' Your sticker got more stars!'
+              : '';
+        sound.say(`${ratingFor(totalScore(state), maxScore(state))} You made ${dish}!${news}`);
       }
       fx.overAge += dt;
-      fx.mood = 'cheer';
+      fx.chef.mood = 'cheer';
       const stars = starsFor(totalScore(state), maxScore(state));
       while (fx.starsPlayed < 3 && fx.overAge >= 0.9 + fx.starsPlayed * 0.45) {
         if (fx.starsPlayed < stars) {
@@ -649,11 +829,18 @@ export function createRenderer(ctx: G, sound: Sound) {
     }
   }
 
-  function update(dt: number) {
+  /** Advances the effects by `dt` seconds; `holding` is whether a hold-style step is held. */
+  function update(dt: number, holding = false) {
     fx.time += dt;
-    fx.moodAge += dt;
+    fx.dt = dt;
+    tickChef(fx.chef, dt, holding);
+    if (fx.focus) fx.focus.age += dt;
+    if (fx.said) {
+      fx.said.age += dt;
+      if (fx.said.age > SAID_TIME) fx.said = null;
+    }
+    badgeAge += dt;
     if (fx.notYet) fx.notYet.age += dt;
-    if (fx.mood !== 'idle' && fx.moodAge > 1.2) fx.mood = 'idle';
     for (const p of fx.particles) {
       p.vy += p.gravity * dt;
       p.x += p.vx * dt;
@@ -685,6 +872,11 @@ export function createRenderer(ctx: G, sound: Sound) {
   }
 
   function drawHud(state: KitchenState) {
+    if (state.phase === 'playing') {
+      onCanvas(() =>
+        drawBadge(ctx, state.dish, places.badge, fx.time, clamp01(1 - badgeAge / 0.6)),
+      );
+    }
     drawButtons();
     onCanvas(() => drawTopBar(state));
     drawProgress(state);
@@ -902,7 +1094,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.globalAlpha = 1;
   }
 
-  function drawEnd(state: KitchenState) {
+  function drawEnd(state: KitchenState, end: RoundEnd) {
     const g = ctx;
     const t = fx.time;
     const age = fx.overAge;
@@ -937,6 +1129,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.save();
     g.translate(0, -66);
     state.dish.draw(g, t, state);
+    drawDecorations(g, end.decor.placed);
     g.restore();
 
     rounded(g, -200, -226, 400, 58, 29);
@@ -980,6 +1173,242 @@ export function createRenderer(ctx: G, sound: Sound) {
     plainText(g, 'Cook again! 🔁', 0, 1, 24, C.ink);
     g.restore();
 
+    // The sticker news pops on after the stars.
+    const newsAt = 0.9 + stars * 0.45 + 0.3;
+    if (end.sticker && age >= newsAt) {
+      if (!fx.stickerShown) {
+        fx.stickerShown = true;
+        sound.chime([NOTE.C6, NOTE.E6, NOTE.G6, NOTE.C7], 0.08, 0.16);
+        burst(400 + 176, 250 - 112, 14, ['star', 'heart'], CONFETTI, 200);
+      }
+      const s = easeOutBack(clamp01((age - newsAt) / 0.4));
+      g.save();
+      g.translate(176, -112);
+      g.rotate(0.2 + Math.sin(t * 3) * 0.05);
+      g.scale(s, s);
+      starPath(g, 0, 0, 66, t * 0.2);
+      fillStroke(g, vertical(g, -60, 60, [C.butter, C.gold]), 4);
+      circle(g, 0, 0, 42);
+      fillStroke(g, C.white, 3);
+      const [top, bottom] = end.sticker === 'new' ? ['New', 'sticker!'] : ['Sticker', 'upgraded!'];
+      stickerText(g, top, 0, -10, 19, C.hotPink, 'center', 76);
+      stickerText(g, bottom, 0, 12, 17, C.purple, 'center', 80);
+      g.restore();
+    }
+
+    g.restore();
+  }
+
+  // -------------------------------------------------------------------------
+  // Decorating the finished dish
+
+  function drawDecorate(state: KitchenState, decor: DecorState) {
+    const g = ctx;
+    const t = fx.time;
+    const p = decorPlaces(layout.shape);
+    dim(0.28 * clamp01(fx.decorAge / 0.4));
+
+    const pop = easeOutBack(clamp01(fx.decorAge / 0.45));
+    const { panel } = p;
+    g.save();
+    g.translate(panel.x + panel.w / 2, panel.y + panel.h / 2);
+    g.scale(pop, pop);
+    g.translate(-(panel.x + panel.w / 2), -(panel.y + panel.h / 2));
+
+    // A cloth to decorate on.
+    rounded(g, panel.x, panel.y, panel.w, panel.h, 36);
+    fillStroke(g, C.cream, 5, C.hotPink);
+    g.setLineDash([10, 9]);
+    rounded(g, panel.x + 12, panel.y + 12, panel.w - 24, panel.h - 24, 26);
+    g.lineWidth = 3;
+    g.strokeStyle = C.lavender;
+    g.stroke();
+    g.setLineDash([]);
+
+    // The dish, with what's on it so far.
+    const { dish } = p;
+    shadow(g, dish.x, dish.y + 70 * dish.scale, 150 * dish.scale, 18);
+    g.save();
+    g.translate(dish.x, dish.y);
+    g.scale(dish.scale, dish.scale);
+    state.dish.draw(g, t, state);
+    drawDecorations(g, decor.placed);
+    g.restore();
+
+    // The title on top, so a tall dish (a smoothie's straw) never hides it.
+    stickerText(
+      g,
+      'Decorate your dish!',
+      p.title.x,
+      p.title.y,
+      34,
+      vertical(g, p.title.y - 20, p.title.y + 20, [C.hotPink, C.purple]),
+      'center',
+      panel.w - 60,
+    );
+
+    // The tray of treats.
+    const r = p.trayRadius;
+    const first = p.tray[0];
+    const lastSpot = p.tray[p.tray.length - 1];
+    rounded(
+      g,
+      first.x - r - 12,
+      first.y - r - 10,
+      lastSpot.x - first.x + 2 * r + 24,
+      2 * r + 20,
+      r + 10,
+    );
+    fillStroke(g, C.white, 3.5);
+    p.tray.forEach((spot, i) => {
+      const kind = DECORATIONS[i];
+      const chosen = decor.selected === kind;
+      if (chosen) {
+        g.strokeStyle = C.gold;
+        g.lineWidth = 5;
+        circle(g, spot.x, spot.y, r + 3 + Math.sin(t * 6) * 2);
+        g.stroke();
+      }
+      circle(g, spot.x, spot.y, r - 2);
+      fillStroke(g, chosen ? C.butter : C.lavenderLight, 2.5);
+      const bob = Math.sin(t * 2.5 + i) * 2;
+      drawDecoration(g, kind, spot.x, spot.y + bob, 1.35);
+    });
+
+    // Done! It nudges a little more once some treats are on.
+    const { done } = p;
+    const pulse = 1 + Math.sin(t * 4) * (decor.placed.length > 0 ? 0.06 : 0.03);
+    g.save();
+    g.translate(done.x, done.y);
+    g.scale(pulse, pulse);
+    rounded(g, -done.w / 2, -done.h / 2, done.w, done.h, done.h / 2);
+    fillStroke(g, vertical(g, -done.h / 2, done.h / 2, [C.cabinetLight, C.mint]), 4);
+    stickerText(g, 'Done!', 0, 2, 28, C.hotPink, 'center', done.w - 16);
+    g.restore();
+
+    g.restore();
+  }
+
+  /** The treat under the finger, a little bigger, as if lifted. */
+  function drawHeld(decor: DecorState) {
+    const held = decor.held;
+    if (!held) return;
+    const scale = decorPlaces(layout.shape).dish.scale * 1.2;
+    shadow(ctx, held.x + 6, held.y + 16, 16, 6);
+    drawDecoration(ctx, held.kind, held.x, held.y - 4, scale);
+  }
+
+  // -------------------------------------------------------------------------
+  // The recipe book
+
+  /** Text that shrinks to fit `maxWidth`. */
+  function fitted(
+    text: string,
+    x: number,
+    y: number,
+    size: number,
+    color: string,
+    maxWidth: number,
+  ) {
+    const g = ctx;
+    g.font = font(size);
+    const wide = g.measureText(text).width;
+    plainText(g, text, x, y, wide > maxWidth ? (size * maxWidth) / wide : size, color);
+  }
+
+  /** A dish nobody has cooked yet: under a little lid with a "?". */
+  function drawCovered(g: G, x: number, y: number, s: number) {
+    oval(g, x, y + 22 * s, 50 * s, 10 * s);
+    fillStroke(g, C.white, 3);
+    g.beginPath();
+    g.ellipse(x, y + 20 * s, 42 * s, 40 * s, 0, Math.PI, 0);
+    g.closePath();
+    fillStroke(g, vertical(g, y - 20 * s, y + 20 * s, [C.white, C.steel, C.steelDark]), 3);
+    circle(g, x, y - 24 * s, 6 * s);
+    fillStroke(g, C.pink, 2.5);
+    stickerText(g, '?', x, y + 2 * s, 30 * s, C.lavender);
+  }
+
+  function drawBookPage(stickers: Record<string, number>) {
+    const g = ctx;
+    const t = fx.time;
+    const b = bookPlaces(layout, DISHES.length);
+    const tall = layout.shape === 'tall';
+    dim(0.3);
+    rounded(g, b.page.x, b.page.y, b.page.w, b.page.h, 32);
+    fillStroke(g, C.cream, 5, C.hotPink);
+    g.setLineDash([10, 9]);
+    rounded(g, b.page.x + 10, b.page.y + 10, b.page.w - 20, b.page.h - 20, 24);
+    g.lineWidth = 3;
+    g.strokeStyle = C.lavender;
+    g.stroke();
+    g.setLineDash([]);
+
+    stickerText(
+      g,
+      'My Recipe Book',
+      b.title.x,
+      b.title.y,
+      tall ? 44 : 36,
+      vertical(g, b.title.y - 22, b.title.y + 22, [C.hotPink, C.purple]),
+      'center',
+      b.page.w - 170,
+    );
+    plainText(
+      g,
+      `📖 ${countLine(stickers, DISHES)}`,
+      b.count.x,
+      b.count.y,
+      tall ? 26 : 20,
+      C.purple,
+    );
+
+    // Close: or tap anywhere that isn't a dish you've cooked.
+    circle(g, b.close.x, b.close.y, b.close.r);
+    fillStroke(g, C.white, 3.5);
+    plainText(g, '✕', b.close.x, b.close.y + 1, 28, C.ink);
+
+    DISHES.forEach((dish, i) => {
+      const cell: Box = b.cells[i];
+      const s = b.scale;
+      const cx = cell.x + cell.w / 2;
+      const level = starsOf(stickers, dish.id);
+      rounded(g, cell.x + 4, cell.y + 4, cell.w - 8, cell.h - 8, 18 * s);
+      fillStroke(g, level ? C.white : C.lavenderLight, 3, level ? C.ink : C.lavender);
+      if (level) {
+        g.save();
+        g.translate(cx, cell.y + 47 * s);
+        g.scale(0.36 * s, 0.36 * s);
+        dish.draw(g, t, null);
+        g.restore();
+        const lines = twoLines(dish.name);
+        lines.forEach((line, k) => {
+          const y = cell.y + (lines.length === 1 ? 100 : 91 + k * 14) * s;
+          fitted(line, cx, y, 13 * s, C.ink, cell.w - 16);
+        });
+      } else {
+        drawCovered(g, cx, cell.y + 52 * s, s);
+      }
+      for (let k = 0; k < 3; k++) {
+        starPath(g, cx + (k - 1) * 20 * s, cell.y + 124 * s, 8 * s);
+        fillStroke(g, k < level ? C.gold : C.white, 2, k < level ? C.ink : C.starEdge);
+      }
+    });
+  }
+
+  /** The book button on the title screen. */
+  function drawBookButton() {
+    const g = ctx;
+    const box = bookButtonFor(layout);
+    const wiggle = Math.sin(fx.time * 2.2) * 0.03;
+    g.save();
+    g.translate(box.x + box.w / 2, box.y + box.h / 2);
+    g.rotate(wiggle);
+    rounded(g, -box.w / 2, -box.h / 2, box.w, box.h, box.h / 2);
+    fillStroke(g, vertical(g, -box.h / 2, box.h / 2, [C.white, C.lavenderLight]), 4);
+    g.fillStyle = C.ink;
+    emoji(g, '📖', -box.w / 2 + 32, 2, 30);
+    stickerText(g, 'Recipes', 22, 2, 24, C.purple, 'center', box.w - 70);
     g.restore();
   }
 
@@ -997,7 +1426,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.restore();
     for (const [dx, y, r] of [
       [-190, 100, 16],
-      [190, 96, 20],
+      [160, 96, 20],
       [220, 190, 12],
       [-200, 200, 12],
     ]) {
@@ -1018,6 +1447,8 @@ export function createRenderer(ctx: G, sound: Sound) {
     fillStroke(g, vertical(g, -35, 35, [C.pink, C.hotPink]), 5);
     stickerText(g, 'Tap to cook!', 0, 2, 34, C.white);
     g.restore();
+
+    onCanvas(drawBookButton);
   }
 
   return {
@@ -1025,12 +1456,114 @@ export function createRenderer(ctx: G, sound: Sound) {
       const keep = fx.particles;
       fx = fresh();
       fx.particles = keep;
+      spin = null;
+      announced = null;
+    },
+
+    /**
+     * Starts the dish spinner, which lands on `dish`: the game has already
+     * picked it. Chef Bunny says "Let's make..." when it lands, so the first
+     * step's card doesn't say it again.
+     */
+    startSpin(dish: Dish) {
+      const count = DISHES.length;
+      const target = Math.max(0, DISHES.indexOf(dish));
+      const start = Math.floor(Math.random() * count);
+      const end = spinEnd(start, target, count);
+      spin = { dish, start, end, age: 0, pos: start, ticked: start, tickAge: 9, landed: false };
+      announced = dish;
+      sound.whoosh();
+    },
+
+    /** Whether the spinner has finished, so cooking can start. */
+    spinDone() {
+      return !spin || spin.age >= spinTime(spin.dish);
+    },
+
+    /** A tap once the spinner has landed skips the rest of the pause. */
+    skipSpin() {
+      if (spin && spin.landed && spin.age >= SPIN_TIME + 0.5) {
+        spin.age = Math.max(spin.age, spinTime(spin.dish) - 0.2);
+      }
+    },
+
+    /** Draws a frame of the dish spinner. */
+    drawSpin(dt: number) {
+      update(dt);
+      begin();
+      if (spin) {
+        spin.age += dt;
+        spin.tickAge += dt;
+        const pos = reelPosition(spin.start, spin.end, spin.age);
+        const speed = dt > 0 ? Math.abs(pos - spin.pos) / dt : 0;
+        spin.pos = pos;
+        // A click each time a dish passes the middle, but not a buzz.
+        const passing = Math.round(pos);
+        if (passing !== spin.ticked && !spin.landed) {
+          spin.ticked = passing;
+          if (spin.tickAge > 0.06) {
+            spin.tickAge = 0;
+            sound.tick(1 + 0.4 * clamp01(spin.age / SPIN_TIME));
+          }
+        }
+        if (!spin.landed && spin.age >= SPIN_TIME) {
+          spin.landed = true;
+          sound.tada();
+          sound.say(`Let's make ${spin.dish.name}!`);
+          // Sparkles from the dish, in scene units.
+          const at = spinnerSpot();
+          burst(
+            at.x - layout.sceneX + (SPINNER_DISH.x - W / 2) * at.scale,
+            at.y - layout.sceneY + (SPINNER_DISH.y - 250) * at.scale,
+            24,
+            ['star', 'heart', 'star', 'dot'],
+            CONFETTI,
+            360,
+          );
+          fx.chef.moodAge = 0;
+        }
+        if (spin.landed) fx.chef.mood = 'cheer';
+        bunny();
+        dim(0.25);
+        const at = spinnerSpot();
+        const view = {
+          dishes: DISHES,
+          pos,
+          speed,
+          landed: spin.landed ? spin.age - SPIN_TIME : -1,
+          t: fx.time,
+        };
+        onCanvas(() => {
+          ctx.translate(at.x, at.y);
+          ctx.scale(at.scale, at.scale);
+          ctx.translate(-W / 2, -250);
+          drawSpinner(ctx, view);
+        });
+      }
+      drawButtons();
+      drawParticles();
+    },
+
+    /** Whether a canvas point is on the badge of the dish being made. */
+    hitBadge(x: number, y: number) {
+      const { badge } = places;
+      return x >= badge.x && x <= badge.x + badge.w && y >= badge.y && y <= badge.y + badge.h;
+    },
+
+    /** Chef Bunny says what we're making, and the badge gives a wiggle. */
+    sayDish(dish: Dish) {
+      badgeAge = 0;
+      sound.pop();
+      sound.say(`We're making ${dish.name}!`);
+      fx.chef.mood = 'nod';
+      fx.chef.moodAge = 0;
     },
 
     /** Shows a gentle "Not yet!" where a too-early tap landed. */
     notYet(x: number, y: number) {
       fx.notYet = { x, y, age: 0 };
       sound.boop();
+      chefReacts({ kind: 'not yet' }, x, y);
     },
 
     /**
@@ -1064,15 +1597,36 @@ export function createRenderer(ctx: G, sound: Sound) {
     drawTitle(dt: number) {
       update(dt);
       begin();
-      bunny(fx.mood, fx.moodAge);
+      bunny();
       drawTitle();
       drawButtons();
       drawParticles();
     },
 
-    draw(state: KitchenState, pointer: Pointer, dt: number) {
-      observe(state, pointer, dt);
+    /** Draws the recipe book, with the stickers earned so far. */
+    drawBook(dt: number, stickers: Record<string, number>) {
       update(dt);
+      begin();
+      onCanvas(() => drawBookPage(stickers));
+    },
+
+    /** Sparkles where a treat lands on the dish, and a happy Chef Bunny. */
+    sparkle(x: number, y: number) {
+      burst(x, y, 8, ['star', 'heart', 'dot'], CONFETTI, 150, 300);
+      sound.bloop();
+      fx.chef.mood = 'cheer';
+      fx.chef.moodAge = 0;
+    },
+
+    draw(state: KitchenState, pointer: Pointer, dt: number, end: RoundEnd) {
+      spin = null;
+      observe(state, pointer, dt, end);
+      fx.pointer = pointer;
+      // Holding to pour, shake or bake: she leans in for a look.
+      const taking = state.phase === 'playing' && state.banner === 0;
+      const holding = taking && pointer.down && isHolding(currentRun(state).state);
+      if (holding && !fx.chef.holding) chefReacts({ kind: 'peek' }, pointer.x, pointer.y);
+      update(dt, holding);
       fx.shownScore += (liveScore(state) - fx.shownScore) * Math.min(1, dt * 8);
 
       begin();
@@ -1081,9 +1635,21 @@ export function createRenderer(ctx: G, sound: Sound) {
       const run = currentRun(state);
       stepOf(run.kind).draw(viewFor(state, run, pointer, dt));
 
-      bunny(fx.mood, fx.moodAge);
+      // The finished dish, waiting to be decorated before the stars.
+      if (state.phase === 'over' && !end.decor.done) {
+        drawDecorate(state, end.decor);
+        bunny();
+        onCanvas(() => drawSpeech(ctx, ['Drag a treat', 'onto your dish!'], places.speech));
+        drawButtons();
+        drawParticles();
+        drawHeld(end.decor);
+        return;
+      }
+
+      bunny();
       if (state.phase === 'playing' && state.banner === 0) {
-        onCanvas(() => drawSpeech(ctx, hintOf(run), places.speech));
+        const said = fx.said;
+        onCanvas(() => drawSpeech(ctx, said ? [said.text] : hintOf(run), places.speech));
       }
       drawHud(state);
       if (state.phase === 'playing') drawParticles();
@@ -1094,7 +1660,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       }
       if (state.phase === 'playing') drawNotYet();
       if (state.phase === 'over') {
-        drawEnd(state);
+        drawEnd(state, end);
         bunny('cheer', fx.overAge);
         drawParticles();
       }

@@ -1,4 +1,14 @@
-import { recordScore, theme, type CarnivalGame } from '../../carnival';
+import { earnSticker, recordScore, stickersFor, theme, type CarnivalGame } from '../../carnival';
+import { bookButtonFor, bookPlaces, cellAt, inBox } from './book';
+import {
+  createDecor,
+  decorMove,
+  decorPlaces,
+  decorPress,
+  decorRelease,
+  decorTick,
+  type DecorState,
+} from './decorate';
 import { DISHES } from './dishes';
 import {
   BANNER_TIME,
@@ -92,7 +102,23 @@ export function starsFor(score: number, max: number): number {
   return 1;
 }
 
-/** Whether the step being cooked takes input: playing, and its card has gone. */
+/** The sticker a finished round earns: its dish, at its stars. */
+export function stickerFor(state: KitchenState): { id: string; level: number } {
+  return { id: state.dish.id, level: starsFor(totalScore(state), maxScore(state)) };
+}
+
+/**
+ * What the end card says about the round's sticker: a dish's first sticker,
+ * more stars than before, or nothing new.
+ */
+export type StickerNews = 'new' | 'better' | null;
+
+export function stickerNews(before: number | undefined, earned: boolean): StickerNews {
+  if (!earned) return null;
+  return before === undefined ? 'new' : 'better';
+}
+
+/** Whether the step being cooked: playing, and its card has gone. */
 function taking(state: KitchenState): boolean {
   return state.phase === 'playing' && state.banner === 0;
 }
@@ -207,10 +233,19 @@ export const carnivalKitchen: CarnivalGame = {
     };
 
     let state = createState(pickDish());
-    // The title screen, waiting for a tap to start cooking.
-    let choosing = true;
+    // The title screen waits for a tap to start cooking; the recipe book
+    // opens from it; the kitchen is where the cooking (and decorating) is.
+    let screen: 'title' | 'book' | 'kitchen' = 'title';
+    // The dish spinner is showing which dish was picked. The round waits,
+    // its card's clock stopped, until it's done.
+    let spinning = false;
     let lastDish: Dish | undefined;
     let scoreRecorded = false;
+    // The finished dish's decorations, and the round's sticker news.
+    let decor: DecorState = createDecor();
+    let sticker: StickerNews = null;
+    // The stickers the recipe book shows, read when it opens.
+    let bookStickers: Record<string, number> = {};
     const pointer: Pointer = { x: WIDTH / 2, y: HEIGHT / 2, down: false };
     const sound = createSound();
     const renderer = createRenderer(ctx, sound);
@@ -219,20 +254,38 @@ export const carnivalKitchen: CarnivalGame = {
     // fingers moving or lifting don't touch its gesture; a new tap takes over.
     let activePointer: number | null = null;
 
-    /** Saves a finished round's score, once, before anything can replace it. */
+    /**
+     * Saves a finished round's score and earns its dish's sticker, once,
+     * before anything can replace the round.
+     */
     const saveScore = () => {
       if (state.phase === 'over' && !scoreRecorded) {
         recordScore(carnivalKitchen.id, totalScore(state));
+        const { id, level } = stickerFor(state);
+        const before = stickersFor(carnivalKitchen.id)[id];
+        sticker = stickerNews(before, earnSticker(carnivalKitchen.id, id, level));
         scoreRecorded = true;
       }
     };
 
-    /** Starts cooking the next dish, picked at random. */
-    const newRound = () => {
-      lastDish = pickDish(Math.random, lastDish);
+    /** Whether the finished dish is being decorated, before the stars. */
+    const decorating = () => state.phase === 'over' && !decor.done;
+
+    /**
+     * Starts cooking `dish`, or the next dish picked at random. A dish picked
+     * at random is shown on the dish spinner first (`spin`), which lands on
+     * it; a chosen dish starts straight away unless `spin` says otherwise.
+     */
+    const newRound = (dish?: Dish, { spin = dish === undefined }: { spin?: boolean } = {}) => {
+      lastDish = dish ?? pickDish(Math.random, lastDish);
       state = createState(lastDish);
       scoreRecorded = false;
+      decor = createDecor();
+      sticker = null;
+      screen = 'kitchen';
       renderer.reset();
+      spinning = spin;
+      if (spin) renderer.startSpin(lastDish);
     };
 
     /** Where the event is, in canvas units. The pointer keeps scene units. */
@@ -248,10 +301,26 @@ export const carnivalKitchen: CarnivalGame = {
       Object.assign(pointer, toScene(layout, at.x, at.y));
       return at;
     };
+    /** A tap on the recipe book: an earned dish cooks it, anywhere else closes it. */
+    const tapBook = (x: number, y: number) => {
+      const i = cellAt(bookPlaces(layout, DISHES.length).cells, x, y);
+      const dish = DISHES[i] as Dish | undefined;
+      if (dish && (bookStickers[dish.id] ?? 0) >= 1) {
+        sound.pop();
+        newRound(dish);
+      } else {
+        sound.whoosh();
+        screen = 'title';
+      }
+    };
     const onDown = (event: PointerEvent) => {
       event.preventDefault();
       const at = track(event);
       sound.unlock();
+      if (screen === 'book') {
+        tapBook(at.x, at.y);
+        return;
+      }
       if (renderer.hitHomeButton(at.x, at.y)) {
         location.hash = '#/';
         return;
@@ -260,13 +329,33 @@ export const carnivalKitchen: CarnivalGame = {
         sound.toggle();
         return;
       }
+      if (spinning) {
+        // Taps can't stop the spinner, but once it has landed one skips the wait.
+        renderer.skipSpin();
+        return;
+      }
+      if (screen === 'kitchen' && state.phase === 'playing' && renderer.hitBadge(at.x, at.y)) {
+        // The dish's badge: Chef Bunny says what we're making. Not a step press.
+        renderer.sayDish(state.dish);
+        return;
+      }
+      if (screen === 'title' && inBox(bookButtonFor(layout), at.x, at.y, 8)) {
+        sound.pop();
+        bookStickers = stickersFor(carnivalKitchen.id);
+        screen = 'book';
+        return;
+      }
       pointer.down = true;
       activePointer = event.pointerId;
-      if (choosing) {
+      if (screen === 'title') {
         // A tap starts cooking a dish picked at random. It also unlocks sound
         // and speech, which browsers only allow after a tap.
-        choosing = false;
         newRound();
+      } else if (decorating()) {
+        const places = decorPlaces(layout.shape);
+        const did = decorPress(decor, places, pointer.x, pointer.y);
+        if (did === 'pick') sound.pop();
+        if (did === 'place') renderer.sparkle(pointer.x, pointer.y);
       } else if (state.phase === 'over') {
         // A short pause first, so a last excited tap doesn't skip the stars.
         if (!renderer.endShown()) return;
@@ -279,13 +368,22 @@ export const carnivalKitchen: CarnivalGame = {
     const onMove = (event: PointerEvent) => {
       if (activePointer !== null && event.pointerId !== activePointer) return;
       track(event);
-      if (pointer.down) move(state, pointer.x, pointer.y);
+      if (!pointer.down) return;
+      if (decorating()) decorMove(decor, pointer.x, pointer.y);
+      else move(state, pointer.x, pointer.y);
     };
     const onUp = (event: PointerEvent) => {
       if (event.pointerId !== activePointer) return;
       activePointer = null;
       pointer.down = false;
-      if (release(state) === 'not yet') renderer.notYet(pointer.x, pointer.y);
+      if (decorating()) {
+        const did = decorRelease(decor, decorPlaces(layout.shape));
+        if (did === 'place') renderer.sparkle(pointer.x, pointer.y);
+        if (did === 'select' || did === 'unselect') sound.pop();
+        if (did === 'remove') sound.whoosh();
+      } else if (release(state) === 'not yet') {
+        renderer.notYet(pointer.x, pointer.y);
+      }
       saveScore();
     };
     canvas.addEventListener('pointerdown', onDown);
@@ -301,14 +399,20 @@ export const carnivalKitchen: CarnivalGame = {
       // Cap the step so a background tab doesn't teleport everything.
       const dt = Math.min((time - last) / 1000, 0.05);
       last = time;
-      if (choosing) {
+      if (screen === 'title') {
         renderer.drawTitle(dt);
-        frame = requestAnimationFrame(loop);
-        return;
+      } else if (screen === 'book') {
+        renderer.drawBook(dt, bookStickers);
+      } else if (spinning) {
+        // The round doesn't tick while the spinner runs.
+        renderer.drawSpin(dt);
+        if (renderer.spinDone()) spinning = false;
+      } else {
+        tick(state, dt);
+        saveScore();
+        if (decorating()) decorTick(decor, dt);
+        renderer.draw(state, pointer, dt, { decor, sticker });
       }
-      tick(state, dt);
-      saveScore();
-      renderer.draw(state, pointer, dt);
       frame = requestAnimationFrame(loop);
     };
     frame = requestAnimationFrame(loop);
