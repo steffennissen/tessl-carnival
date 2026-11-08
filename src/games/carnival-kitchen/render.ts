@@ -7,8 +7,8 @@ import {
   clamp01,
   easeOutBack,
   emoji,
-  face,
   fillStroke,
+  font,
   heartPath,
   horizontal,
   oval,
@@ -19,6 +19,20 @@ import {
   stickerText,
   vertical,
 } from './art';
+import { type BunnyPose, drawBunny } from './bunny';
+import {
+  type BunnyMood,
+  blinking,
+  createChef,
+  earFlick,
+  gaze,
+  glancing,
+  instructionStarted,
+  isHolding,
+  react,
+  tickChef,
+  type ChefEvent,
+} from './chef';
 import { liveScore, maxScore, ratingFor, starsFor, totalScore } from './game';
 import {
   BANNER_TIME,
@@ -34,7 +48,7 @@ import {
   type StepView,
 } from './kit';
 import { type Layout, layoutFor } from './layout';
-import type { Sound } from './sound';
+import { NOTE, type Sound } from './sound';
 import { hintOf, iconOf, stepOf, titleOf } from './steps';
 
 /**
@@ -53,6 +67,9 @@ import { hintOf, iconOf, stepOf, titleOf } from './steps';
 const START_BUTTON = { x: W / 2 + 40, y: 392, w: 300, h: 70 };
 
 const BUTTON_RADIUS = 24;
+
+/** Seconds something Chef Bunny said stays in her bubble. */
+const SAID_TIME = 2;
 
 interface Spot {
   x: number;
@@ -99,8 +116,6 @@ export function placesFor(layout: Layout) {
     speech: { x: sx + 12, y: sy + 230, w: 188, tail: 'down' } as Bubble,
   };
 }
-
-type BunnyMood = 'idle' | 'cheer' | 'nod';
 
 // ---------------------------------------------------------------------------
 // The kitchen behind everything, drawn once
@@ -265,71 +280,6 @@ function drawShelf(g: G, dx: number, dy: number) {
   g.restore();
 }
 
-// ---------------------------------------------------------------------------
-// Chef Bunny
-
-/** Chef Bunny, with her head at (x, y). */
-function drawBunny(g: G, t: number, mood: BunnyMood, moodAge: number, at: Spot) {
-  const cheering = mood === 'cheer';
-  const hop = cheering ? -Math.abs(Math.sin(moodAge * 9)) * 16 : Math.sin(t * 2) * 2;
-  const tilt = mood === 'nod' ? Math.sin(moodAge * 10) * 0.12 * Math.max(0, 1 - moodAge) : 0;
-  const x = at.x;
-  const y = at.y + hop;
-
-  // Body and apron.
-  oval(g, x, y + 82, 50, 46);
-  fillStroke(g, C.white);
-  rounded(g, x - 28, y + 54, 56, 60, 16);
-  fillStroke(g, C.pink, 3.5);
-  heartPath(g, x, y + 76, 9);
-  fillStroke(g, C.white, 2.5);
-
-  g.save();
-  g.translate(x, y);
-  g.rotate(tilt);
-
-  // Ears, splayed out from under the hat.
-  for (const side of [-1, 1]) {
-    const wiggle = cheering ? Math.sin(moodAge * 18) * 0.15 : Math.sin(t * 1.5 + side) * 0.04;
-    oval(g, side * 30, -46, 11, 30, side * 0.55 + wiggle);
-    fillStroke(g, C.white);
-    oval(g, side * 30, -46, 5, 20, side * 0.55 + wiggle);
-    g.fillStyle = C.pink;
-    g.fill();
-  }
-
-  circle(g, 0, 0, 42);
-  fillStroke(g, C.white);
-
-  // Chef's hat.
-  for (const [hx, hy, r] of [
-    [-18, -60, 15],
-    [18, -60, 15],
-    [0, -70, 19],
-  ]) {
-    circle(g, hx, hy, r);
-    fillStroke(g, C.white, 3.5);
-  }
-  rounded(g, -24, -52, 48, 16, 6);
-  fillStroke(g, C.white, 3.5);
-
-  const blink = mood === 'idle' && t % 3.4 < 0.14;
-  face(g, 0, 4, 1.3, cheering || blink ? 'joy' : 'happy');
-  g.fillStyle = C.hotPink;
-  oval(g, 0, 2, 3.4, 2.4);
-  g.fill();
-  g.restore();
-
-  // Paws: waving when cheering, resting on the counter otherwise.
-  for (const side of [-1, 1]) {
-    const wave = Math.sin(moodAge * 14 + side) * 8;
-    const px = cheering ? x + side * 50 : x + side * 32;
-    const py = cheering ? y - 12 + wave : y + 46;
-    circle(g, px, py, 12);
-    fillStroke(g, C.white, 3.5);
-  }
-}
-
 /**
  * A plate under a shiny lid with a big "?" on it, for the title screen. The
  * lid wobbles and now and then peeks open a crack, with a puff of steam, but
@@ -418,7 +368,7 @@ function drawMysteryDish(g: G, x: number, y: number, t: number) {
  * Chef Bunny's speech bubble. Above her head it points down; beside her (in
  * the tall layout) it points left, and the words are bigger.
  */
-function drawSpeech(g: G, lines: [string, string], bubble: Bubble) {
+function drawSpeech(g: G, lines: [string, string] | [string], bubble: Bubble) {
   const { x, y, w, tail } = bubble;
   const h = 82;
   rounded(g, x, y, w, h, 20);
@@ -451,6 +401,13 @@ function drawSpeech(g: G, lines: [string, string], bubble: Bubble) {
   });
   g.stroke();
   const size = tail === 'down' ? 16 : 22;
+  if (lines.length === 1) {
+    // Something she said herself, big and pink, shrunk to fit.
+    g.font = font(size * 1.3);
+    const fit = Math.min(1, (w - 24) / Math.max(1, g.measureText(lines[0]).width));
+    plainText(g, lines[0], x + w / 2, y + 41, size * 1.3 * fit, C.hotPink);
+    return;
+  }
   plainText(g, lines[0], x + w / 2, y + 27, size, C.ink);
   plainText(g, lines[1], x + w / 2, y + 54, size, C.hotPink);
 }
@@ -489,8 +446,65 @@ export function createRenderer(ctx: G, sound: Sound) {
     ctx.setTransform(pixels, 0, 0, pixels, layout.sceneX * pixels, layout.sceneY * pixels);
   }
 
-  function bunny(mood: BunnyMood, age: number) {
-    onCanvas(() => drawBunny(ctx, fx.time, mood, age, places.bunny));
+  // -------------------------------------------------------------------------
+  // Chef Bunny: chef.ts decides how she feels, bunny.ts draws her.
+
+  /** Where she looks: what just happened, the pointer, or now and then at you. */
+  function lookTarget(): Spot | null {
+    const focus = fx.focus;
+    if (focus && focus.age < 1.5) return focus;
+    if (glancing(fx.chef)) return null;
+    if (fx.pointer) {
+      return { x: fx.pointer.x + layout.sceneX, y: fx.pointer.y + layout.sceneY };
+    }
+    return null;
+  }
+
+  function bunny(mood?: BunnyMood, age?: number) {
+    const chef = fx.chef;
+    const at = places.bunny;
+    const target = lookTarget();
+    const look = target ? gaze({ x: at.x, y: at.y + 4 }, target, 3.2) : { x: 0, y: 0.6 };
+    const ease = Math.min(1, fx.dt * 10);
+    fx.look.x += (look.x - fx.look.x) * ease;
+    fx.look.y += (look.y - fx.look.y) * ease;
+    // She leans toward the cooking: right, unless what she's looking at is left of her.
+    const side = target && target.x < at.x - 20 ? -1 : 1;
+    const pose: BunnyPose = {
+      mood: mood ?? chef.mood,
+      age: age ?? chef.moodAge,
+      t: fx.time,
+      blink: blinking(chef),
+      ear: earFlick(chef),
+      look: fx.look,
+      lean: chef.lean * side,
+    };
+    onCanvas(() => drawBunny(ctx, at, pose));
+  }
+
+  /**
+   * Chef Bunny reacts to something at (x, y) on the scene, and may say a
+   * line about it: only while the step is taking input and the voice is free,
+   * so she never talks over an instruction.
+   */
+  function chefReacts(event: ChefEvent, x: number, y: number) {
+    const state = fx.seen;
+    fx.focus = { x: x + layout.sceneX, y: y + layout.sceneY, age: 0 };
+    const open = !!state && state.phase === 'playing' && state.banner === 0;
+    const line = react(fx.chef, event, fx.time, open);
+    if (fx.chef.mood === 'party' && fx.chef.moodAge === 0) {
+      // A milestone streak: she jumps for joy in a shower of stars.
+      burst(
+        places.bunny.x - layout.sceneX,
+        places.bunny.y - layout.sceneY - 20,
+        16,
+        ['star', 'heart', 'star'],
+        [C.gold, C.hotPink, C.butter, C.white],
+        280,
+      );
+      sound.chime([NOTE.G6, NOTE.C7, NOTE.G6, NOTE.C7], 0.09, 0.08);
+    }
+    if (line && sound.chatter(line)) fx.said = { text: line, age: 0 };
   }
 
   const fresh = () => ({
@@ -501,8 +515,14 @@ export function createRenderer(ctx: G, sound: Sound) {
     feedback: null as Feedback | null,
     /** Each step's own effect memory, from its `fx`. */
     runs: new Map<StepRun, unknown>(),
-    mood: 'idle' as BunnyMood,
-    moodAge: 9,
+    chef: createChef(),
+    /** What she said on her own, shown in her bubble for a moment. */
+    said: null as { text: string; age: number } | null,
+    /** Where something just happened, in canvas units, for her to look at. */
+    focus: null as { x: number; y: number; age: number } | null,
+    pointer: null as Pointer | null,
+    look: { x: 0, y: 0 },
+    dt: 0,
     overAge: -1,
     starsPlayed: 0,
     shownScore: 0,
@@ -537,8 +557,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     const shapes: Particle['shape'][] =
       feedback.grade === 'Nice try!' ? ['heart'] : ['star', 'heart', 'star', 'dot'];
     burst(x, y, counts[feedback.grade], shapes, CONFETTI);
-    fx.mood = feedback.grade === 'Perfect!' || feedback.grade === 'Great!' ? 'cheer' : 'nod';
-    fx.moodAge = 0;
+    chefReacts({ kind: 'hit', grade: feedback.grade, combo: feedback.combo }, x, y);
   }
 
   /** What steps can set off: sounds, sparkles, and Chef Bunny's mood. */
@@ -553,7 +572,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       fx.particles.push(particle);
     },
     calm() {
-      fx.mood = 'idle';
+      fx.chef.mood = 'idle';
     },
   };
 
@@ -592,6 +611,8 @@ export function createRenderer(ctx: G, sound: Sound) {
       // The first step also says what we're making.
       const intro = state.stepIndex === 0 ? `Let's make ${state.dish.name}! ` : '';
       sound.say(`${intro}${titleOf(run)} ${hintOf(run).join(' ')}`);
+      instructionStarted(fx.chef, fx.time);
+      fx.said = null;
     }
 
     if (state.feedback && state.feedback !== fx.feedback) {
@@ -614,7 +635,7 @@ export function createRenderer(ctx: G, sound: Sound) {
         sound.say(`${ratingFor(totalScore(state), maxScore(state))} You made ${dish}!`);
       }
       fx.overAge += dt;
-      fx.mood = 'cheer';
+      fx.chef.mood = 'cheer';
       const stars = starsFor(totalScore(state), maxScore(state));
       while (fx.starsPlayed < 3 && fx.overAge >= 0.9 + fx.starsPlayed * 0.45) {
         if (fx.starsPlayed < stars) {
@@ -649,11 +670,17 @@ export function createRenderer(ctx: G, sound: Sound) {
     }
   }
 
-  function update(dt: number) {
+  /** Advances the effects by `dt` seconds; `holding` is whether a hold-style step is held. */
+  function update(dt: number, holding = false) {
     fx.time += dt;
-    fx.moodAge += dt;
+    fx.dt = dt;
+    tickChef(fx.chef, dt, holding);
+    if (fx.focus) fx.focus.age += dt;
+    if (fx.said) {
+      fx.said.age += dt;
+      if (fx.said.age > SAID_TIME) fx.said = null;
+    }
     if (fx.notYet) fx.notYet.age += dt;
-    if (fx.mood !== 'idle' && fx.moodAge > 1.2) fx.mood = 'idle';
     for (const p of fx.particles) {
       p.vy += p.gravity * dt;
       p.x += p.vx * dt;
@@ -1031,6 +1058,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     notYet(x: number, y: number) {
       fx.notYet = { x, y, age: 0 };
       sound.boop();
+      chefReacts({ kind: 'not yet' }, x, y);
     },
 
     /**
@@ -1064,7 +1092,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     drawTitle(dt: number) {
       update(dt);
       begin();
-      bunny(fx.mood, fx.moodAge);
+      bunny();
       drawTitle();
       drawButtons();
       drawParticles();
@@ -1072,7 +1100,12 @@ export function createRenderer(ctx: G, sound: Sound) {
 
     draw(state: KitchenState, pointer: Pointer, dt: number) {
       observe(state, pointer, dt);
-      update(dt);
+      fx.pointer = pointer;
+      // Holding to pour, shake or bake: she leans in for a look.
+      const taking = state.phase === 'playing' && state.banner === 0;
+      const holding = taking && pointer.down && isHolding(currentRun(state).state);
+      if (holding && !fx.chef.holding) chefReacts({ kind: 'peek' }, pointer.x, pointer.y);
+      update(dt, holding);
       fx.shownScore += (liveScore(state) - fx.shownScore) * Math.min(1, dt * 8);
 
       begin();
@@ -1081,9 +1114,10 @@ export function createRenderer(ctx: G, sound: Sound) {
       const run = currentRun(state);
       stepOf(run.kind).draw(viewFor(state, run, pointer, dt));
 
-      bunny(fx.mood, fx.moodAge);
+      bunny();
       if (state.phase === 'playing' && state.banner === 0) {
-        onCanvas(() => drawSpeech(ctx, hintOf(run), places.speech));
+        const said = fx.said;
+        onCanvas(() => drawSpeech(ctx, said ? [said.text] : hintOf(run), places.speech));
       }
       drawHud(state);
       if (state.phase === 'playing') drawParticles();
