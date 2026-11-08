@@ -3,7 +3,7 @@ import { drawSteam, type Dish } from '../kit';
 
 const soup: Dish = {
   id: 'soup',
-  name: 'Veggie Soup',
+  name: 'Vegetable Soup',
   steps: [
     { kind: 'chop', item: 'carrot' },
     { kind: 'stir', vessel: 'pot', contents: 'soup' },

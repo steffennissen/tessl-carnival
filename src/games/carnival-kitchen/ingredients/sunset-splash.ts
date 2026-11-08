@@ -10,13 +10,13 @@ const SUN = palette({
 });
 
 /**
- * Sunset splash: a golden, sparkly cooking splash in a round bottle (it
- * stands in for the sherry a real bisque has).
+ * Seafood stock: the golden broth a real bisque simmers its shells in, in a
+ * round bottle. (The file keeps its old id, sunset-splash.)
  */
 const sunsetSplash: Ingredient = {
   id: 'sunset-splash',
-  label: 'sunset splash',
-  plural: 'sunset splash',
+  label: 'seafood stock',
+  plural: 'seafood stock',
   icon: '✨',
   amount: '1 cup',
   colors: [SUN.gold, SUN.light, C.white],

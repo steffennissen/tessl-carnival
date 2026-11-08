@@ -22,7 +22,7 @@ function steam(g: G, t: number, x: number, y: number, gap: number) {
 
 const macAndCheese: Dish = {
   id: 'mac-and-cheese',
-  name: 'Creamy Dreamy Mac & Cheese',
+  name: 'Mac and Cheese',
   steps: [
     { kind: 'grate', item: 'cheddar' },
     { kind: 'pour', pours: ['milk'], into: 'pot', amounts: ['2 cups'], title: 'Pour the milk!' },

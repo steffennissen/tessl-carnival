@@ -8,7 +8,7 @@ const LEANS = [0, 4, -3, 2, -4, 3, -1];
 
 const cheeseburger: Dish = {
   id: 'cheeseburger',
-  name: 'Cheeseburger Tower',
+  name: 'Cheeseburger',
   steps: [
     { kind: 'chop', item: 'pickle' },
     { kind: 'flip', item: 'patty', count: 3 },

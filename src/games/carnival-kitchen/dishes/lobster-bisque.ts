@@ -5,7 +5,7 @@ import { drawSteam, type Dish } from '../kit';
 
 const lobsterBisque: Dish = {
   id: 'lobster-bisque',
-  name: "Lulu's Pink Bisque",
+  name: 'Lobster Bisque',
   steps: [
     { kind: 'chop', item: 'celery' },
     // Lulu the lobster gives you the shells she has outgrown.

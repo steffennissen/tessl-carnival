@@ -10,7 +10,7 @@ export const BISQUE = palette({
   light: '#ffe0e4',
 });
 
-/** Lulu's pink bisque: shells, celery and sunset splash, blended silky and pink. */
+/** Lobster bisque: Lulu's outgrown shells, celery and seafood stock, blended silky and pink. */
 const bisque: Ingredient = {
   id: 'bisque',
   label: 'bisque',

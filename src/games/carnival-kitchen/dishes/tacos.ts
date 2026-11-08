@@ -8,7 +8,7 @@ const ALL_TOPPINGS = ['lettuce', 'shredded-cheese', 'tomato', 'avocado'];
 
 const tacos: Dish = {
   id: 'tacos',
-  name: 'Taco Fiesta',
+  name: 'Tacos',
   steps: [
     { kind: 'chop', item: 'tomato' },
     { kind: 'stir', vessel: 'rice-pan', contents: 'taco-meat' },

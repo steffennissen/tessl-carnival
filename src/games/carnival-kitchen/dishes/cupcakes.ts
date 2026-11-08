@@ -12,7 +12,7 @@ const TOPPINGS = [
 
 const cupcakes: Dish = {
   id: 'cupcakes',
-  name: 'Sprinkle Cupcakes',
+  name: 'Cupcakes',
   steps: [
     { kind: 'crack', item: 'egg' },
     { kind: 'pour', pours: ['flour', 'sugar'], amounts: ['1½ cups', '1 cup'] },
