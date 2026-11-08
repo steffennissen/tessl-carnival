@@ -26,3 +26,5 @@ export * from './quiz';
 export * from './words';
 export * from './order';
 export * from './clock';
+export * from './measure';
+export * from './picture-quiz';

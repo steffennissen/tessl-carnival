@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { press, tick } from '../game';
-import { BOWL, POUR_SPEED, TARGET_HIGH, TARGET_LOW, type HoldState } from '../kit';
+import { DISHES } from '../dishes';
+import {
+  BOWL,
+  POUR_SPEED,
+  TARGET_HIGH,
+  TARGET_LOW,
+  measureScale,
+  measureTarget,
+  parseAmount,
+  type HoldState,
+} from '../kit';
 import { current, drawRound, nextStep, pourPerfectly, ready, seeded } from '../test-kit';
-import pour, { insideSmoothness, mouthOf, POUR_TOP, type PourOptions } from './pour';
+import pour, { amountOf, insideSmoothness, mouthOf, POUR_TOP, type PourOptions } from './pour';
 
 const meter = current<HoldState>;
 
@@ -14,6 +24,38 @@ describe('pour', () => {
     for (const p of targets) {
       expect(p).toBeGreaterThanOrEqual(TARGET_LOW);
       expect(p).toBeLessThanOrEqual(TARGET_HIGH);
+    }
+  });
+
+  it('puts the star on the line of the real amount, on a measuring cup', () => {
+    const options: PourOptions = {
+      kind: 'pour',
+      pours: ['flour', 'milk'],
+      amounts: ['1½ cups', '½ cup'],
+    };
+    expect(pour.start(options, seeded()).targets).toEqual([0.75, 0.5]);
+    expect(pour.hint(options)).toEqual(['1½ cups of flour,', 'let go at the star!']);
+    // Each pour says its own amount in Chef Bunny's bubble.
+    const state = pour.start(options, seeded());
+    state.index = 1;
+    expect(pour.bubble?.({ round: ready('pancakes'), options, state })).toEqual([
+      '½ cup of milk,',
+      'let go at the star!',
+    ]);
+  });
+
+  it('gives every pour in every dish a real amount, with its own line on the cup', () => {
+    for (const dish of DISHES) {
+      for (const step of dish.steps.filter((s): s is PourOptions => s.kind === 'pour')) {
+        const targets = pour.start(step, seeded()).targets;
+        step.pours.forEach((_, i) => {
+          const amount = parseAmount(amountOf(step, i));
+          expect(amount, `${dish.id} pour ${i}`).not.toBeNull();
+          if (!amount) return;
+          expect(measureScale(amount.value).marks).toContain(amount.value);
+          expect(targets[i]).toBe(measureTarget(amount.value));
+        });
+      }
     }
   });
 

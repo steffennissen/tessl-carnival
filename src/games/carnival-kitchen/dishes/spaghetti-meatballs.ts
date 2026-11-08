@@ -9,7 +9,7 @@ const spaghettiMeatballs: Dish = {
   steps: [
     { kind: 'chop', item: 'tomato' },
     { kind: 'stir', vessel: 'pot', contents: 'spaghetti-sauce' },
-    { kind: 'season', shaker: 'salt', food: 'spaghetti-sauce' },
+    { kind: 'season', shaker: 'salt', food: 'spaghetti-sauce', amount: '¼ teaspoon' },
     {
       kind: 'top',
       base: 'spaghetti-plate',

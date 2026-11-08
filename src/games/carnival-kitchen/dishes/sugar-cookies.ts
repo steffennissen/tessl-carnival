@@ -30,7 +30,7 @@ const sugarCookies: Dish = {
       hint: ['Tap when the cutter', 'is on the sparkle!'],
       icon: '⭐',
     },
-    { kind: 'bake', item: 'cookies' },
+    { kind: 'bake', item: 'cookies', minutes: 10 },
   ],
 
   draw(g, t, state) {

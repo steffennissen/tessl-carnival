@@ -12,7 +12,7 @@ const tacos: Dish = {
   steps: [
     { kind: 'chop', item: 'tomato' },
     { kind: 'stir', vessel: 'rice-pan', contents: 'taco-meat' },
-    { kind: 'season', shaker: 'taco-spice', food: 'taco-meat' },
+    { kind: 'season', shaker: 'taco-spice', food: 'taco-meat', amount: '1 teaspoon' },
     {
       kind: 'top',
       base: 'taco-shell',

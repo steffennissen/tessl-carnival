@@ -28,7 +28,7 @@ const pizza: Dish = {
       extras: ['mushroom', 'pineapple', 'olive', 'pepper', 'tomato'],
       count: 5,
     },
-    { kind: 'bake', item: 'pizza' },
+    { kind: 'bake', item: 'pizza', minutes: 15 },
   ],
 
   draw(g, t, state) {

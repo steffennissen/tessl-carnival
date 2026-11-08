@@ -7,7 +7,7 @@ const soup: Dish = {
   steps: [
     { kind: 'chop', item: 'carrot' },
     { kind: 'stir', vessel: 'pot', contents: 'soup' },
-    { kind: 'season', shaker: 'salt', food: 'soup', shakes: 3 },
+    { kind: 'season', shaker: 'salt', food: 'soup', shakes: 3, amount: '¼ teaspoon' },
   ],
 
   draw(g, t) {

@@ -25,7 +25,7 @@ const macAndCheese: Dish = {
   name: 'Creamy Dreamy Mac & Cheese',
   steps: [
     { kind: 'grate', item: 'cheddar' },
-    { kind: 'pour', pours: ['milk'], into: 'pot', title: 'Pour the milk!' },
+    { kind: 'pour', pours: ['milk'], into: 'pot', amounts: ['2 cups'], title: 'Pour the milk!' },
     { kind: 'stir', vessel: 'pot', contents: 'cheese-sauce' },
     // Four sprinkles of crumbs, one after another.
     {
@@ -37,7 +37,7 @@ const macAndCheese: Dish = {
       title: 'Sprinkle the crumbs!',
       hint: ['Tap when the crumbs', 'are on the sparkle!'],
     },
-    { kind: 'bake', item: 'casserole' },
+    { kind: 'bake', item: 'casserole', minutes: 25 },
   ],
 
   draw(g, t, state) {

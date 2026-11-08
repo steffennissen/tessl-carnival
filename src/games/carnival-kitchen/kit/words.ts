@@ -175,6 +175,26 @@ export function drawSpeaker(g: G, x: number, y: number, r: number, speaking: boo
   emoji(g, '🔊', x, y + 1, r * 1.05);
 }
 
+const SPOKEN_PARTS: Record<string, [one: string, more: string]> = {
+  '¼': ['one-quarter', 'a-quarter'],
+  '½': ['one-half', 'a-half'],
+  '¾': ['three-quarters', 'three-quarters'],
+  '⅓': ['one-third', 'a-third'],
+  '⅔': ['two-thirds', 'two-thirds'],
+};
+
+/**
+ * Text as the voice should say it: "1½ cups" is "one-and-a-half cups", "¼"
+ * "one-quarter". Each fraction stays one word (joined with hyphens), so the
+ * words line up with the text's for lighting them up as they're read.
+ */
+export function speakable(text: string): string {
+  return text.replace(/(\d*)([¼½¾⅓⅔])/g, (_, whole: string, glyph: string) => {
+    const [one, more] = SPOKEN_PARTS[glyph];
+    return whole ? `${numberWord(Number(whole))}-and-${more}` : one;
+  });
+}
+
 /** Whether (x, y) is within `r` (plus a little slop for fingers) of (cx, cy). */
 export function inCircle(cx: number, cy: number, r: number, x: number, y: number, slop = 8) {
   return Math.hypot(x - cx, y - cy) <= r + slop;

@@ -6,7 +6,7 @@ const pancakes: Dish = {
   name: 'Fluffy Pancakes',
   steps: [
     { kind: 'crack', item: 'egg' },
-    { kind: 'pour', pours: ['flour', 'milk'] },
+    { kind: 'pour', pours: ['flour', 'milk'], amounts: ['1½ cups', '1 cup'] },
     { kind: 'mix', vessel: 'mixing-bowl', contents: 'batter' },
     { kind: 'flip', item: 'pancake' },
   ],

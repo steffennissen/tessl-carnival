@@ -8,6 +8,7 @@ import {
   horizontal,
   rounded,
   shadow,
+  stickerText,
   vertical,
 } from '../art';
 import { artOf, ingredient } from '../ingredients';
@@ -86,13 +87,42 @@ interface BakeFx {
   sizzle: number;
 }
 
+/**
+ * A line on the oven's meter every 5 minutes, numbered, so the star sits on
+ * the recipe's real time: the meter's GOLDEN is `minutes` in. Same place as
+ * drawMeter's tube (x 594 to 628, y 126 to 384).
+ */
+export function minuteMarks(minutes: number): number[] {
+  const most = minutes / BAKE_TARGET;
+  const step = minutes > 30 ? 10 : 5;
+  const marks: number[] = [];
+  for (let m = step; m <= most + 1e-9; m += step) marks.push(m);
+  return marks;
+}
+
+function drawMinuteMarks(g: G, minutes: number) {
+  const top = 126;
+  const height = 258;
+  if (minutes <= 0) return;
+  for (const m of minuteMarks(minutes)) {
+    const y = top + height * (1 - (m / minutes) * BAKE_TARGET);
+    g.strokeStyle = C.ink;
+    g.lineWidth = 2.5;
+    g.beginPath();
+    g.moveTo(594, y);
+    g.lineTo(604, y);
+    g.stroke();
+    stickerText(g, String(m), 618, y, m === minutes ? 16 : 13, C.ink, 'center', 26);
+  }
+}
+
 const bake: Step<BakeOptions, HoldState, BakeFx> = {
   kind: 'bake',
   uses: (o) => [[o.item, 'bake']],
   start: () => startHold([BAKE_TARGET]),
 
   title: (o) => `Bake the ${ingredient(o.item).label}!`,
-  hint: () => ['Hold to bake, let go', 'when it is golden!'],
+  hint: (o) => [`Bake for ${stepMinutes(o)} minutes!`, 'Let go when golden!'],
   icon: () => '🔥',
   progress: holdProgress,
   points: ({ state }) => state.points,
@@ -226,6 +256,7 @@ const bake: Step<BakeOptions, HoldState, BakeFx> = {
       [C.hotPink, C.ember, C.butter],
       `${stepMinutes(options)} minutes`,
     );
+    drawMinuteMarks(g, stepMinutes(options));
 
     if (taking && !b.holding) {
       const bob = Math.sin(t * 5) * 6;

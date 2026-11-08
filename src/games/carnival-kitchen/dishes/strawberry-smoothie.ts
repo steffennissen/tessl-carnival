@@ -41,7 +41,7 @@ const strawberrySmoothie: Dish = {
   steps: [
     { kind: 'chop', item: 'strawberry' },
     { kind: 'chop', item: 'banana' },
-    { kind: 'pour', pours: ['milk'], into: 'blender', inside: 'smoothie' },
+    { kind: 'pour', pours: ['milk'], into: 'blender', inside: 'smoothie', amounts: ['1 cup'] },
     { kind: 'blend', blender: 'blender', contents: 'smoothie' },
   ],
 

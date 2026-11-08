@@ -15,9 +15,9 @@ const cupcakes: Dish = {
   name: 'Sprinkle Cupcakes',
   steps: [
     { kind: 'crack', item: 'egg' },
-    { kind: 'pour', pours: ['flour', 'sugar'] },
+    { kind: 'pour', pours: ['flour', 'sugar'], amounts: ['1½ cups', '1 cup'] },
     { kind: 'mix', vessel: 'mixing-bowl', contents: 'cupcake-batter' },
-    { kind: 'bake', item: 'cupcake-tray' },
+    { kind: 'bake', item: 'cupcake-tray', minutes: 20 },
     {
       kind: 'top',
       base: 'cupcake',
