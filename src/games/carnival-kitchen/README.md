@@ -22,9 +22,43 @@ Tap **Tap to cook!** on the title screen. There's nothing to choose: the dish
 waits under a lid with a "?" on it, and the kitchen picks it when you tap. A
 ribbon says what we're making, a
 card names each step, a voice reads it out, and Chef Bunny's speech bubble
-keeps the hint on screen. Tap **Cook again!** on the end screen for another
-dish, never the same one twice in a row. The speaker button in the corner turns
-sound and the voice off and on.
+keeps the hint on screen. The speaker button in the corner turns sound and
+the voice off and on.
+
+A round goes like this:
+
+1. **Title screen.** Tap **Tap to cook!** for a surprise dish, or **📖 Recipes**
+   to open the recipe book.
+2. **The steps**, one card at a time.
+3. **Decorate your dish!** The finished dish sits on a cloth with a tray of six
+   treats: sprinkles, a cherry, a heart, a star, a flower and a little flag.
+   Drag a treat onto the dish, or tap a treat and then tap the dish to add as
+   many as you like. Drag one on the dish to move it, or back to the tray to
+   take it off. A treat let go anywhere above the tray lands on the dish, so
+   nothing can go wrong, and decorating scores nothing. Tap **Done!**, or leave
+   it 20 seconds without a touch, to move on. A tap in the first moment does
+   nothing, so a last excited tap from the final step doesn't skip it. Up to 30
+   treats fit on a dish; another one replaces the oldest. Decorations start
+   fresh every round.
+4. **The end card**: the dish with its decorations, the stars, Chef Bunny's
+   verdict and the points. If the dish earned its first sticker, or more stars
+   than its sticker had, a badge says **New sticker!** or **Sticker
+   upgraded!** after the stars, and Chef Bunny says so too. After a short
+   pause, tap **Cook again!** for another dish, never the same one twice in a
+   row.
+
+### The recipe book
+
+Every finished round earns its dish's sticker at the round's stars (1 to 3).
+A sticker only ever keeps its best stars. The recipe book, from the title
+screen's **📖 Recipes** button, shows all the dishes in a grid with a count
+such as "7 of 16 dishes": each cooked dish with its picture, name and best
+stars, and the rest under a little lid with a "?". Tap a cooked dish to cook
+it again; tap anywhere else, or the ✕, to go back to the title screen. The
+grid picks as many columns as make the dishes biggest, so it fits a computer,
+a phone held sideways and a phone held upright. Stickers are kept by the
+carnival's shared sticker book (`earnSticker` and `stickersFor` from
+`src/carnival`), not by the game.
 
 | Dish                             | Steps                                                                               |
 | -------------------------------- | ----------------------------------------------------------------------------------- |
@@ -155,7 +189,8 @@ shows in her bubble.
 
 The score in the corner counts up as you earn points. Your final score is the
 step points plus the combo bonus, and it's saved to the carnival's score board
-when the round ends. Dishes have three to five steps, so stars and Chef
+once, when the round ends (before decorating, which doesn't change it), along
+with the dish's sticker. Dishes have three to five steps, so stars and Chef
 Bunny's verdict go by your share of what the dish could score (100 a step,
 before bonuses):
 
@@ -265,13 +300,16 @@ without errors (on a pretend canvas that throws on NaN). So run it.
    about 240 wide and 160 tall, with the helpers in `art.ts` (`C`, `oval`,
    `fillStroke`, `face`, `vertical`...) and `drawSteam` from the kit. `time`
    is in seconds, for steam and wobbles. `state` is the round that made it,
-   or null, so always draw something sensible without it. To show what the
+   or null, so always draw something sensible without it: the recipe book
+   draws every cooked dish small, with null. The same drawing shows while
+   decorating, 1.3 times bigger, with the treats on top. To show what the
    round did, find its steps: `findStep<TopState>(state, 'top')?.state.spots`
    (with the step's exported state type). An ingredient's art can be reused,
    such as `drawPizza` from `ingredients/pizza.ts`, or `artOf(id, role)` from
    `'../ingredients'`.
 
-3. That's it: the dish joins the random pick.
+3. That's it: the dish joins the random pick and gets a page in the recipe
+   book.
 
 **Working alongside others.** Each new dish, step or ingredient is its own
 new file, so several can be added at once without touching the same file.
@@ -527,12 +565,17 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
   blinks, ear flicks and glances: plain functions, tested in `chef.test.ts`.
 - `bunny.ts`: drawing Chef Bunny in a pose (mood, blink, ear, gaze, lean).
 - `render.ts`: the kitchen, Chef Bunny's place and what she sees, the HUD, the card and popups,
-  particles, the title and end screens. It asks the step being cooked to draw
+  particles, the title, decorating, end and recipe book screens. It asks the step being cooked to draw
   itself, and every started step to `observe`.
 - `art.ts`: the drawing kit: palette, shapes, faces, text.
 - `sound.ts`: sound effects made with Web Audio (no files to load) and the
   voice that reads each step out loud, plus `chatter` for Chef Bunny's own
   lines, which only speaks when the voice is free.
+- `decorate.ts`: decorating the finished dish: the treats, where the dish,
+  tray and **Done!** go for each layout, and plain functions for pressing,
+  dragging and letting go. `decorate.test.ts` tests it.
+- `book.ts`: the recipe book's count, grid and hit testing, and the title
+  screen's book button. `book.test.ts` tests it.
 - `layout.ts`: how the canvas fits the screen (page, wide or tall), and
   where the 800×500 cooking scene sits on it. The game logic only ever sees
   scene coordinates. `layout.test.ts` tests it.
