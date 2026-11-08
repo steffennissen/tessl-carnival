@@ -1,5 +1,6 @@
-import { C, type G, face, fillStroke, oval, palette, vertical, type Mood } from '../art';
+import { C, type G, face, fillStroke, oval, palette, type Mood } from '../art';
 import type { Ingredient } from '../kit';
+import { drawChopRow } from './tomato';
 
 /** This file's own colours: see `palette` in art.ts. */
 export const BERRY = palette({
@@ -151,71 +152,25 @@ const strawberry: Ingredient = {
   icon: '🍓',
   colors: [BERRY.main, BERRY.light, BERRY.seed],
 
-  /** A big strawberry lying on its side: the point on the left, the leafy cap on the right. */
+  /** A row of strawberries standing on the board, like the tomatoes, cut into pieces. */
   chop: {
-    draw(g, { bounds, cy, x0, x1 }) {
-      const span = x1 - x0;
-      const radius = (x: number) => {
-        const u = Math.min(1, Math.max(0, (x - x0) / span));
-        if (u < 0.62) return 5 + 37 * Math.sin((u / 0.62) * (Math.PI / 2)) ** 0.6;
-        const v = (u - 0.62) / 0.38;
-        return 42 * Math.sqrt(Math.max(0, 1 - v ** 4 * 0.85));
-      };
-      const outline = () => {
-        g.beginPath();
-        for (let i = 0; i <= 48; i++) {
-          const x = x0 + (span * i) / 48;
-          g.lineTo(x, cy - radius(x));
-        }
-        for (let i = 48; i >= 0; i--) {
-          const x = x0 + (span * i) / 48;
-          g.lineTo(x, cy + radius(x));
-        }
-        g.closePath();
-      };
-      drawChopPieces(g, bounds, {
-        outline,
-        mid: () => cy,
-        radius,
-        paint() {
-          fillStroke(g, vertical(g, cy - 38, cy + 38, [BERRY.light, BERRY.main, BERRY.dark]), 3.5);
-          g.fillStyle = BERRY.seed;
-          for (let i = 0; i < 26; i++) {
-            const x = x0 + 30 + ((i * 53) % (span - 60));
-            const r = radius(x);
-            const y = cy + (((i * 37) % 100) / 100 - 0.5) * r * 1.4;
-            if (x > 548 && Math.abs(y - cy) < 14) continue;
-            oval(g, x, y, 2.4, 3.6, 0.3);
-            g.fill();
-          }
-          g.fillStyle = 'rgba(255, 255, 255, 0.45)';
-          oval(g, x0 + span * 0.55, cy - 22, 50, 6, -0.05);
-          g.fill();
-        },
-        cut(x) {
-          const r = radius(x);
-          oval(g, x, cy, 5, r);
+    draw(g, look) {
+      const { cy } = look;
+      drawChopRow(
+        g,
+        look,
+        5,
+        36,
+        (g, x, r) => drawStrawberry(g, x, cy + 4, r),
+        (g, x, h) => {
+          if (h < 3) return;
+          oval(g, x, cy, 6, h);
           fillStroke(g, BERRY.inside, 2.5);
-          oval(g, x, cy, 2.5, r * 0.45);
+          oval(g, x, cy, 2.5, h * 0.5);
           g.fillStyle = BERRY.core;
           g.fill();
         },
-      });
-      // The leafy cap, laid over its shoulders, and a little stalk.
-      for (const angle of [-1.25, 1.25, -0.62, 0.62, 0]) {
-        g.save();
-        g.translate(x1 - 2, cy);
-        g.rotate(angle);
-        g.beginPath();
-        g.moveTo(0, -9);
-        g.quadraticCurveTo(44, 0, 0, 9);
-        g.closePath();
-        fillStroke(g, vertical(g, -9, 9, [C.leaf, C.leafDark]), 3);
-        g.restore();
-      }
-      g.beginPath();
-      g.roundRect(x1 + 20, cy - 5, 22, 10, 5);
-      fillStroke(g, C.leafDark, 3);
+      );
     },
   },
 };
