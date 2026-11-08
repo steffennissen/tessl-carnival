@@ -82,6 +82,11 @@ export interface Activity {
   name: string;
   /** What it practises. */
   skills: ('reading' | 'math' | 'time')[];
+  /**
+   * How often the planner picks it among the activities that fit, compared
+   * with the others: 1 if left out, 2 for twice as often.
+   */
+  weight?: number;
   /** Whether it can be woven into this dish (a predicate on its steps, usually). */
   fits(dish: Dish): boolean;
   /**

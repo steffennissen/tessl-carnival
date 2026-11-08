@@ -42,9 +42,23 @@ export function activitiesFor(dish: Dish, from: readonly Activity[] = ACTIVITIES
 }
 
 /**
+ * Which of `activities` a roll (0 to 1) picks, each as likely as its
+ * `weight` (1 if left out). Equal weights split the roll evenly.
+ */
+export function pickWeighted(activities: readonly Activity[], roll: number): number {
+  const weights = activities.map((a) => Math.max(0, a.weight ?? 1));
+  let left = roll * weights.reduce((sum, w) => sum + w, 0);
+  for (let i = 0; i < activities.length - 1; i++) {
+    if (left < weights[i]) return i;
+    left -= weights[i];
+  }
+  return activities.length - 1;
+}
+
+/**
  * Plans a round: the kitchen clock's start time, and at most one learning
  * moment. None when learning is off or nothing fits the dish. Otherwise one
- * of the activities that fit, picked at random, but not `previous` (the last
+ * of the activities that fit, picked at random by their weights, but not `previous` (the last
  * round's) when another one fits too, so the same one doesn't come twice in
  * a row. `from` is for tests.
  */
@@ -60,7 +74,7 @@ export function planRound(
   const fits = activitiesFor(dish, from);
   const fresh = fits.length > 1 ? fits.filter((a) => a.id !== previous) : fits;
   if (!fresh.length) return { ...plainPlan(dish, settings), start };
-  const activity = fresh[Math.floor(random() * fresh.length) % fresh.length];
+  const activity = fresh[pickWeighted(fresh, random())];
   const steps = activity.weave({ dish, level: settings.level, random, start });
   return { steps, activity: activity.id, settings, start };
 }

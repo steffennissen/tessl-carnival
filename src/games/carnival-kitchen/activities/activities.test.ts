@@ -6,7 +6,7 @@ import { ingredient } from '../ingredients';
 import { DEFAULT_SETTINGS, NO_LEARNING, type Activity, type Level } from '../kit';
 import { stepOf } from '../steps';
 import { drawRound, playThrough, seeded } from '../test-kit';
-import { ACTIVITIES, activityOf, planRound } from './index';
+import { ACTIVITIES, activityOf, pickWeighted, planRound } from './index';
 
 /**
  * Every activity in this folder, woven into every dish it fits, at both
@@ -100,5 +100,23 @@ describe('planning a round', () => {
     expect(seen.size).toBe(3);
     // The only one that fits may come again.
     expect(planRound(dish, DEFAULT_SETTINGS, seeded(), 'a', [fake('a')]).activity).toBe('a');
+  });
+
+  it('picks by weight: an activity with weight 3 comes three times as often', () => {
+    const from = [fake('a'), { ...fake('b'), weight: 3 }];
+    expect(pickWeighted(from, 0)).toBe(0);
+    expect(pickWeighted(from, 0.24)).toBe(0);
+    expect(pickWeighted(from, 0.26)).toBe(1);
+    expect(pickWeighted(from, 0.999)).toBe(1);
+    // Equal weights split evenly, as before weights.
+    const even = [fake('a'), fake('b'), fake('c')];
+    expect([0, 0.34, 0.67].map((r) => pickWeighted(even, r))).toEqual([0, 1, 2]);
+    const counts = { a: 0, b: 0 };
+    for (let seed = 1; seed <= 400; seed++) {
+      const plan = planRound(dish, DEFAULT_SETTINGS, seeded(seed), null, from);
+      counts[plan.activity as 'a' | 'b'] += 1;
+    }
+    expect(counts.b / counts.a).toBeGreaterThan(2);
+    expect(counts.b / counts.a).toBeLessThan(4.5);
   });
 });
