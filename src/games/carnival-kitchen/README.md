@@ -126,8 +126,9 @@ Each step is one of these:
 Every round is different:
 
 - The dotted lines on the carrot or pepperoni move, and there are 4 or 5.
-- The stars for shakes, pours, blends and scoops sit somewhere new, between
-  0.4 and 0.8 (the pasta water's between 0.25 and 0.45: just a little).
+- The stars for shakes, blends and scoops sit somewhere new, between 0.4
+  and 0.8. A pour's star sits on its real amount's line on the measuring
+  cup (see "Learning"), which is always between 0.4 and 0.8 too.
 - The golden zone for each pancake moves, between 0.3 and 0.7.
 - The pizza always gets the pepperoni you chopped, plus four of mushroom,
   pineapple, olive, pepper and tomato, each on its own random spot.
@@ -259,7 +260,24 @@ screen all the time.
   minutes"). An ingredient says its usual amount for one pour or shake with
   `amount`; a recipe can say its own with `amounts` on a pour (one per pour)
   or `amount` on a season step. Use cups for flour, milk and water,
-  tablespoons and teaspoons for small things.
+  tablespoons and teaspoons for small things, and the fractions ¼, ½ and ¾.
+  Every dish's pours and shakes say their real amounts (pancakes 1½ cups of
+  flour and 1 cup of milk, mac & cheese 2 cups of milk...).
+- **The measuring cup.** A pour with a real amount fills a see-through
+  measuring cup instead of a plain meter, with a line and a number for each
+  ¼ cup (a ½ or 1 cup measure) or each ½ cup (a 2 or 3 cup jug), and the
+  star exactly on the recipe's amount: 1 cup fills a 2 cup jug to the 1
+  line. `measureScale` in `kit/measure.ts` picks the smallest cup the amount
+  fills no more than 0.8 of the way, so the star always sits between 0.4 and
+  0.8, like other meters, and scoring is unchanged. Chef Bunny's bubble says
+  each pour's amount ("1½ cups of flour,"), and says the next one out loud.
+- **Baking time.** A bake step's hint says its minutes ("Bake for 10
+  minutes!"), and the oven's meter has a numbered line every 5 minutes with
+  the star on the recipe's time: cookies 10, pizza 15, cupcakes 20, mac &
+  cheese 25.
+- **Fractions out loud.** The voice says "1½ cups" as "one and a half
+  cups" (`speakable` in `kit/words.ts`), keeping each fraction one word so
+  the words still light up in step.
 
 ### The grown-ups' settings
 
@@ -369,6 +387,42 @@ checks, Chef Bunny lays out the fewest coins and counts them on.
 | 1     | 10¢ to 50¢ | Dimes, nickels and pennies        |
 | 2     | 26¢ to 99¢ | Quarters, dimes, nickels, pennies |
 
+#### Measure it, Equal parts and Tray arrays (math)
+
+- **Measure it** (`activities/measure.ts`, step `cup`) fits dishes that pour
+  ½ cup or more of something (pancakes, cupcakes, mac & cheese, smoothie,
+  bisque). Just before that pour, a big measuring cup with the ingredient in
+  it and its bag or jug beside it: "How much milk is in the measuring cup?".
+  The pour after it then pours that amount, its star on the same line.
+
+  | Level | Question                                                                                                                                                                     |
+  | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | 1     | ½, 1 or 2 cups, every line numbered; the answers are always ½ cup, 1 cup, 2 cups                                                                                             |
+  | 2     | ¼, ¾ or 1½ cups with only whole cups (and ½) numbered, or half the time "We need 1 cup of milk and have ½ cup. How much more?" (a star on the need line), then pour the rest |
+
+- **Equal parts** (`activities/equal-parts.ts`, step `cut`, then an `ask`)
+  fits the pizza, the pancakes and the mac & cheese, once they're cooked.
+  Three pictures of it on the answer buttons: cut into equal pieces, cut
+  into the same number of pieces that aren't equal, and cut into a different
+  number of equal pieces. The pieces are honest: equal ones really are the
+  same size (a test measures them). Then a question beside the food, big and
+  cut the right way.
+
+  | Level | Pick the picture                                   | Then                                                  |
+  | ----- | -------------------------------------------------- | ----------------------------------------------------- |
+  | 1     | "Which pizza is cut into 4 equal pieces?" (2 or 4) | "What is each piece?" one half, one third, one fourth |
+  | 2     | "Which pizza is cut into thirds?" (2, 3 or 4)      | "How many thirds make the whole pizza?" 2, 3, 4       |
+
+- **Tray arrays** (`activities/trays.ts`, step `tray`) fits the cupcakes and
+  cookies after baking, and the sushi after it's cut: they sit on a tray in
+  rows, and a question asks how many. The wrong answers are a row more or
+  less (or one off).
+
+  | Level | Tray                                                               | Help                                                                        |
+  | ----- | ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+  | 1     | Rows of 2, 5 or 10: "3 rows of 5 cupcakes. Count by 5s! How many?" | After a wrong try, each row but the last shows its running total (5, 10...) |
+  | 2     | 2 to 5 rows of 2 to 5: "4 rows of 3 cookies. How many cookies?"    | Chef Bunny shows it as adding: "3 + 3 + 3 + 3 = 12"                         |
+
 ### How it's built
 
 | Piece                   | What it is                                                                                                      |
@@ -379,6 +433,8 @@ checks, Chef Bunny lays out the fewest coins and counts them on.
 | `kit/words.ts`          | Reading: `wordsOf`, `numberWord`, `fitWords`, `drawWords` (with the word being read lit up), `drawSpeaker`.     |
 | `kit/clock.ts`          | Kitchen time: `stepMinutes`, `roundTime`, `startTime`, `drawClock`, and the maths for dragging a clock's hands. |
 | `kit/order.ts`          | Order tickets: `Order`, `drawOrderNote`.                                                                        |
+| `kit/measure.ts`        | Real amounts: `parseAmount`, `amountText`, `measureScale`, `measureTarget`, `drawMeasuringCup`.                 |
+| `kit/picture-quiz.ts`   | `pictureQuiz(kind, picture)`: a step that plays like `ask` with a picture of its own (the cup and tray steps).  |
 | `steps/ask.ts`          | A question step with a picture of the step before. Most activities use it as is.                                |
 | `steps/ticket.ts`       | The order ticket step.                                                                                          |
 | `sound.ts` `read(text)` | Reads out loud like `say`, and follows the word being said (or times it), for lighting words up.                |

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { press, release, tick } from '../game';
 import type { HoldState } from '../kit';
+import { dishById } from '../dishes';
 import { current, ready } from '../test-kit';
-import { BAKE_EARLY, BAKE_SPEED, BAKE_TARGET } from './bake';
+import bake, { BAKE_EARLY, BAKE_SPEED, BAKE_TARGET, minuteMarks, type BakeOptions } from './bake';
 
 const oven = current<HoldState>;
 
@@ -40,5 +41,19 @@ describe('bake', () => {
     expect(b.level).toBe(1);
     expect(state.scores[3]).toBeGreaterThan(0);
     expect(state.phase).toBe('over');
+  });
+
+  it('bakes for the real minutes, and says so, with a line every 5 minutes up to the star', () => {
+    const minutes = (id: string) =>
+      (dishById(id).steps.find((s) => s.kind === 'bake') as BakeOptions).minutes;
+    expect(minutes('sugar-cookies')).toBe(10);
+    expect(minutes('cupcakes')).toBe(20);
+    expect(minutes('pizza')).toBe(15);
+    expect(minutes('mac-and-cheese')).toBe(25);
+    expect(bake.hint({ kind: 'bake', item: 'cookies', minutes: 10 })[0]).toBe(
+      'Bake for 10 minutes!',
+    );
+    expect(minuteMarks(10)).toEqual([5, 10]);
+    expect(minuteMarks(25)).toEqual([5, 10, 15, 20, 25, 30, 35]);
   });
 });

@@ -2,16 +2,21 @@ import { type G, circle, rounded } from '../art';
 import { artOf, ingredient } from '../ingredients';
 import {
   BOWL,
+  CUP_METER,
   type KitchenState,
   POUR_RULES,
   TARGET_HIGH,
   TARGET_LOW,
   between,
+  drawMeasuringCup,
   drawMeter,
   drawMixingBowl,
   findStep,
   holdProgress,
   listOf,
+  measureScale,
+  measureTarget,
+  parseAmount,
   pressHold,
   releaseHold,
   startHold,
@@ -44,9 +49,16 @@ export interface PourOptions extends StepBasics {
    * a blend step earlier in the round has blended it.
    */
   inside?: string;
-  /** Where the stars may sit, low to high. Defaults to TARGET_LOW to TARGET_HIGH. */
+  /**
+   * Where the stars may sit, low to high, for a pour with no real amount.
+   * Defaults to TARGET_LOW to TARGET_HIGH.
+   */
   targets?: [number, number];
-  /** The real amount of each pour, shown under the meter ("1 cup"); each ingredient's `amount` if left out. */
+  /**
+   * The real amount of each pour ("1½ cups"); each ingredient's `amount` if
+   * left out. The meter is a measuring cup with its lines, and the star sits
+   * on this amount's line (see kit/measure.ts).
+   */
   amounts?: string[];
 }
 
@@ -130,6 +142,18 @@ export function insideSmoothness(round: KitchenState, inside: string): number {
   return blend && blend.options.contents === inside ? smoothness(blend.state) : 0;
 }
 
+/** The real amount of pour `i`: the recipe's, or the ingredient's usual. */
+export function amountOf(options: PourOptions, i: number): string | undefined {
+  return options.amounts?.[i] ?? ingredient(options.pours[i]).amount;
+}
+
+/** Chef Bunny's lines for pour `i`: ["1½ cups of flour,", "let go at the star!"]. */
+function pourLines(options: PourOptions, i: number): [string, string] | null {
+  const amount = amountOf(options, i);
+  if (!amount) return null;
+  return [`${amount} of ${ingredient(options.pours[i]).label},`, 'let go at the star!'];
+}
+
 interface PourFx {
   index: number;
   timer: number;
@@ -145,11 +169,19 @@ const pour: Step<PourOptions, HoldState, PourFx> = {
 
   start: (o, random) => {
     const [low, high] = o.targets ?? [TARGET_LOW, TARGET_HIGH];
-    return startHold(o.pours.map(() => between(random, low, high)));
+    return startHold(
+      o.pours.map((_, i) => {
+        const real = parseAmount(amountOf(o, i));
+        return real ? measureTarget(real.value) : between(random, low, high);
+      }),
+    );
   },
 
   title: (o) => `Add ${listOf(o.pours.map((id) => ingredient(id).label))}!`,
-  hint: () => ['Hold to pour,', 'let go at the star!'],
+  hint: (o) => pourLines(o, 0) ?? ['Hold to pour,', 'let go at the star!'],
+  // Each pour says its own amount: "1½ cups of flour," then "1 cup of milk,".
+  bubble: ({ options, state }) =>
+    pourLines(options, Math.min(state.index, options.pours.length - 1)),
   icon: (o) => ingredient(o.pours[o.pours.length - 1]).icon,
   progress: holdProgress,
   points: ({ state }) => state.points,
@@ -160,11 +192,16 @@ const pour: Step<PourOptions, HoldState, PourFx> = {
 
   fx: () => ({ index: 0, timer: 0 }),
 
-  observe({ state: s, options, fx, dt, effects }) {
+  observe({ state: s, options, fx, dt, effects, round }) {
     if (s.index > fx.index) {
       const mouth = mouthOf(options);
       effects.sound.pop();
       effects.celebrate(mouth.x - 26, mouth.y - 45);
+      // The next pour's amount, said out loud (its words are in Chef Bunny's bubble too).
+      const next = s.index < options.pours.length ? amountOf(options, s.index) : undefined;
+      if (next && !round.learn.settings.readMyself) {
+        effects.sound.say(`Now ${next} of ${ingredient(options.pours[s.index]).label}!`);
+      }
     }
     fx.index = s.index;
     // Pouring glugs softly.
@@ -246,8 +283,24 @@ const pour: Step<PourOptions, HoldState, PourFx> = {
     art.drawContainer(g, s.holding);
     g.restore();
 
-    const amount = options.amounts?.[index] ?? ingredient(options.pours[index]).amount;
-    drawMeter(g, t, s.level, targets[index], art.meter, amount);
+    // A measuring cup with its lines when the pour has a real amount; else a plain meter.
+    const amount = amountOf(options, index);
+    const real = parseAmount(amount);
+    if (real) {
+      const scale = measureScale(real.value);
+      drawMeasuringCup(g, {
+        ...CUP_METER,
+        scale,
+        unit: real.unit,
+        level: s.level,
+        fill: art.meter,
+        target: targets[index],
+        label: amount,
+        t,
+      });
+    } else {
+      drawMeter(g, t, s.level, targets[index], art.meter, amount);
+    }
   },
 };
 

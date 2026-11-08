@@ -32,9 +32,9 @@ const cacioEPepe: Dish = {
   name: 'Cheesy Pepper Twirl',
   steps: [
     { kind: 'grate', item: 'pecorino' },
-    { kind: 'season', shaker: 'black-pepper', food: 'pecorino', shakes: 3 },
+    { kind: 'season', shaker: 'black-pepper', food: 'pecorino', shakes: 3, amount: '¼ teaspoon' },
     // Into the bowl of peppery cheese, to mix into a cream.
-    { kind: 'pour', pours: ['pasta-water'], into: 'pecorino', targets: [0.25, 0.45] },
+    { kind: 'pour', pours: ['pasta-water'], into: 'pecorino', amounts: ['¼ cup'] },
     { kind: 'mix', vessel: 'mixing-bowl', contents: 'cheese-cream' },
     { kind: 'toss', item: 'spaghetti' },
   ],

@@ -1,5 +1,5 @@
 import type { Grade } from './kit/types';
-import { WORDS_PER_SECOND, timedWord, wordAtChar, wordsOf } from './kit/words';
+import { WORDS_PER_SECOND, speakable, timedWord, wordAtChar, wordsOf } from './kit/words';
 
 /**
  * Sound effects, made on the fly with Web Audio so there are no files to load,
@@ -191,7 +191,9 @@ export function createSound(): Sound {
 
   function read(text: string): Reading {
     endReading?.();
-    const words = wordsOf(text);
+    // Said with its fractions as words, each still one word, so they line up.
+    const spoken = speakable(text);
+    const words = wordsOf(spoken);
     const called = now();
     let started: number | null = null;
     let told = -1;
@@ -207,7 +209,7 @@ export function createSound(): Sound {
       try {
         const synth = window.speechSynthesis;
         synth.cancel();
-        const line = new SpeechSynthesisUtterance(text);
+        const line = new SpeechSynthesisUtterance(spoken);
         if (voice) line.voice = voice;
         line.rate = 0.95;
         line.pitch = 1.35;
@@ -356,7 +358,7 @@ export function createSound(): Sound {
       try {
         const synth = window.speechSynthesis;
         synth.cancel();
-        const line = new SpeechSynthesisUtterance(text);
+        const line = new SpeechSynthesisUtterance(speakable(text));
         if (voice) line.voice = voice;
         line.rate = 0.95;
         line.pitch = 1.35;
