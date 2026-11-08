@@ -10,6 +10,7 @@ const tacoSpice: Ingredient = {
   label: 'taco spice',
   plural: 'taco spice',
   icon: '🌶️',
+  amount: '1 teaspoon',
   // The grains: mostly orange, some red.
   colors: [K.spice, C.berry],
 

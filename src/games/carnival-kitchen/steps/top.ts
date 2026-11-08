@@ -4,6 +4,7 @@ import {
   FLOAT_START,
   drawFallArrows,
   drawGlowLane,
+  drawOrderNote,
   floatProgress,
   shuffle,
   startFloat,
@@ -12,6 +13,7 @@ import {
   type FloatRules,
   type FloatState,
   type KitchenState,
+  type Order,
   type Step,
   type StepBasics,
 } from '../kit';
@@ -33,6 +35,8 @@ export interface TopOptions extends StepBasics {
   extras: string[];
   /** How many toppings in all. */
   count: number;
+  /** An order ticket this step fills: its note is pinned up, ticking off what's on. */
+  order?: Order;
 }
 
 /** One piece of a topping. */
@@ -54,6 +58,11 @@ export interface ToppingSpot {
   id: string;
   x: number;
   y: number;
+  /**
+   * One piece, not a little heap of them, so the toppings can be counted
+   * (an order ticket). Bases that draw a heap per topping draw just one.
+   */
+  single?: boolean;
 }
 
 /** Something toppings go on. */
@@ -148,7 +157,12 @@ const top: Step<TopOptions, TopState, TopFx> = {
     const spots = spotsIn(artOf(o.base, 'toppingBase').area, o.count, random);
     return {
       ...startFloat(),
-      spots: ids.map((id, i) => ({ id, ...spots[i], speed: TOPPING_SPEED + i * TOPPING_SPEEDUP })),
+      spots: ids.map((id, i) => ({
+        id,
+        ...spots[i],
+        speed: TOPPING_SPEED + i * TOPPING_SPEEDUP,
+        ...(o.order ? { single: true } : {}),
+      })),
     };
   },
 
@@ -194,6 +208,15 @@ const top: Step<TopOptions, TopState, TopFx> = {
   draw({ g, t, state: top, options, fx, taking, round }) {
     const spots = top.spots;
     const placed = top.results.length - (fx.drop ? 1 : 0);
+    // The order's note, while it's being filled (not in a picture of it later).
+    if (options.order && taking) {
+      drawOrderNote(
+        g,
+        options.order,
+        spots.slice(0, placed).map((s) => s.id),
+        t,
+      );
+    }
     artOf(options.base, 'toppingBase').draw(g, { toppings: spots.slice(0, placed), t, round });
 
     const active = taking && top.index < spots.length;

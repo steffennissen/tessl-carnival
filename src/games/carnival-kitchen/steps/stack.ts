@@ -5,8 +5,10 @@ import {
   accuracy,
   drawFallArrows,
   drawGlowLane,
+  drawOrderNote,
   finishStep,
   scoreAction,
+  type Order,
   type Step,
   type StepBasics,
   type Turn,
@@ -26,6 +28,8 @@ export interface StackOptions extends StepBasics {
   base: string;
   /** The layers, bottom first: ingredients with `stack` art. One may come twice (a bun). */
   layers: string[];
+  /** An order ticket this step fills: its note is pinned up, ticking off what's on. */
+  order?: Order;
 }
 
 /** One layer of a tower. */
@@ -315,6 +319,15 @@ const stack: Step<StackOptions, StackState, StackFx> = {
     const swinging = round.phase === 'playing' && s.index < total;
     const sy = swingY(bottoms, s.index);
     const towerTop = bottoms[Math.min(landed, total - 1)];
+    // The order's note, while it's being filled (not in a picture of it later).
+    if (options.order && taking) {
+      drawOrderNote(
+        g,
+        options.order,
+        s.layers.slice(0, landed).map((l) => l.id),
+        t,
+      );
+    }
 
     // A glowing lane down the middle, where the layers should drop.
     if (taking && swinging) {

@@ -1,4 +1,5 @@
 import type { Grade } from './kit/types';
+import { WORDS_PER_SECOND, timedWord, wordAtChar, wordsOf } from './kit/words';
 
 /**
  * Sound effects, made on the fly with Web Audio so there are no files to load,
@@ -32,6 +33,12 @@ export interface Sound {
   tada(): void;
   say(text: string): void;
   /**
+   * Reads `text` out loud like `say`, following which word is being said, so
+   * the words can light up as they're read. With the sound off (or no voice
+   * in this browser) it still follows along, timed, without a sound.
+   */
+  read(text: string): Reading;
+  /**
    * Chef Bunny's own chatter ("Wow, three in a row!"): said only if the voice
    * isn't already reading something, and never cuts anything off. Returns
    * whether it was free to speak (true when muted: nothing to talk over).
@@ -47,6 +54,16 @@ export interface Sound {
   /** Notes one after another, `gap` seconds apart, like a little bell. */
   chime(notes: number[], gap: number, volume?: number): void;
   close(): void;
+}
+
+/** Words being read out loud by `read`. */
+export interface Reading {
+  /** How many words. */
+  readonly count: number;
+  /** The word being said: -1 before it starts, `count` once it's done. */
+  word(): number;
+  /** Whether it has finished, or was cut off by something else being said. */
+  done(): boolean;
 }
 
 export interface ToneOptions {
@@ -168,6 +185,64 @@ export function createSound(): Sound {
     // No speech in this browser.
   }
 
+  /** Ends the reading being followed, when something else is said over it. */
+  let endReading: (() => void) | null = null;
+  const now = () => performance.now() / 1000;
+
+  function read(text: string): Reading {
+    endReading?.();
+    const words = wordsOf(text);
+    const called = now();
+    let started: number | null = null;
+    let told = -1;
+    let ended = false;
+    let silent = muted;
+    endReading = () => {
+      ended = true;
+    };
+    const finish = () => {
+      ended = true;
+    };
+    if (!silent) {
+      try {
+        const synth = window.speechSynthesis;
+        synth.cancel();
+        const line = new SpeechSynthesisUtterance(text);
+        if (voice) line.voice = voice;
+        line.rate = 0.95;
+        line.pitch = 1.35;
+        line.onstart = () => {
+          started = now();
+        };
+        line.onboundary = (event) => {
+          if (event.name && event.name !== 'word') return;
+          told = wordAtChar(words, event.charIndex);
+        };
+        line.onend = finish;
+        line.onerror = finish;
+        synth.speak(line);
+      } catch {
+        silent = true;
+      }
+    }
+    // Followed by the voice's word events when there are any; else timed from
+    // when the voice started, or from now with no voice (or one that never starts).
+    const word = () => {
+      if (ended && !silent) return words.length;
+      if (told >= 0) return told;
+      if (started !== null) return timedWord(words.length, now() - started);
+      if (silent) return timedWord(words.length, now() - called);
+      if (now() - called > 1.5) return timedWord(words.length, now() - called - 1.5);
+      return -1;
+    };
+    const longest = words.length / WORDS_PER_SECOND + 6;
+    return {
+      count: words.length,
+      word,
+      done: () => ended || (silent && word() >= words.length) || now() - called > longest,
+    };
+  }
+
   return {
     unlock() {
       if (ctx) return;
@@ -277,6 +352,7 @@ export function createSound(): Sound {
     },
     say(text) {
       if (muted) return;
+      endReading?.();
       try {
         const synth = window.speechSynthesis;
         synth.cancel();
@@ -304,6 +380,7 @@ export function createSound(): Sound {
       }
       return true;
     },
+    read,
     tone,
     hiss,
     chime,

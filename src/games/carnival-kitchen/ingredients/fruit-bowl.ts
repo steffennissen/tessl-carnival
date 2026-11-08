@@ -83,7 +83,7 @@ export function drawFruitBowl(
     const art = artOf(spot.id, 'topping');
     const sx = x + (spot.x - FRUIT_TOP.x) * scale;
     const sy = y + (spot.y - FRUIT_TOP.y) * scale;
-    for (const [dx, dy, s] of PIECES[spot.id] ?? ONE) {
+    for (const [dx, dy, s] of (!spot.single && PIECES[spot.id]) || ONE) {
       g.save();
       g.translate(sx + dx * scale, sy + dy * scale);
       g.rotate((dx + dy) * 0.05);

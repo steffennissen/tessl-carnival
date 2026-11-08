@@ -46,6 +46,8 @@ export interface PourOptions extends StepBasics {
   inside?: string;
   /** Where the stars may sit, low to high. Defaults to TARGET_LOW to TARGET_HIGH. */
   targets?: [number, number];
+  /** The real amount of each pour, shown under the meter ("1 cup"); each ingredient's `amount` if left out. */
+  amounts?: string[];
 }
 
 /** How something you pour into the bowl draws itself. */
@@ -244,7 +246,8 @@ const pour: Step<PourOptions, HoldState, PourFx> = {
     art.drawContainer(g, s.holding);
     g.restore();
 
-    drawMeter(g, t, s.level, targets[index], art.meter);
+    const amount = options.amounts?.[index] ?? ingredient(options.pours[index]).amount;
+    drawMeter(g, t, s.level, targets[index], art.meter, amount);
   },
 };
 

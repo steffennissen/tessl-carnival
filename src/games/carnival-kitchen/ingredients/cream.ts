@@ -10,6 +10,7 @@ const cream: Ingredient = {
   label: 'cream',
   plural: 'cream',
   icon: '🥛',
+  amount: '½ cup',
   colors: [K.cream, C.white],
 
   pour: {

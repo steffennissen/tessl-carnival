@@ -31,6 +31,8 @@ const PIECES = [
   [18, -9],
   [2, 11],
 ] as const;
+/** A counted topping (an order ticket) is one piece. */
+const ONE_PIECE = [[0, 0]] as const;
 
 export interface PizzaLook {
   /** How much of the dough the sauce covers, 0 to 1. */
@@ -165,7 +167,7 @@ export function drawPizza(g: G, x: number, y: number, rx: number, ry: number, lo
     const art = artOf(spot.id, 'topping');
     const nx = (spot.x - PIZZA_VIEW.x) / PIZZA_VIEW.rx;
     const ny = (spot.y - PIZZA_VIEW.y) / PIZZA_VIEW.ry;
-    PIECES.forEach(([dx, dy], k) => {
+    (spot.single ? ONE_PIECE : PIECES).forEach(([dx, dy], k) => {
       const tx = x + nx * rx + dx * scale;
       const ty = y + ny * ry + dy * scale * (squash / (PIZZA_VIEW.ry / PIZZA_VIEW.rx));
       g.save();

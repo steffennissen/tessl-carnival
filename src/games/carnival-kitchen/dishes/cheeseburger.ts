@@ -23,19 +23,21 @@ const cheeseburger: Dish = {
   draw(g, time, state) {
     // The tower as it was stacked this round, leaning where it landed, but
     // never so far that it looks like it will fall.
+    // An order ticket can change the layers, so draw the round's own.
     const run = state && findStep<StackState, StackOptions>(state, 'stack');
     const offsets = run?.state.offsets ?? [];
-    const layers = LAYERS.map((id, i) => ({
+    const ids = run?.options.layers ?? LAYERS;
+    const layers = ids.map((id, i) => ({
       id,
-      lean: offsets[i] === undefined ? LEANS[i] : leanOf(offsets[i]) * 0.6,
+      lean: offsets[i] === undefined ? (LEANS[i] ?? 0) : leanOf(offsets[i]) * 0.6,
     }));
     g.save();
     g.scale(0.9, 0.9);
     drawStack(g, 0, 62, 'burger-plate', layers, {
       t: time,
       wobble: 0.35,
-      total: LAYERS.length,
-      mood: (i) => (i === LAYERS.length - 1 ? 'joy' : 'happy'),
+      total: ids.length,
+      mood: (i) => (i === ids.length - 1 ? 'joy' : 'happy'),
     });
     g.restore();
 

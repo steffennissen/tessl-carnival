@@ -18,6 +18,7 @@ const sunsetSplash: Ingredient = {
   label: 'sunset splash',
   plural: 'sunset splash',
   icon: '✨',
+  amount: '1 cup',
   colors: [SUN.gold, SUN.light, C.white],
 
   pour: {

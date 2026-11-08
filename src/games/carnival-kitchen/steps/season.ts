@@ -29,6 +29,8 @@ export interface SeasonOptions extends StepBasics {
   food: string;
   /** How many shakes. 3 if left out. */
   shakes?: number;
+  /** The real amount of each shake, shown under the meter; the shaker's `amount` if left out. */
+  amount?: string;
 }
 
 /** How a shaker (salt, a pepper mill, a spice jar) draws itself. */
@@ -153,7 +155,14 @@ const season: Step<SeasonOptions, HoldState, SeasonFx> = {
     g.restore();
 
     // The meter, with a star to stop at.
-    drawMeter(g, t, s.level, targets[Math.min(s.index, targets.length - 1)], [C.lavender, C.sky]);
+    drawMeter(
+      g,
+      t,
+      s.level,
+      targets[Math.min(s.index, targets.length - 1)],
+      [C.lavender, C.sky],
+      options.amount ?? ingredient(options.shaker).amount,
+    );
   },
 };
 

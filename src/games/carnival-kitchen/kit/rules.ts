@@ -13,6 +13,18 @@ export const STEP_POINTS = 100;
  * Long enough for the instruction to be read out loud.
  */
 export const BANNER_TIME = 2.6;
+/**
+ * Seconds a step's card stays up in "Read it myself" mode: long enough to
+ * read it. A tap on the card after CARD_SKIP_AFTER moves on sooner.
+ */
+export const READ_BANNER_TIME = 6;
+export const CARD_SKIP_AFTER = 0.8;
+
+/** How long this round's step cards stay up. */
+export function bannerTime(round: KitchenState): number {
+  return round.learn.settings.readMyself ? READ_BANNER_TIME : BANNER_TIME;
+}
+
 /** Seconds a "Perfect!" style popup stays on screen. */
 export const FEEDBACK_TIME = 1.1;
 
@@ -73,7 +85,7 @@ export function finishStep(round: KitchenState, points: number): void {
   round.scores[round.stepIndex] = Math.round(Math.min(STEP_POINTS, Math.max(0, points)));
   round.stepIndex += 1;
   if (round.stepIndex < round.steps.length) {
-    round.banner = BANNER_TIME;
+    round.banner = bannerTime(round);
   } else {
     round.stepIndex = round.steps.length - 1;
     round.phase = 'over';

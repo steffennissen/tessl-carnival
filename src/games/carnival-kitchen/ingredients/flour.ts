@@ -6,6 +6,7 @@ const flour: Ingredient = {
   label: 'flour',
   plural: 'flour',
   icon: '🌾',
+  amount: '1 cup',
   colors: [C.white, C.cream],
 
   pour: {
