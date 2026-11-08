@@ -7,5 +7,6 @@ export {
   createPreferences,
   type PreferenceValue,
 } from './preferences';
+export { coinsFor, earnCoins, spendCoins, createWallets } from './wallet';
 export { prizeFor, type PrizeTier } from './prizes';
 export { theme, canvasFont, applyTheme } from './theme';
