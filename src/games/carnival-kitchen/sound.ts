@@ -26,6 +26,10 @@ export interface Sound {
   grade(grade: Grade, combo: number): void;
   star(index: number): void;
   fanfare(): void;
+  /** One click of the dish spinner's reel; `pitch` above 1 sounds brighter. */
+  tick(pitch?: number): void;
+  /** The dish spinner landing: ta-da! */
+  tada(): void;
   say(text: string): void;
   /**
    * A new sound from scratch, for a step that needs one of its own: a note
@@ -252,6 +256,18 @@ export function createSound(): Sound {
         tone(note / 2, lengths[i] + 0.15, { type: 'sine', volume: 0.12, delay: at });
         at += lengths[i];
       });
+    },
+    tick(pitch = 1) {
+      tone(1100 * pitch, 0.04, { type: 'square', volume: 0.05 });
+      hiss(0.025, { volume: 0.08, from: 5000, filter: 'highpass' });
+    },
+    tada() {
+      chime([NOTE.C5, NOTE.E5, NOTE.G5], 0.08, 0.14);
+      for (const note of [NOTE.C6, NOTE.E6, NOTE.G6]) {
+        tone(note, 0.7, { type: 'triangle', volume: 0.1, delay: 0.26 });
+      }
+      tone(NOTE.C5 / 2, 0.7, { type: 'sine', volume: 0.12, delay: 0.26 });
+      hiss(0.3, { volume: 0.06, from: 8000, filter: 'highpass', delay: 0.26 });
     },
     say(text) {
       if (muted) return;

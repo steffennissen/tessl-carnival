@@ -209,6 +209,9 @@ export const carnivalKitchen: CarnivalGame = {
     let state = createState(pickDish());
     // The title screen, waiting for a tap to start cooking.
     let choosing = true;
+    // The dish spinner is showing which dish was picked. The round waits,
+    // its card's clock stopped, until it's done.
+    let spinning = false;
     let lastDish: Dish | undefined;
     let scoreRecorded = false;
     const pointer: Pointer = { x: WIDTH / 2, y: HEIGHT / 2, down: false };
@@ -227,12 +230,18 @@ export const carnivalKitchen: CarnivalGame = {
       }
     };
 
-    /** Starts cooking the next dish, picked at random. */
-    const newRound = () => {
-      lastDish = pickDish(Math.random, lastDish);
+    /**
+     * Starts cooking `dish`, or the next dish picked at random. A dish picked
+     * at random is shown on the dish spinner first (`spin`), which lands on
+     * it; a chosen dish starts straight away unless `spin` says otherwise.
+     */
+    const newRound = (dish?: Dish, { spin = dish === undefined }: { spin?: boolean } = {}) => {
+      lastDish = dish ?? pickDish(Math.random, lastDish);
       state = createState(lastDish);
       scoreRecorded = false;
       renderer.reset();
+      spinning = spin;
+      if (spin) renderer.startSpin(lastDish);
     };
 
     /** Where the event is, in canvas units. The pointer keeps scene units. */
@@ -258,6 +267,16 @@ export const carnivalKitchen: CarnivalGame = {
       }
       if (renderer.hitSoundButton(at.x, at.y)) {
         sound.toggle();
+        return;
+      }
+      if (spinning) {
+        // Taps can't stop the spinner, but once it has landed one skips the wait.
+        renderer.skipSpin();
+        return;
+      }
+      if (!choosing && state.phase === 'playing' && renderer.hitBadge(at.x, at.y)) {
+        // The dish's badge: Chef Bunny says what we're making. Not a step press.
+        renderer.sayDish(state.dish);
         return;
       }
       pointer.down = true;
@@ -303,6 +322,13 @@ export const carnivalKitchen: CarnivalGame = {
       last = time;
       if (choosing) {
         renderer.drawTitle(dt);
+        frame = requestAnimationFrame(loop);
+        return;
+      }
+      if (spinning) {
+        // The round doesn't tick while the spinner runs.
+        renderer.drawSpin(dt);
+        if (renderer.spinDone()) spinning = false;
         frame = requestAnimationFrame(loop);
         return;
       }

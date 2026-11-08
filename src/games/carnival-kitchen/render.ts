@@ -9,6 +9,7 @@ import {
   emoji,
   face,
   fillStroke,
+  font,
   heartPath,
   horizontal,
   oval,
@@ -19,12 +20,14 @@ import {
   stickerText,
   vertical,
 } from './art';
+import { DISHES } from './dishes';
 import { liveScore, maxScore, ratingFor, starsFor, totalScore } from './game';
 import {
   BANNER_TIME,
   FEEDBACK_TIME,
   currentRun,
   currentTurn,
+  type Dish,
   type Effects,
   type Feedback,
   type KitchenState,
@@ -35,6 +38,7 @@ import {
 } from './kit';
 import { type Layout, layoutFor } from './layout';
 import type { Sound } from './sound';
+import { SPINNER_DISH, SPIN_TIME, drawSpinner, reelPosition, spinEnd, spinTime } from './spinner';
 import { hintOf, iconOf, stepOf, titleOf } from './steps';
 
 /**
@@ -59,6 +63,13 @@ interface Spot {
   y: number;
 }
 
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 interface Bubble {
   x: number;
   y: number;
@@ -77,7 +88,20 @@ export function placesFor(layout: Layout) {
     // The buttons and score stay at the top; the recipe sits just above the
     // cooking and Chef Bunny just below it, whatever the screen's height.
     const bunnyY = Math.min(height - 150, sy + 635);
+    // The dish being made: big on the wall between the score and the recipe
+    // when there's room, or small between the buttons and the score.
+    const room = sy - 24 - 84;
+    const badge: Box =
+      room >= 70
+        ? {
+            x: width / 2 - Math.min(210, width / 2 - 50),
+            y: 84 + (room - Math.min(room, 200)) / 2,
+            w: Math.min(420, width - 100),
+            h: Math.min(room, 200),
+          }
+        : { x: 134, y: 26, w: width - 134 - 180, h: 48 };
     return {
+      badge,
       home: { x: 40, y: 50 } as Spot | null,
       sound: { x: 100, y: 50 },
       score: { x: width - 168, y: 28 },
@@ -88,8 +112,18 @@ export function placesFor(layout: Layout) {
     };
   }
   // On the page the scene is the whole canvas, and there's a back link above
-  // it, so there's no home button.
+  // it, so there's no home button. The dish being made sits in the kitchen
+  // beside the scene when the screen is wide enough, above it when there's
+  // room there, and otherwise in the strip above the recipe.
+  const side = Math.min(220, sx - 20);
+  const badge: Box =
+    side >= 110
+      ? { x: (sx - side) / 2, y: sy + 110, w: side, h: Math.min(240, side * 1.8) }
+      : sy >= 90
+        ? { x: sx + W / 2 - 180, y: (sy - 80) / 2, w: 360, h: 80 }
+        : { x: sx + W / 2 - 165, y: sy + 4, w: 330, h: 40 };
   return {
+    badge,
     home: layout.shape === 'wide' ? { x: sx + 40, y: sy + 80 } : null,
     sound: { x: sx + (layout.shape === 'wide' ? 100 : 40), y: sy + 80 },
     score: { x: sx + W - 168, y: sy + 58 },
@@ -455,6 +489,75 @@ function drawSpeech(g: G, lines: [string, string], bubble: Bubble) {
   plainText(g, lines[1], x + w / 2, y + 54, size, C.hotPink);
 }
 
+/**
+ * The dish being made, on a little card: its finished picture and its name.
+ * A tall card has the picture on top; a short one has it on the left.
+ * `wiggle` (0 to 1) gives it a shake when it's tapped.
+ */
+function drawBadge(g: G, dish: Dish, box: Box, t: number, wiggle: number) {
+  const { x, y, w, h } = box;
+  g.save();
+  g.translate(x + w / 2, y + h / 2);
+  g.rotate(Math.sin(wiggle * 18) * 0.06 * wiggle);
+  g.translate(-w / 2, -h / 2);
+  rounded(g, 0, 0, w, h, Math.min(22, h / 2));
+  fillStroke(g, C.white, 3.5, C.ink);
+  g.save();
+  rounded(g, 0, 0, w, h, Math.min(22, h / 2));
+  g.clip();
+  const tall = h >= 100;
+  // A tall card's name goes on as many lines as it needs, up to three.
+  const name = tall ? wrapName(g, dish.name, w - 16, Math.min(24, w / 8)) : null;
+  const nameHeight = name ? name.lines.length * name.size * 1.15 + 12 : 0;
+  // The picture's space, and the name's.
+  const art = tall
+    ? { x: w / 2, y: (h - nameHeight) / 2 + 2, w: w - 16, h: h - nameHeight - 8 }
+    : { x: 8 + ((h - 6) * 1.5) / 2, y: h / 2, w: (h - 6) * 1.5, h: h - 6 };
+  const scale = Math.min(art.w / 250, art.h / 170);
+  g.translate(art.x, art.y);
+  g.scale(scale, scale);
+  dish.draw(g, t, null);
+  g.restore();
+  if (name) {
+    name.lines.forEach((line, i) => {
+      const y = h - nameHeight + 6 + (i + 0.5) * name.size * 1.15;
+      stickerText(g, line, w / 2, y, name.size, C.hotPink, 'center', w - 14);
+    });
+  } else {
+    // A short card's name goes beside the picture, on two lines if it's tall enough.
+    const left = 8 + art.w + 4;
+    const room = w - 8 - left;
+    const beside = wrapName(g, dish.name, room, Math.min(26, h * 0.5), h >= 60 ? 2 : 1);
+    beside.lines.forEach((line, i) => {
+      const y = h / 2 + 1 + (i - (beside.lines.length - 1) / 2) * beside.size * 1.15;
+      stickerText(g, line, (left + w - 8) / 2, y, beside.size, C.hotPink, 'center', room);
+    });
+  }
+  g.restore();
+}
+
+/**
+ * Splits a name into lines no wider than `width`, at the biggest size up to
+ * `size` that needs `most` lines at most.
+ */
+function wrapName(g: G, text: string, width: number, size: number, most = 3) {
+  const words = text.split(' ');
+  let lines: string[] = [text];
+  for (let s = size; s >= 10; s -= 1) {
+    g.font = font(s);
+    lines = [];
+    for (const word of words) {
+      const last = lines[lines.length - 1];
+      const joined = last === undefined ? word : `${last} ${word}`;
+      if (last !== undefined && g.measureText(joined).width + s * 0.3 > width) lines.push(word);
+      else lines[Math.max(0, lines.length - 1)] = joined;
+    }
+    const fits = lines.every((line) => g.measureText(line).width + s * 0.3 <= width);
+    if (lines.length <= most && fits) return { lines, size: s };
+  }
+  return { lines, size: 10 };
+}
+
 // ---------------------------------------------------------------------------
 // The renderer
 
@@ -509,6 +612,36 @@ export function createRenderer(ctx: G, sound: Sound) {
     notYet: null as { x: number; y: number; age: number } | null,
   });
   let fx = fresh();
+
+  /** The dish spinner while it runs (see spinner.ts), or null. */
+  let spin: {
+    dish: Dish;
+    start: number;
+    end: number;
+    age: number;
+    pos: number;
+    ticked: number;
+    tickAge: number;
+    landed: boolean;
+  } | null = null;
+  /** The dish the spinner already said "Let's make..." for. */
+  let announced: Dish | null = null;
+  /**
+   * Where the spinner goes on the canvas: on the scene, or bigger on a tall
+   * screen, in the space above Chef Bunny. `x`, `y` is its middle.
+   */
+  function spinnerSpot() {
+    if (layout.shape !== 'tall') {
+      return { x: layout.sceneX + W / 2, y: layout.sceneY + 250, scale: 1 };
+    }
+    const top = 90;
+    const bottom = places.bunny.y - 84;
+    const scale = Math.min((layout.width - 70) / 380, (bottom - top) / 430);
+    return { x: layout.width / 2, y: (top + bottom) / 2, scale };
+  }
+
+  /** Seconds since the dish badge was tapped. */
+  let badgeAge = 9;
 
   const burst: Effects['burst'] = (x, y, count, shapes, colors, speed = 220, gravity = 380) => {
     for (let i = 0; i < count; i++) {
@@ -589,8 +722,9 @@ export function createRenderer(ctx: G, sound: Sound) {
       fx.stepIndex = state.stepIndex;
       const run = currentRun(state);
       sound.banner();
-      // The first step also says what we're making.
-      const intro = state.stepIndex === 0 ? `Let's make ${state.dish.name}! ` : '';
+      // The first step also says what we're making, unless the spinner did.
+      const intro =
+        state.stepIndex === 0 && announced !== state.dish ? `Let's make ${state.dish.name}! ` : '';
       sound.say(`${intro}${titleOf(run)} ${hintOf(run).join(' ')}`);
     }
 
@@ -651,6 +785,7 @@ export function createRenderer(ctx: G, sound: Sound) {
 
   function update(dt: number) {
     fx.time += dt;
+    badgeAge += dt;
     fx.moodAge += dt;
     if (fx.notYet) fx.notYet.age += dt;
     if (fx.mood !== 'idle' && fx.moodAge > 1.2) fx.mood = 'idle';
@@ -685,6 +820,11 @@ export function createRenderer(ctx: G, sound: Sound) {
   }
 
   function drawHud(state: KitchenState) {
+    if (state.phase === 'playing') {
+      onCanvas(() =>
+        drawBadge(ctx, state.dish, places.badge, fx.time, clamp01(1 - badgeAge / 0.6)),
+      );
+    }
     drawButtons();
     onCanvas(() => drawTopBar(state));
     drawProgress(state);
@@ -1025,6 +1165,107 @@ export function createRenderer(ctx: G, sound: Sound) {
       const keep = fx.particles;
       fx = fresh();
       fx.particles = keep;
+      spin = null;
+      announced = null;
+    },
+
+    /**
+     * Starts the dish spinner, which lands on `dish`: the game has already
+     * picked it. Chef Bunny says "Let's make..." when it lands, so the first
+     * step's card doesn't say it again.
+     */
+    startSpin(dish: Dish) {
+      const count = DISHES.length;
+      const target = Math.max(0, DISHES.indexOf(dish));
+      const start = Math.floor(Math.random() * count);
+      const end = spinEnd(start, target, count);
+      spin = { dish, start, end, age: 0, pos: start, ticked: start, tickAge: 9, landed: false };
+      announced = dish;
+      sound.whoosh();
+    },
+
+    /** Whether the spinner has finished, so cooking can start. */
+    spinDone() {
+      return !spin || spin.age >= spinTime(spin.dish);
+    },
+
+    /** A tap once the spinner has landed skips the rest of the pause. */
+    skipSpin() {
+      if (spin && spin.landed && spin.age >= SPIN_TIME + 0.5) {
+        spin.age = Math.max(spin.age, spinTime(spin.dish) - 0.2);
+      }
+    },
+
+    /** Draws a frame of the dish spinner. */
+    drawSpin(dt: number) {
+      update(dt);
+      begin();
+      if (spin) {
+        spin.age += dt;
+        spin.tickAge += dt;
+        const pos = reelPosition(spin.start, spin.end, spin.age);
+        const speed = dt > 0 ? Math.abs(pos - spin.pos) / dt : 0;
+        spin.pos = pos;
+        // A click each time a dish passes the middle, but not a buzz.
+        const passing = Math.round(pos);
+        if (passing !== spin.ticked && !spin.landed) {
+          spin.ticked = passing;
+          if (spin.tickAge > 0.06) {
+            spin.tickAge = 0;
+            sound.tick(1 + 0.4 * clamp01(spin.age / SPIN_TIME));
+          }
+        }
+        if (!spin.landed && spin.age >= SPIN_TIME) {
+          spin.landed = true;
+          sound.tada();
+          sound.say(`Let's make ${spin.dish.name}!`);
+          // Sparkles from the dish, in scene units.
+          const at = spinnerSpot();
+          burst(
+            at.x - layout.sceneX + (SPINNER_DISH.x - W / 2) * at.scale,
+            at.y - layout.sceneY + (SPINNER_DISH.y - 250) * at.scale,
+            24,
+            ['star', 'heart', 'star', 'dot'],
+            CONFETTI,
+            360,
+          );
+          fx.moodAge = 0;
+        }
+        if (spin.landed) fx.mood = 'cheer';
+        bunny(fx.mood, fx.moodAge);
+        dim(0.25);
+        const at = spinnerSpot();
+        const view = {
+          dishes: DISHES,
+          pos,
+          speed,
+          landed: spin.landed ? spin.age - SPIN_TIME : -1,
+          t: fx.time,
+        };
+        onCanvas(() => {
+          ctx.translate(at.x, at.y);
+          ctx.scale(at.scale, at.scale);
+          ctx.translate(-W / 2, -250);
+          drawSpinner(ctx, view);
+        });
+      }
+      drawButtons();
+      drawParticles();
+    },
+
+    /** Whether a canvas point is on the badge of the dish being made. */
+    hitBadge(x: number, y: number) {
+      const { badge } = places;
+      return x >= badge.x && x <= badge.x + badge.w && y >= badge.y && y <= badge.y + badge.h;
+    },
+
+    /** Chef Bunny says what we're making, and the badge gives a wiggle. */
+    sayDish(dish: Dish) {
+      badgeAge = 0;
+      sound.pop();
+      sound.say(`We're making ${dish.name}!`);
+      fx.mood = 'nod';
+      fx.moodAge = 0;
     },
 
     /** Shows a gentle "Not yet!" where a too-early tap landed. */
@@ -1071,6 +1312,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     },
 
     draw(state: KitchenState, pointer: Pointer, dt: number) {
+      spin = null;
       observe(state, pointer, dt);
       update(dt);
       fx.shownScore += (liveScore(state) - fx.shownScore) * Math.min(1, dt * 8);
