@@ -242,6 +242,43 @@ without errors (on a pretend canvas that throws on NaN). So run it.
 
 ## Adding a dish
 
+A new dish is usually one file. Here's the quickest way from "I want to make
+French toast!" to playing it.
+
+**1. Write the recipe in kid steps.** Three to five steps, each one thing you
+can do with a tap, a hold or a drag. Match each to a step kind in the table
+below:
+
+| French toast       | Step kind                        |
+| ------------------ | -------------------------------- |
+| Crack the eggs     | `crack`, item `egg`              |
+| Pour the milk      | `pour`, pours `milk`             |
+| Flip the toast     | `flip`, a new `french-toast`     |
+| Add berries on top | `top`, a new base, with toppings |
+
+**2. Check the ingredients.** The roles table below lists what each step can
+use today. Anything missing is a new file in `ingredients/` that draws it (see
+"Adding an ingredient"). Reusing what's there is the fastest: egg, milk and
+blueberry already exist.
+
+**3. Add `dishes/<id>.ts`.** Copy `dishes/pancakes.ts` or `dishes/pizza.ts`,
+change the id, name and steps, and draw the finished dish for the end card.
+
+**4. Try it.** Run `npm run check`: the tests cook every dish to the end and
+draw every screen, so a missing ingredient or role fails here. Then
+`npm run dev` and tap to cook until the spinner lands on it (or cook it once,
+then pick it from the recipe book).
+
+The new dish joins the spinner, the random pick and the recipe book by
+itself. Nothing else needs to change.
+
+**Asking an agent.** A prompt like this is enough: _"Add French toast to
+Carnival Kitchen: crack eggs, pour milk, flip the toast, top with
+berries. Follow 'Adding a dish' in its README, reuse existing ingredients
+where you can, and check it in the browser on desktop and on a phone size."_
+
+The details:
+
 1. Add `dishes/<id>.ts` whose default export is a `Dish` (from `'../kit'`):
 
    ```ts
