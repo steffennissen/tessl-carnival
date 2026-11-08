@@ -222,8 +222,15 @@ export function stickerText(
   size: number,
   fill: string | CanvasGradient,
   align: CanvasTextAlign = 'center',
+  maxWidth = Infinity,
 ) {
   g.font = font(size);
+  // Too wide for its space (a long dish name): shrink it to fit.
+  const wide = g.measureText(text).width + size * 0.3;
+  if (wide > maxWidth) {
+    size *= maxWidth / wide;
+    g.font = font(size);
+  }
   g.textAlign = align;
   g.textBaseline = 'middle';
   g.lineJoin = 'round';

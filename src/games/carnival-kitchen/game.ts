@@ -141,7 +141,7 @@ export const carnivalKitchen: CarnivalGame = {
   id: 'carnival-kitchen',
   name: 'Carnival Kitchen',
   description:
-    'Cook pizza, pancakes or soup with Chef Bunny. Sharp timing and perfect streaks score the most.',
+    'Cook a surprise dish with Chef Bunny, from pizza to sushi. Sharp timing and perfect streaks score the most.',
 
   start(canvas) {
     const ctx = canvas.getContext('2d');

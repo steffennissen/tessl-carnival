@@ -881,13 +881,22 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.fillStyle = C.ink;
     emoji(g, iconOf(run), 0, 0, 76);
     g.restore();
-    stickerText(g, titleOf(run), 50, -16, 38, vertical(g, -36, 4, [C.hotPink, C.purple]));
+    stickerText(
+      g,
+      titleOf(run),
+      50,
+      -16,
+      38,
+      vertical(g, -36, 4, [C.hotPink, C.purple]),
+      'center',
+      380,
+    );
     plainText(g, `Step ${state.stepIndex + 1} of ${state.steps.length}`, 50, 36, 20, C.purple);
     // The first step says what we're making, on a ribbon above the card.
     if (state.stepIndex === 0) {
       rounded(g, -190, -122, 380, 50, 25);
       fillStroke(g, horizontal(g, -190, 190, [C.purple, C.lavender, C.purple]), 4);
-      stickerText(g, `Let's make ${state.dish.name}!`, 0, -97, 26, C.white);
+      stickerText(g, `Let's make ${state.dish.name}!`, 0, -97, 26, C.white, 'center', 350);
     }
     g.restore();
     g.globalAlpha = 1;
@@ -932,7 +941,7 @@ export function createRenderer(ctx: G, sound: Sound) {
 
     rounded(g, -200, -226, 400, 58, 29);
     fillStroke(g, horizontal(g, -200, 200, [C.hotPink, C.pink, C.hotPink]));
-    stickerText(g, `${state.dish.name}!`, 0, -197, 30, C.white);
+    stickerText(g, `${state.dish.name}!`, 0, -197, 30, C.white, 'center', 370);
 
     for (let i = 0; i < 3; i++) {
       const x = (i - 1) * 92;

@@ -31,6 +31,8 @@ export interface PourOptions extends StepBasics {
   kind: 'pour';
   /** What's poured, in order: each an ingredient with `pour` art. One pour each. */
   pours: string[];
+  /** Where the stars may sit, low to high. Defaults to TARGET_LOW to TARGET_HIGH. */
+  targets?: [number, number];
 }
 
 /** How something you pour into the bowl draws itself. */
@@ -70,7 +72,10 @@ const pour: Step<PourOptions, HoldState, PourFx> = {
   kind: 'pour',
   uses: (o) => o.pours.map((id) => [id, 'pour']),
 
-  start: (o, random) => startHold(o.pours.map(() => between(random, TARGET_LOW, TARGET_HIGH))),
+  start: (o, random) => {
+    const [low, high] = o.targets ?? [TARGET_LOW, TARGET_HIGH];
+    return startHold(o.pours.map(() => between(random, low, high)));
+  },
 
   title: (o) => `Add ${listOf(o.pours.map((id) => ingredient(id).label))}!`,
   hint: () => ['Hold to pour,', 'let go at the star!'],
