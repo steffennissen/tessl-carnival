@@ -134,7 +134,7 @@ describe('carnival kitchen', () => {
       const random = seeded(7);
       const seen = new Set<string>();
       let previous = pickDish(random);
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 400; i++) {
         const next = pickDish(random, previous);
         expect(next.id).not.toBe(previous.id);
         seen.add(next.id);

@@ -1,7 +1,8 @@
 # Carnival Kitchen
 
 Cook with Chef Bunny. Tap **Tap to cook!** and the kitchen picks a dish at
-random: a cheesy pizza, fluffy pancakes or a veggie soup. Each dish is a whole
+random from 16 dishes, from pizza and pancakes to sushi, burgers and an ice
+cream sundae. Each dish is a whole
 recipe, made step by step, and every round is a little different. It's made
 for young cooks: everything is slow and forgiving, every grade is kind, and a
 voice reads each step out loud for cooks who can't read yet.
@@ -25,29 +26,53 @@ keeps the hint on screen. Tap **Cook again!** on the end screen for another
 dish, never the same one twice in a row. The speaker button in the corner turns
 sound and the voice off and on.
 
-| Dish                | Steps                                                                  |
-| ------------------- | ---------------------------------------------------------------------- |
-| **Cheesy Pizza**    | Chop the pepperoni, spread the sauce, add the toppings, bake the pizza |
-| **Fluffy Pancakes** | Crack the eggs, add flour and milk, mix the batter, flip the pancakes  |
-| **Veggie Soup**     | Chop the carrot, stir the soup, shake the salt                         |
+| Dish                             | Steps                                                                               |
+| -------------------------------- | ----------------------------------------------------------------------------------- |
+| **Cheesy Pizza**                 | Chop the pepperoni, spread the sauce, add the toppings, bake the pizza              |
+| **Fluffy Pancakes**              | Crack the eggs, add flour and milk, mix the batter, flip the pancakes               |
+| **Veggie Soup**                  | Chop the carrot, stir the soup, shake the salt                                      |
+| **Creamy Dreamy Mac & Cheese**   | Grate the cheese, pour the milk, stir the cheese sauce, sprinkle the crumbs, bake   |
+| **Cheesy Pepper Twirl**          | Grate the cheese, shake the pepper, add pasta water, mix the cheese cream, toss     |
+| **Strawberry Smoothie**          | Chop the strawberry, chop the banana, add milk, blend                               |
+| **Rainbow Fruit Salad**          | Chop the strawberry, chop the banana, mix the fruit, add blueberries, kiwi and mint |
+| **Lulu's Pink Bisque**           | Chop the celery, stir the shells and veggies, add sunset splash, blend, add cream   |
+| **Omurice with a Ketchup Heart** | Chop the onion, stir the rice, crack the eggs, flip the omelettes, draw ketchup     |
+| **Taco Fiesta**                  | Chop the tomato, stir the taco meat, shake the spice, add the toppings              |
+| **Spaghetti & Meatballs**        | Chop the tomato, stir the sauce, shake the salt, add meatballs and basil            |
+| **Cheeseburger Tower**           | Chop the pickle, flip the patties, stack the burger                                 |
+| **Ice Cream Sundae**             | Scoop the ice cream, stack the scoops, drizzle the chocolate, add the toppings      |
+| **Sprinkle Cupcakes**            | Crack the eggs, add flour and sugar, mix, bake, add the toppings                    |
+| **Cut-out Sugar Cookies**        | Crack the eggs, mix the dough, roll it out, cut the cookies, bake                   |
+| **Sushi Rolls**                  | Chop the cucumber, spread the rice, add the fillings, roll the sushi, chop it       |
 
-| Step                   | What to do                                                                                    |
-| ---------------------- | --------------------------------------------------------------------------------------------- |
-| **Chop**               | A knife glides along the carrot or pepperoni. Tap when it's over a dotted line. 4 or 5 chops. |
-| **Crack the eggs**     | An egg floats across. Tap when it's over the bowl. 3 eggs, each a little faster.              |
-| **Add flour and milk** | Hold to pour, and let go when the meter reaches the star. Flour first, then milk.             |
-| **Mix the batter**     | Hold and draw circles in the bowl until it's smooth. 3 turns in 15 seconds.                   |
-| **Flip the pancakes**  | Tap when the heart is in the gold. 4 pancakes, each a little faster.                          |
-| **Spread the sauce**   | Hold and draw circles on the pizza. 3 turns in 15 seconds.                                    |
-| **Add the toppings**   | A topping floats across. Tap when it's over its sparkly spot. 5 toppings, each faster.        |
-| **Bake the pizza**     | Hold to bake, and let go when the meter reaches the star and the pizza looks golden.          |
-| **Stir the soup**      | Hold and draw circles in the pot. 3 turns in 15 seconds.                                      |
-| **Shake the salt**     | Hold to shake, and let go when the meter reaches the star. 3 shakes.                          |
+Lulu's Pink Bisque is made from the shells Lulu the lobster has grown out of
+(real lobsters shed theirs), so no lobster is ever cooked.
+
+Each step is one of these:
+
+| Step            | What to do                                                                                                           |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Chop**        | A knife glides along the food. Tap when it's over a dotted line. 4 or 5 chops.                                       |
+| **Crack**       | An egg floats across. Tap when it's over the bowl. 3 eggs, each a little faster.                                     |
+| **Pour**        | Hold to pour, and let go when the meter reaches the star. One pour per ingredient.                                   |
+| **Mix or stir** | Hold and draw circles in the bowl or pot. 3 turns in 15 seconds.                                                     |
+| **Sauce**       | Hold and draw circles to spread it (sauce, ketchup, rice, chocolate). 3 turns in 15 seconds.                         |
+| **Season**      | Hold to shake, and let go when the meter reaches the star. 3 shakes.                                                 |
+| **Toppings**    | A topping floats across. Tap when it's over its sparkly spot. Each one a little faster.                              |
+| **Bake**        | Hold to bake, and let go when the meter reaches the star and the food looks golden.                                  |
+| **Flip**        | Tap when the heart is in the gold. Each one a little faster.                                                         |
+| **Grate**       | Hold the cheese and rub it left and right across the grater. 8 strokes in 20 seconds.                                |
+| **Toss**        | Hold the pan and swipe left and right. Tossing warms the thermometer, resting cools it. 10 tosses.                   |
+| **Blend**       | Hold to whirr the blender, and let go when the smoothness meter reaches the star.                                    |
+| **Scoop**       | Hold in the tub and the ball grows. Let go when the meter reaches the star. One scoop per flavour.                   |
+| **Stack**       | Each layer swings over the plate. Tap to drop it; the closer to the middle, the better. It always sticks.            |
+| **Roll**        | Hold and drag the rolling pin until the dough reaches the dotted line, or push the mat up to roll sushi. 20 seconds. |
 
 Every round is different:
 
 - The dotted lines on the carrot or pepperoni move, and there are 4 or 5.
-- The stars for salt, flour and milk sit somewhere new, between 0.4 and 0.8.
+- The stars for shakes, pours, blends and scoops sit somewhere new, between
+  0.4 and 0.8 (the pasta water's between 0.25 and 0.45: just a little).
 - The golden zone for each pancake moves, between 0.3 and 0.7.
 - The pizza always gets the pepperoni you chopped, plus four of mushroom,
   pineapple, olive, pepper and tomato, each on its own random spot.
@@ -58,11 +83,14 @@ Nothing is ever wasted:
 - Tapping when the egg is far from the bowl, a topping is far from its spot,
   or the heart is far from the gold, just shows "Not yet!" and lets you try
   again.
-- Letting go of the oven while the pizza is still pale shows "Not yet!": the
-  pizza stays in, keeps its heat, and you can hold again. A pizza left in too
-  long comes out by itself, a little crispy.
-- A quick tap on the salt, flour or milk that barely pours anything doesn't
-  use up a pour: it shows "Not yet!" so you can hold it properly.
+- Letting go of the oven while the food is still pale shows "Not yet!": it
+  stays in, keeps its heat, and you can hold again. Food left in too long
+  comes out by itself, a little crispy. The blender works the same way.
+- A quick tap on a shaker, a pour or a scoop that barely does anything doesn't
+  use it up: it shows "Not yet!" so you can hold it properly.
+- A stacked layer always sticks, however far off: it just leans a little.
+- Tossing too hot only makes a few cartoon cheese lumps and a "Not too hot!"
+  hint. Grating and rolling never mind how fast you go.
 - A chop always cuts the nearest dotted line, and scores something whenever
   the knife is close to it.
 
@@ -78,21 +106,28 @@ Nothing is ever wasted:
   in full within 0.06 of the gold's middle, and the pan takes any tap within
   0.3. Toppings score in full within 20 px of their spot, and the pizza takes
   any tap within 100 px. The bake scores in full within 0.07 of the star (0.7)
-  and nothing from 0.4 off; letting go below 0.5 is "Not yet!".
+  and nothing from 0.4 off; letting go below 0.5 is "Not yet!". The blend
+  scores the same way, against its star. Scoops score like pours. Stacked
+  layers score in full within 20 px of the middle, and nothing from 130 px.
 - **Circles** (stirring, sauce and batter) score 50 for finishing, plus up to
   50 for time left. If time runs out you get up to 50 for the turns you made.
   Circles count in either direction, but wiggling back and forth cancels out.
+  **Grating** (8 strokes of 60 px, 20 seconds) and **rolling** (20 seconds)
+  score the same way: 50 for finishing plus up to 50 for time left.
+- **Tossing** scores the share of your tossing time the thermometer stayed
+  cosy (below 0.75), so brisk tossing scores 100.
 - **Every action gets a kind grade:** Perfect! (90% of its points or more),
   Great! (60% or more), Good! (anything) or Nice try! (nothing).
 - **Combo bonus:** each Perfect! after the first in an unbroken streak adds 5
   points. Anything short of perfect breaks the streak. The streak carries from
-  one step to the next, and circles neither add to it nor break it.
+  one step to the next. Circles, grating, rolling and tossing neither add to
+  it nor break it.
 
 The score in the corner counts up as you earn points. Your final score is the
 step points plus the combo bonus, and it's saved to the carnival's score board
-when the round ends. Soup has three steps and the others four, so stars and
-Chef Bunny's verdict go by your share of what the dish could score (300 or
-400, before bonuses):
+when the round ends. Dishes have three to five steps, so stars and Chef
+Bunny's verdict go by your share of what the dish could score (100 a step,
+before bonuses):
 
 | Share of the most | Stars | Verdict                |
 | ----------------- | ----- | ---------------------- |
@@ -145,37 +180,52 @@ without errors (on a pretend canvas that throws on NaN). So run it.
    override its card, such as a `title` of "Shake the pepper!" on a season
    step that shakes a pepper mill.
 
-   | Kind     | Options                                                                | Card it makes        |
-   | -------- | ---------------------------------------------------------------------- | -------------------- |
-   | `chop`   | `item` (chop)                                                          | Chop the `item`!     |
-   | `crack`  | `item` (crack), `count?` = 3                                           | Crack the `item`s!   |
-   | `pour`   | `pours`: ids (pour), one pour each, in order                           | Add flour and milk!  |
-   | `mix`    | `vessel` (vessel), `contents` (stirred)                                | Mix the `contents`!  |
-   | `stir`   | `vessel` (vessel), `contents` (stirred)                                | Stir the `contents`! |
-   | `season` | `shaker` (shaker), `food` (seasoned), `shakes?` = 3                    | Shake the `shaker`!  |
-   | `sauce`  | `base` (sauceBase), `sauce` (spread)                                   | Spread the `sauce`!  |
-   | `top`    | `base` (toppingBase), `always?`: ids, `extras`: ids (topping), `count` | Add the toppings!    |
-   | `bake`   | `item` (bake)                                                          | Bake the `item`!     |
-   | `flip`   | `item` (flip), `count?` = 4                                            | Flip the `item`s!    |
+   | Kind     | Options                                                                | Card it makes               |
+   | -------- | ---------------------------------------------------------------------- | --------------------------- |
+   | `chop`   | `item` (chop)                                                          | Chop the `item`!            |
+   | `crack`  | `item` (crack), `count?` = 3                                           | Crack the `item`s!          |
+   | `pour`   | `pours`: ids (pour), one pour each, in order; `targets?`: [low, high]  | Add flour and milk!         |
+   | `mix`    | `vessel` (vessel), `contents` (stirred)                                | Mix the `contents`!         |
+   | `stir`   | `vessel` (vessel), `contents` (stirred)                                | Stir the `contents`!        |
+   | `season` | `shaker` (shaker), `food` (seasoned), `shakes?` = 3                    | Shake the `shaker`!         |
+   | `sauce`  | `base` (sauceBase), `sauce` (spread)                                   | Spread the `sauce`!         |
+   | `top`    | `base` (toppingBase), `always?`: ids, `extras`: ids (topping), `count` | Add the toppings!           |
+   | `bake`   | `item` (bake)                                                          | Bake the `item`!            |
+   | `flip`   | `item` (flip), `count?` = 4                                            | Flip the `item`s!           |
+   | `grate`  | `item` (grate), `strokes?` = 8                                         | Grate the `item`!           |
+   | `toss`   | `item` (tossed), `tosses?` = 10                                        | Toss the `item`!            |
+   | `blend`  | `blender` (blender), `contents` (blended), `blends?` = 1               | Blend the `contents`!       |
+   | `scoop`  | `flavours`: ids (scoop), one scoop each                                | Scoop the ice cream!        |
+   | `stack`  | `base` (stackBase), `layers`: ids (stack), bottom first                | Stack it up!                |
+   | `roll`   | `how`: 'dough' or 'mat', `item` (rollOut or rollUp)                    | Roll out / Roll the `item`! |
 
    In brackets is the art role each ingredient must have (see "Adding an
    ingredient"). The ones there today:
 
-   | Role          | Ingredients                                           |
-   | ------------- | ----------------------------------------------------- |
-   | `chop`        | carrot, pepperoni                                     |
-   | `crack`       | egg                                                   |
-   | `pour`        | flour, milk                                           |
-   | `vessel`      | pot, mixing-bowl                                      |
-   | `stirred`     | soup, batter                                          |
-   | `shaker`      | salt                                                  |
-   | `seasoned`    | soup                                                  |
-   | `sauceBase`   | pizza                                                 |
-   | `spread`      | tomato-sauce                                          |
-   | `toppingBase` | pizza                                                 |
-   | `topping`     | pepperoni, mushroom, pineapple, olive, pepper, tomato |
-   | `bake`        | pizza                                                 |
-   | `flip`        | pancake                                               |
+   | Role          | Ingredients                                                                                                                                                                                                                                                                        |
+   | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `chop`        | carrot, pepperoni, strawberry, banana, celery, tomato, onion, cucumber, sushi-roll, pickle                                                                                                                                                                                         |
+   | `crack`       | egg                                                                                                                                                                                                                                                                                |
+   | `pour`        | flour, milk, sugar, pasta-water, sunset-splash, cream                                                                                                                                                                                                                              |
+   | `vessel`      | pot, mixing-bowl, rice-pan, fruit-bowl                                                                                                                                                                                                                                             |
+   | `stirred`     | soup, batter, cupcake-batter, cookie-dough, cheese-sauce, cheese-cream, fruit-salad, lobster-shells, rice, taco-meat, spaghetti-sauce                                                                                                                                              |
+   | `shaker`      | salt, black-pepper, taco-spice                                                                                                                                                                                                                                                     |
+   | `seasoned`    | soup, pecorino, taco-meat, spaghetti-sauce                                                                                                                                                                                                                                         |
+   | `sauceBase`   | pizza, omelette, nori, sundae-glass                                                                                                                                                                                                                                                |
+   | `spread`      | tomato-sauce, ketchup, sushi-rice, chocolate-sauce                                                                                                                                                                                                                                 |
+   | `toppingBase` | pizza, casserole, fruit-bowl, taco-shell, spaghetti-plate, cupcake, sundae-glass, cookie-dough, nori                                                                                                                                                                               |
+   | `topping`     | pepperoni, mushroom, pineapple, olive, pepper, tomato, breadcrumbs, macaroni, blueberry, kiwi, mint, lettuce, shredded-cheese, avocado, meatball, basil, whipped-cream, sprinkles, cherry, candy-heart, star-cutter, heart-cutter, bunny-cutter, cucumber, carrot-stick, egg-strip |
+   | `bake`        | pizza, casserole, cupcake-tray, cookies                                                                                                                                                                                                                                            |
+   | `flip`        | pancake, omelette, patty                                                                                                                                                                                                                                                           |
+   | `grate`       | cheddar, pecorino                                                                                                                                                                                                                                                                  |
+   | `tossed`      | spaghetti                                                                                                                                                                                                                                                                          |
+   | `blender`     | blender                                                                                                                                                                                                                                                                            |
+   | `blended`     | smoothie, bisque                                                                                                                                                                                                                                                                   |
+   | `scoop`       | strawberry-scoop, vanilla-scoop, mint-scoop                                                                                                                                                                                                                                        |
+   | `stack`       | bun, patty, cheese-slice, pickle, lettuce-leaf, tomato-slice, strawberry-scoop, vanilla-scoop, mint-scoop                                                                                                                                                                          |
+   | `stackBase`   | burger-plate, sundae-glass                                                                                                                                                                                                                                                         |
+   | `rollOut`     | cookie-dough                                                                                                                                                                                                                                                                       |
+   | `rollUp`      | sushi-roll                                                                                                                                                                                                                                                                         |
 
    Anything missing (cupcake batter, a taco shell, sprinkles) is a new
    ingredient file: see below. `dishes/pizza.ts` is a good one to copy.
@@ -233,6 +283,15 @@ here. What each one draws (all in scene units, see "The scene" below):
 | `toppingBase` (`steps/top.ts`) | `area`: where it sits ({ x, y, rx, ry }; spots are picked inside). `draw(g, { toppings, t, round })`: at `area`, with these `{ id, x, y }` toppings on. `splash`: landing colours.                        |
 | `topping` (`steps/top.ts`)     | `draw(g)`: one piece at the origin, about 26 across. `faceY?`: where the face goes when it floats; `ring?`: a ring (the face goes on a sign).                                                             |
 | `bake` (`steps/bake.ts`)       | `draw(g, { x, y, level, baking, t, round })`: on the oven rack centred on (x, y), ~200×70 (the window is 270×150). `level`: 0 raw, `GOLDEN` (0.7) just right, 1 crispy.                                   |
+| `grate` (`steps/grate.ts`)     | `drawBlock(g, left, rubbing)`: the block, ~110×70, bottom-centre on the origin. `shreds`: [light, main] colours for the pile.                                                                             |
+| `tossed` (`steps/toss.ts`)     | `draw(g, { x, y, r, t, lumps, tossing })`: the food in the pan; `lumps` cartoon lumps when too hot.                                                                                                       |
+| `blender` (`steps/blend.ts`)   | `jar { bottom, top, height }`, `drawBase(g, { whirr, t, done })`, `drawJar(g, { whirr, t })`.                                                                                                             |
+| `blended` (`steps/blend.ts`)   | Colours only: `chunks[]`, `chunky`, `smooth`, `light`.                                                                                                                                                    |
+| `scoop` (`steps/scoop.ts`)     | `drawBall(g, r, mood)`: the scoop, radius r. `tub`, `top`, `meter` colours. `drawScoopBall` helps.                                                                                                        |
+| `stack` (`steps/stack.ts`)     | `size(top)`: `{ w, h }`. `draw(g, { top, mood, t })`: bottom-centre on the origin; `top` for the last layer.                                                                                              |
+| `stackBase` (`steps/stack.ts`) | `top`: height of the first layer. `draw(g, t)`, and `drawFront?(g, t)` for a glass rim in front.                                                                                                          |
+| `rollOut` (`steps/roll.ts`)    | The dough, drawn growing toward its dotted outline.                                                                                                                                                       |
+| `rollUp` (`steps/roll.ts`)     | The filling and roll, drawn rolling up the mat.                                                                                                                                                           |
 | `flip` (`steps/flip.ts`)       | `drawInPan(g, { up, flipping })`: at the origin, ~200×90 (the step squashes it to turn it). `drawOnPlate(g, x, y, share)`: one on the stack, 15 apart. `garnish?(g, x, y)`.                               |
 
 Things to know:
