@@ -16,9 +16,9 @@ function fillingColor(id: string): [string, string] {
   return [CUKE.flesh, CUKE.skin];
 }
 
-/** The fillings to show in a slice: this round's, or one of each. */
+/** The fillings to show in a slice: every one this round put on, or one of each. */
 export function sliceFillings(round: KitchenState | null): string[] {
-  const ids = [...new Set(fillingsIn(round).map((spot) => spot.id))];
+  const ids = fillingsIn(round).map((spot) => spot.id);
   return ids.length > 0 ? ids : ['cucumber', 'carrot-stick', 'egg-strip'];
 }
 

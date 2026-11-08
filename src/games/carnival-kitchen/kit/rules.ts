@@ -92,15 +92,16 @@ export function currentTurn(round: KitchenState): Turn {
 }
 
 /**
- * The last step of this kind in the round's recipe, or undefined. For art
- * that shows an earlier step's work, such as the toppings in the oven.
+ * The latest step of this kind cooked so far (the one being cooked
+ * included), or undefined. For art that shows an earlier step's work, such
+ * as the toppings in the oven; a later repeat of the kind doesn't count.
  * Type it with the step's exported options and state types.
  */
 export function findStep<S = unknown, O extends StepBasics = StepBasics>(
   round: KitchenState,
   kind: string,
 ): StepRun<O, S> | undefined {
-  for (let i = round.steps.length - 1; i >= 0; i--) {
+  for (let i = Math.min(round.stepIndex, round.steps.length - 1); i >= 0; i--) {
     if (round.steps[i].kind === kind) return round.steps[i] as StepRun<O, S>;
   }
   return undefined;

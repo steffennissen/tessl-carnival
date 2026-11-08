@@ -304,7 +304,10 @@ Things to know:
   const K = palette({ shellEdge: '#f0dcc6' });
   ```
 
-  That's the only place a colour code goes outside `art.ts`. Pick soft,
+  That's the only place a colour code goes outside `art.ts`. (This game has
+  its own pastel palette instead of the carnival theme, an exception to house
+  rule 3 explained under "Notes" below; `palette` keeps those colours in
+  one sanctioned place per file.) Pick soft,
   bright colours that sit with the rest. (`rgba(...)` strings for see-through
   white or ink, as the existing art uses, are fine.)
 

@@ -23,6 +23,7 @@ import {
   POUR_SPEED,
   accuracy,
   circleTurns,
+  findStep,
   gradeFor,
   listOf,
   type CircleState,
@@ -128,6 +129,25 @@ describe('carnival kitchen', () => {
       ]);
       expect(hints(pancakes)[2]).toEqual(['Hold and draw', 'circles in the bowl!']);
       expect(hints(pizza)[1]).toEqual(['Hold and draw', 'circles on the pizza!']);
+    });
+
+    it('finds the latest step of a kind cooked so far, not a later repeat', () => {
+      const dish: Dish = {
+        id: 'repeat',
+        name: 'Repeat',
+        steps: [
+          { kind: 'crack', item: 'egg' },
+          { kind: 'pour', pours: ['milk'] },
+          { kind: 'crack', item: 'egg' },
+        ],
+        draw() {},
+      };
+      const state = createState(dish, seeded());
+      state.stepIndex = 1;
+      expect(findStep(state, 'crack')).toBe(state.steps[0]);
+      state.stepIndex = 2;
+      expect(findStep(state, 'crack')).toBe(state.steps[2]);
+      expect(findStep(state, 'bake')).toBeUndefined();
     });
 
     it('picks dishes at random, never the same one twice in a row', () => {
