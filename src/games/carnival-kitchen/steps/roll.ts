@@ -370,6 +370,44 @@ function drawUpDownArrows(g: G, t: number, x: number, y: number) {
   }
 }
 
+/**
+ * A flat bamboo mat from above, from x0 to x1 and y0 down to `bottom`, tied
+ * with pink string. `onTop` draws what lies on it, clipped to the mat. For
+ * ingredients that sit on the mat before it's rolled, such as sushi's nori.
+ */
+export function drawBambooMat(
+  g: G,
+  x0: number,
+  y0: number,
+  x1: number,
+  bottom: number,
+  onTop?: () => void,
+) {
+  rounded(g, x0, y0, x1 - x0, bottom - y0, 10);
+  fillStroke(g, horizontal(g, x0, x1, [K.bambooDark, K.bamboo, K.bambooLight, K.bamboo]), 3.5);
+  g.save();
+  rounded(g, x0, y0, x1 - x0, bottom - y0, 10);
+  g.clip();
+  g.strokeStyle = 'rgba(91, 59, 79, 0.25)';
+  g.lineWidth = 2;
+  for (let sy = y0 + 13; sy < bottom; sy += 13) {
+    g.beginPath();
+    g.moveTo(x0, sy);
+    g.lineTo(x1, sy);
+    g.stroke();
+  }
+  onTop?.();
+  g.restore();
+  g.strokeStyle = C.hotPink;
+  g.lineWidth = 2.5;
+  for (const sx of [x0 + 10, x1 - 10]) {
+    g.beginPath();
+    g.moveTo(sx, y0 + 2);
+    g.lineTo(sx, bottom);
+    g.stroke();
+  }
+}
+
 function drawMat(view: StepView<RollOptions, RollState, RollFx>) {
   const { g, t, state: s, options, pointer, taking, round } = view;
   const art = artOf(options.item, 'rollUp');
@@ -380,33 +418,11 @@ function drawMat(view: StepView<RollOptions, RollState, RollFx>) {
   const logY = y1 - r * 0.6 - rolled * (y1 - y0 - 70);
   const flatBottom = logY;
 
-  shadow(g, 400, y1 + 14, (x1 - x0) / 2 + 20, 12);
-  // The flat part of the mat: bamboo slats tied with string.
+  // The flat part of the mat, with the sheet on top cut off where it's rolled up.
   if (flatBottom > y0 + 4) {
-    rounded(g, x0, y0, x1 - x0, flatBottom - y0, 10);
-    fillStroke(g, horizontal(g, x0, x1, [K.bambooDark, K.bamboo, K.bambooLight, K.bamboo]), 3.5);
-    g.save();
-    rounded(g, x0, y0, x1 - x0, flatBottom - y0, 10);
-    g.clip();
-    g.strokeStyle = 'rgba(91, 59, 79, 0.25)';
-    g.lineWidth = 2;
-    for (let sy = y0 + 13; sy < flatBottom; sy += 13) {
-      g.beginPath();
-      g.moveTo(x0, sy);
-      g.lineTo(x1, sy);
-      g.stroke();
-    }
-    // The sheet on top, cut off where it's rolled up.
-    art.drawSheet(g, { x0: x0 + 22, y0: y0 + 16, x1: x1 - 22, y1: y1 - 16, t, round });
-    g.restore();
-    g.strokeStyle = C.hotPink;
-    g.lineWidth = 2.5;
-    for (const sx of [x0 + 10, x1 - 10]) {
-      g.beginPath();
-      g.moveTo(sx, y0 + 2);
-      g.lineTo(sx, flatBottom);
-      g.stroke();
-    }
+    drawBambooMat(g, x0, y0, x1, flatBottom, () =>
+      art.drawSheet(g, { x0: x0 + 22, y0: y0 + 16, x1: x1 - 22, y1: y1 - 16, t, round }),
+    );
   }
 
   // The roll: the mat wrapped round it, the sushi showing at each end.
@@ -439,7 +455,7 @@ function drawMat(view: StepView<RollOptions, RollState, RollFx>) {
     art.drawEnd(g, 0, 0, r * 0.95);
     g.restore();
   }
-  if (rolled > 0.15) face(g, 400, logY + 2, 0.55 + rolled * 0.35, s.done ? 'joy' : 'happy');
+  if (rolled > 0.15) face(g, 400, logY + 2, 0.7 + rolled * 0.5, s.done ? 'joy' : 'happy');
 
   // Arrows up the mat, and a finger pushing up while nobody's holding.
   if (taking && !s.done) {

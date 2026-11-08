@@ -6,6 +6,7 @@ import {
   DOUGH,
   DOUGH_DISTANCE,
   DOUGH_REACH,
+  MAT_DISTANCE,
   ROLL_STEP_MAX,
   ROLL_TIME,
   rollGain,
@@ -25,6 +26,15 @@ function rollDough(state: ReturnType<typeof ready>, pixels: number) {
     move(state, DOUGH.x, y);
   }
   release(state);
+}
+
+/** Pushes the mat up `pixels` in strokes from the bottom, lifting between strokes. */
+function pushMat(state: ReturnType<typeof ready>, pixels: number) {
+  for (let done = 0; done < pixels;) {
+    press(state, 400, 400);
+    for (let y = 400; y > 200 && done < pixels; y -= 10, done += 10) move(state, 400, y - 10);
+    release(state);
+  }
 }
 
 describe('roll', () => {
@@ -76,8 +86,37 @@ describe('roll', () => {
     });
   });
 
+  describe('mat', () => {
+    it('rolls up with upward drags, and down drags just do not count', () => {
+      const state = ready('sushi-rolls', 'roll');
+      press(state, 400, 400);
+      move(state, 400, 350);
+      expect(pin(state).rolled).toBeCloseTo(50 / MAT_DISTANCE);
+      move(state, 400, 400);
+      move(state, 450, 400);
+      expect(pin(state).rolled).toBeCloseTo(50 / MAT_DISTANCE);
+      expect(rollGain('mat', { x: 400, y: 400 }, 380, 380)).toBeCloseTo(20 / MAT_DISTANCE);
+    });
+
+    it('scores 100 for rolling it straight away, and moves on', () => {
+      const state = ready('sushi-rolls', 'roll');
+      const index = state.stepIndex;
+      pushMat(state, MAT_DISTANCE + 20);
+      expect(state.scores[index]).toBe(100);
+      expect(currentKind(state)).toBe('chop');
+    });
+
+    it('scores up to 50 for how far it got when time runs out', () => {
+      const state = ready('sushi-rolls', 'roll');
+      const index = state.stepIndex;
+      pushMat(state, MAT_DISTANCE * 0.6);
+      for (let t = 0; t <= ROLL_TIME; t += 0.1) tick(state, 0.1);
+      expect(state.scores[index]).toBe(30);
+    });
+  });
+
   it('draws both ways, on a wide and a tall screen, to the end', () => {
-    for (const id of ['sugar-cookies']) {
+    for (const id of ['sugar-cookies', 'sushi-rolls']) {
       for (const shape of ['page', 'tall'] as const) {
         const state = createState(dishById(id), seeded(3));
         const memory = new Map();
