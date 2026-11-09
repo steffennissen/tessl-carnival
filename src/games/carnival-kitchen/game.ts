@@ -28,6 +28,14 @@ import {
   type Visit,
 } from './customers';
 import {
+  moveSurprise,
+  planSurprise,
+  pressSurprise,
+  releaseSurprise,
+  settleSurprise,
+  tickSurprise,
+} from './chaos';
+import {
   createDecor,
   decorMove,
   decorPlaces,
@@ -45,6 +53,7 @@ import {
   onGear,
   saveSetting,
   withSetting,
+  type GrownupSettings,
 } from './grownups';
 import {
   CARD_SKIP_AFTER,
@@ -60,7 +69,6 @@ import {
   startTime,
   type Dish,
   type KitchenState,
-  type LearnSettings,
   type Pointer,
   type RoundPlan,
 } from './kit';
@@ -254,12 +262,17 @@ function taking(state: KitchenState): boolean {
  */
 export function press(state: KitchenState, x: number, y: number, shape?: Shape): boolean {
   if (!taking(state)) return true;
-  return stepOf(currentKind(state)).press?.({ ...currentTurn(state), shape }, x, y) !== false;
+  // A kitchen surprise (chaos/) that's on takes the tap: the step waits.
+  if (pressSurprise(state, x, y, shape)) return true;
+  const pressed = stepOf(currentKind(state)).press?.({ ...currentTurn(state), shape }, x, y);
+  settleSurprise(state);
+  return pressed !== false;
 }
 
 /** Moves the held-down pointer to (x, y): stirring, mostly. */
 export function move(state: KitchenState, x: number, y: number, shape?: Shape): void {
   if (!taking(state)) return;
+  if (moveSurprise(state, x, y, shape)) return;
   stepOf(currentKind(state)).move?.({ ...currentTurn(state), shape }, x, y);
 }
 
@@ -270,8 +283,12 @@ export function move(state: KitchenState, x: number, y: number, shape?: Shape): 
  * canvas's, for steps whose buttons are bigger on a phone.
  */
 export function release(state: KitchenState, shape?: Shape): number | 'not yet' | null {
-  if (!taking(state)) return null;
-  return stepOf(currentKind(state)).release?.({ ...currentTurn(state), shape }) ?? null;
+  // A surprise hears every let-go (so it knows nobody's holding on), and takes it while it's on.
+  const surprised = releaseSurprise(state);
+  if (!taking(state) || surprised) return null;
+  const released = stepOf(currentKind(state)).release?.({ ...currentTurn(state), shape }) ?? null;
+  settleSurprise(state);
+  return released;
 }
 
 /**
@@ -285,6 +302,7 @@ export function cancel(state: KitchenState, shape?: Shape): number | 'not yet' |
   const held = currentRun(state).state as { holding?: unknown } | null;
   if (held && typeof held === 'object' && held.holding === true) {
     held.holding = false;
+    releaseSurprise(state);
     return null;
   }
   return release(state, shape);
@@ -301,9 +319,13 @@ export function tick(state: KitchenState, dt: number): void {
     // Read it myself: the card waits at CARD_HOLD until it's tapped or read out.
     const waits = state.learn.settings.readMyself && state.banner >= CARD_HOLD;
     state.banner = Math.max(waits ? CARD_HOLD : 0, state.banner - dt);
+    tickSurprise(state, dt);
     return;
   }
+  // While a kitchen surprise is on, the step waits: no timer runs, no meter fills.
+  if (tickSurprise(state, dt)) return;
   stepOf(currentKind(state)).update?.(currentTurn(state), dt);
+  settleSurprise(state);
 }
 
 export const carnivalKitchen: CarnivalGame = {
@@ -439,9 +461,11 @@ export const carnivalKitchen: CarnivalGame = {
     // opens from it; the kitchen is where the cooking (and decorating) is.
     let screen: 'title' | 'book' | 'grownups' | 'kitchen' | 'shop' | 'ceremony' = 'title';
     // The grown-ups' settings, remembered between visits.
-    let settings: LearnSettings = loadSettings();
+    let settings: GrownupSettings = loadSettings();
     // The last round's learning activity, so the next one is different.
     let lastActivity: string | null = null;
+    // Rounds started this visit: the first never has a kitchen surprise.
+    let rounds = 0;
     // Seconds the grown-ups' gear has been held on the title screen, or null.
     let gearHeld: number | null = null;
     // The dish spinner is showing which dish was picked. The round waits,
@@ -564,6 +588,8 @@ export const carnivalKitchen: CarnivalGame = {
       // An order ticket comes from the guest, and "the customer pays" is them paying.
       const steps = visit ? withGuest(plan.steps, visit.guest) : plan.steps;
       state = createState(dish, Math.random, { ...plan, steps });
+      planSurprise(state, Math.random, { round: rounds, on: settings.surprises });
+      rounds += 1;
       scoreRecorded = false;
       decor = createDecor();
       sticker = null;
@@ -816,6 +842,9 @@ export const carnivalKitchen: CarnivalGame = {
     const onMove = (event: PointerEvent) => {
       if (activePointer !== null && event.pointerId !== activePointer) return;
       track(event);
+      // The mouse moving without a press still steers a surprise (the sprinkle bowl).
+      if (!pointer.down && screen === 'kitchen' && !spinning)
+        moveSurprise(state, pointer.x, pointer.y);
       if (!pointer.down) return;
       if (decorating()) decorMove(decor, pointer.x, pointer.y);
       else move(state, pointer.x, pointer.y, layout.shape);
