@@ -75,9 +75,10 @@ A round goes like this:
    learning moment answered on her own adds a **Smart Chef** badge. If the dish earned its first sticker, or more stars
    than its sticker had, a badge says **New sticker!** or **Sticker
    upgraded!** after the stars, and Chef Bunny says so too. After a short
-   pause, tap **Cook again!** for another dish, never the same one twice in a
-   row, picked on the spinner again (after the rank ceremony, if the round
-   made her rank go up).
+   pause, tap **Home 🏠** to go back to the title screen (after the rank
+   ceremony, if the round made her rank go up), where she picks what's next:
+   **Tap to cook!** for another dish (never the same one twice in a row), the
+   recipe book, the shop or a cook-off.
 
 While you cook, a badge shows the dish you're making: its finished picture
 and its name. On the page it sits in the strip above the recipe; on a phone
@@ -263,9 +264,9 @@ cap).
   (`trophy:king`, `trophy:dragon`, `trophy:grandma`), its level how many
   times it was won; it and the bonus are given once per boss visit
   (`claimTrophy`). A trophy is worth 3 chef points, so it can bring a new
-  rank: its ceremony comes after the trophy, before the next visit, and
-  never in the middle of a boss's three dishes. A tap then starts the next
-  visit.
+  rank: its ceremony comes after the trophy, before the title screen, and
+  never in the middle of a boss's three dishes. Then it's back to the title
+  screen.
 - **The trophy shelf** in the recipe book shows each boss's golden trophy
   ("×2" when won more than once), or a grey "?" for one not won yet: at the
   top left of the page beside the title, or along the bottom on a phone held
@@ -410,11 +411,11 @@ and Master Chef once most of the book is cooked well with a few Smart Chef
 marks: days, not weeks. The title screen's badge shows the rank and a bar to
 the next one.
 
-**The ceremony.** When her rank has gone up, the next **Tap to cook!** or
-**Cook again!** starts a ceremony before the round: a drumroll, then the rank
+**The ceremony.** When her rank has gone up, the end card's **Home 🏠** (or
+the next **Tap to cook!**) starts a ceremony first: a drumroll, then the rank
 on a ribbon ("Sous Chef!"), Chef Bunny bowing as her new hat drops onto her
 head, confetti, and "You're a Sous Chef now!" out loud, then a card with the
-new kitchen. Once it's all shown (about 4.5 seconds), a tap goes on to cook.
+new kitchen. Once it's all shown (about 4.5 seconds), a tap goes on.
 The new hat goes on and the new kitchen goes up straight away; the shop
 changes them back. The last rank celebrated is saved (the `rank-celebrated`
 preference), so each rank's ceremony happens once, and jumping two ranks at
@@ -821,12 +822,13 @@ checks, Chef Bunny lays out the fewest coins and counts them on.
 
 **Find the ingredient** (`activities/find-word.ts`: phonics and sight
 words) fits dishes that use an ingredient from its word bank for sure.
-Just before the step that uses it, "Tap the CHEESE!": three jars with a word
-on each label and a "?" where the picture goes, so it takes reading, not
-matching pictures. Once she's found it the pictures pop in, and the step
-that uses it comes next ("Grate the cheese!"). The voice only ever says
-"Find the word!" by itself, never the word: tapping 🔊 reads "Tap the
-cheese!", and hearing it counts as help (a right answer then carries on
+Just before the step that uses it, a card shows its picture (🧀) and asks
+"Which jar says this?": three jars with a word on each label and a "?" where
+the picture goes, so it takes reading the words, not matching letters or
+pictures. The word itself is never on the card. Once she's found it the
+pictures pop in, and the step that uses it comes next ("Grate the cheese!").
+The voice only ever says "Which jar says this?" by itself, never the word:
+tapping 🔊 reads "Tap the cheese!", and hearing it counts as help (a right answer then carries on
 without the bonus or the Smart Chef star; nothing is taken away). A wrong
 jar greys out with a hint about the letters ("Look at the letters: find ch
 and ee!").
@@ -960,7 +962,7 @@ An activity is one new file, `activities/<id>.ts`, and usually that's all.
    up), 2 to 4 short `choices` with the `answer`'s index, a two-line `hint`
    for after a wrong try, and the `help` Chef Bunny says when she shows it.
    `layout: 'row'` puts the answers in a row under the question instead of
-   beside a picture (for words, such as "Tap the CHEESE"). An `ask` step's
+   beside a picture (for words, such as the jars to find a word in). An `ask` step's
    picture is the step before it, as it was left; `picture: 'none'` leaves
    it out, and `tag` puts a sticker on it ("+5 🍄").
 4. **A step of its own**, when a question isn't enough: a step file with

@@ -94,13 +94,19 @@ describe('buttons a finger taps on a phone', () => {
   const phones = [
     ['tall', 390, 844],
     ['wide', 844, 390],
+    // iPads: about 4:3, so there's little kitchen beside or above the scene.
+    ['wide', 1180, 820],
+    ['wide', 1024, 768],
+    ['tall', 820, 1180],
   ] as const;
 
   for (const [shape, w, h] of phones) {
     const layout = layoutFor(w, h, true);
-    const scale = cssScale(shape);
+    // CSS pixels per canvas unit on this screen.
+    const scale = Math.min(w / layout.width, h / layout.height);
+    it(`is ${shape} at ${w}×${h}`, () => expect(layout.shape).toBe(shape));
 
-    it(`makes 🏠 and 🔊 at least 60 CSS pixels and well apart, ${shape}`, () => {
+    it(`makes 🏠 and 🔊 at least 60 CSS pixels and well apart, ${shape} ${w}×${h}`, () => {
       const p = placesFor(layout);
       const { home, sound, buttonR } = p;
       expect(home).not.toBeNull();
@@ -117,7 +123,7 @@ describe('buttons a finger taps on a phone', () => {
       ).toBeGreaterThanOrEqual(15);
     });
 
-    it(`asks "Leave the kitchen?" with ✓ and ✕ at least 60 CSS pixels, ${shape}`, () => {
+    it(`asks "Leave the kitchen?" with ✓ and ✕ at least 60 CSS pixels, ${shape} ${w}×${h}`, () => {
       const card = leavePlaces(layout);
       for (const b of [card.yes, card.no]) {
         expect(b.r * 2 * scale).toBeGreaterThanOrEqual(60);
@@ -130,7 +136,7 @@ describe('buttons a finger taps on a phone', () => {
       expect(card.no.x - card.yes.x - card.yes.r - card.no.r).toBeGreaterThan(20);
     });
 
-    it(`makes the book's and the grown-ups' buttons at least 60 CSS pixels, ${shape}`, () => {
+    it(`makes the book's and the grown-ups' buttons at least 60 CSS pixels, ${shape} ${w}×${h}`, () => {
       const close = closeButton(layout);
       expect(close.r * 2 * scale).toBeGreaterThanOrEqual(60);
       expect(close.x + close.r).toBeLessThanOrEqual(layout.width);

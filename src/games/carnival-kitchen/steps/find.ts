@@ -36,14 +36,15 @@ import {
 } from '../kit';
 
 /**
- * Find: "Tap the CHEESE!" before a step that uses it. Three jars, each with
- * a word on its label and its picture hidden under a "?", so finding the
- * right one takes reading, not matching a picture. Once she's found it, the
- * pictures pop in. A learning step (see "Learning" in the README), woven in
- * by activities/find-word.ts.
+ * Find: before a step that uses cheese, a picture of cheese and "Which jar
+ * says this?". Three jars, each with a word on its label and its picture
+ * hidden under a "?", so finding the right one takes reading the words, not
+ * matching letters or pictures. Once she's found it, the pictures pop in. A
+ * learning step (see "Learning" in the README), woven in by
+ * activities/find-word.ts.
  *
- * The voice only says "Find the word!", never the word itself, unless she
- * taps 🔊: then it reads "Tap the cheese!". Hearing it is a hint, so a right
+ * The word itself is never written on the card, and the voice never says it
+ * by itself, unless she taps 🔊: then it reads "Tap the cheese!". Hearing it is a hint, so a right
  * answer after it carries on without the Smart Chef bonus. Nothing to fail:
  * a wrong jar greys out with a hint about its letters, and after two Chef
  * Bunny shows the right one.
@@ -51,10 +52,12 @@ import {
 
 export interface FindOptions extends StepBasics {
   kind: 'find';
-  /** The word to find, its jar labels and answer. `question.text` is "Tap the CHEESE!". */
+  /** The jar labels and answer. `question.text` is "Which jar says this?": never the word. */
   question: Question;
   /** The word to find, as it's said when 🔊 is tapped. */
   word: string;
+  /** The word's picture (an emoji), on the card beside the question. */
+  picture: string;
   /** Each jar's picture (an emoji), shown once she's found the word. */
   pictures: string[];
 }
@@ -65,8 +68,21 @@ declare module '../kit/types' {
   }
 }
 
-/** What the voice says by itself: never the word. */
-export const FIND_SAY = 'Find the word!';
+/** What the card says, and the voice by itself: never the word. */
+export const FIND_SAY = 'Which jar says this?';
+
+/**
+ * The question card, split in two: the question, and a card beside it at
+ * the right with the word's picture.
+ */
+export function findCards(shape: Shape = 'page'): { question: Box; picture: Box } {
+  const { bubble } = quizPlaces(shape);
+  const side = bubble.h;
+  return {
+    question: { ...bubble, w: bubble.w - side - 10 },
+    picture: { x: bubble.x + bubble.w - side, y: bubble.y, w: side, h: side },
+  };
+}
 /** Seconds a right answer is cheered before the step moves on. */
 const OUTRO = 1.8;
 
@@ -250,14 +266,20 @@ const find: Step<FindOptions, FindState, AnswerFx> = {
   draw({ g, t, state: s, options, fx, taking, shape }) {
     if (!taking && s.age === 0) return;
     const q = s.question;
-    const { bubble, speaker } = quizPlaces(shape);
-    const mid = middleOf(bubble);
+    const { speaker } = quizPlaces(shape);
+    const cards = findCards(shape);
+    const mid = middleOf(cards.question);
     const appear = easeOutBack(clamp01(s.age / 0.4));
     g.save();
     g.translate(mid.x, mid.y);
     g.scale(appear, appear);
     g.translate(-mid.x, -mid.y);
-    drawQuestion(g, q.text, bubble, speaker, fx.reading, t);
+    drawQuestion(g, q.text, cards.question, speaker, fx.reading, t);
+    const pic = cards.picture;
+    rounded(g, pic.x, pic.y, pic.w, pic.h, 22);
+    fillStroke(g, C.white, 4, C.hotPink);
+    g.fillStyle = C.ink;
+    emoji(g, options.picture, pic.x + pic.w / 2, pic.y + pic.h / 2 + 2, pic.h * 0.62);
     g.restore();
     const boxes = jarBoxes(q.choices.length, shape);
     boxes.forEach((b, i) => {

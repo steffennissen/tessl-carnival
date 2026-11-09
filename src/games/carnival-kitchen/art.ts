@@ -213,7 +213,18 @@ export function face(g: G, x: number, y: number, s: number, mood: Mood) {
   g.restore();
 }
 
-/** Chunky sticker text: an ink edge, a white outline and a bright fill. */
+/**
+ * The outlines around sticker text, as parts of the text size. They're kept
+ * thin enough that neighbouring letters' outlines don't run together, and the
+ * letters are spaced a little apart where the browser can.
+ */
+export const STICKER_EDGE = { ink: 0.2, white: 0.1, whiteFillInk: 0.16, spacing: 0.05 } as const;
+
+/**
+ * Chunky sticker text: an ink edge, a white outline and a bright fill. White
+ * text gets only the ink edge: a white outline on white letters would just
+ * make them fatter, and fill in the holes of letters like "o".
+ */
 export function stickerText(
   g: G,
   text: string,
@@ -224,24 +235,34 @@ export function stickerText(
   align: CanvasTextAlign = 'center',
   maxWidth = Infinity,
 ) {
+  const spaced = 'letterSpacing' in g;
+  const space = (s: number) => {
+    if (spaced) g.letterSpacing = `${(s * STICKER_EDGE.spacing).toFixed(2)}px`;
+  };
   g.font = font(size);
+  space(size);
   // Too wide for its space (a long dish name): shrink it to fit.
   const wide = g.measureText(text).width + size * 0.3;
   if (wide > maxWidth) {
     size *= maxWidth / wide;
     g.font = font(size);
+    space(size);
   }
+  const whiteFill = fill === C.white;
   g.textAlign = align;
   g.textBaseline = 'middle';
   g.lineJoin = 'round';
-  g.lineWidth = size * 0.3;
+  g.lineWidth = size * (whiteFill ? STICKER_EDGE.whiteFillInk : STICKER_EDGE.ink);
   g.strokeStyle = C.ink;
   g.strokeText(text, x, y);
-  g.lineWidth = size * 0.17;
-  g.strokeStyle = C.white;
-  g.strokeText(text, x, y);
+  if (!whiteFill) {
+    g.lineWidth = size * STICKER_EDGE.white;
+    g.strokeStyle = C.white;
+    g.strokeText(text, x, y);
+  }
   g.fillStyle = fill;
   g.fillText(text, x, y);
+  if (spaced) g.letterSpacing = '0px';
 }
 
 export function plainText(
