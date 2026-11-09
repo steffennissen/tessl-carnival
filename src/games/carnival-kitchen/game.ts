@@ -840,8 +840,17 @@ export const carnivalKitchen: CarnivalGame = {
     };
 
     /**
+     * Back to the title screen, where she picks what's next: cook, the book,
+     * the shop or a cook-off.
+     */
+    const goHome = () => {
+      visit = null;
+      screen = 'title';
+    };
+
+    /**
      * After a dish's end card: the boss's next dish, their trophy, or (a new
-     * rank's ceremony first, if one is due) a new visit. The ceremony never
+     * rank's ceremony first, if one is due) back to the title screen. The ceremony never
      * comes in the middle of a boss's visit.
      */
     const afterRound = () => {
@@ -859,7 +868,7 @@ export const carnivalKitchen: CarnivalGame = {
         }
         showStage('trophy', before);
       } else {
-        celebrateOr(() => newRound());
+        celebrateOr(goHome);
       }
     };
 
@@ -1149,8 +1158,8 @@ export const carnivalKitchen: CarnivalGame = {
         if (renderer.stageDone()) {
           const shown = staging;
           staging = null;
-          // After the trophy, a new rank's ceremony if one is due, then the next visit.
-          if (shown === 'trophy') celebrateOr(() => newRound());
+          // After the trophy, a new rank's ceremony if one is due, then home.
+          if (shown === 'trophy') celebrateOr(goHome);
         }
       } else {
         // A card being read out by its speaker stays up until it's done, then

@@ -419,9 +419,10 @@ describe('start', () => {
     const earn = vi.mocked(carnival.earnCoins);
     expect(earn).toHaveBeenCalledTimes(1);
     expect(carnival.stickersFor(id)[dish.id]).toBeGreaterThanOrEqual(1);
-    // Decorating (it times out), serving and the end card; then a tap: the
-    // rank's ceremony, before the next customer.
+    // Decorating (it times out), serving and the end card with its Home
+    // button; then a tap: the rank's ceremony, then home to the title screen.
     p.run(30);
+    expect(p.texts).toContain('Home 🏠');
     p.tap(...p.scene(400, 250));
     p.texts.length = 0;
     p.run(2.5);
@@ -431,6 +432,13 @@ describe('start', () => {
     p.tap(p.layout.width / 2, p.layout.height / 2);
     p.texts.length = 0;
     p.run(7);
+    // The title screen, not a new customer: she picks what's next.
+    expect(p.texts).toContain('Tap to cook!');
+    expect(p.texts.some((text) => text.startsWith("Hi! I'm"))).toBe(false);
+    // Tap to cook: the next customer.
+    p.tap(p.layout.width / 2, p.layout.height / 2);
+    p.texts.length = 0;
+    p.run(10);
     expect(p.texts.some((text) => text.startsWith("Hi! I'm"))).toBe(true);
     expect(earn).toHaveBeenCalledTimes(1);
     stop();

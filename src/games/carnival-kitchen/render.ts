@@ -1519,7 +1519,7 @@ export function createRenderer(ctx: G, voice: Sound) {
         ? 'Next dish! 🍽️'
         : stand?.next === 'trophy'
           ? 'Trophy time! 🏆'
-          : 'Cook again! 🔁';
+          : 'Home 🏠';
 
     const pulse = 1 + Math.sin(t * 4) * 0.04;
     g.save();
@@ -2424,7 +2424,7 @@ export function createRenderer(ctx: G, voice: Sound) {
         g.scale(pulse, pulse);
         rounded(g, -b.w / 2, -b.h / 2, b.w, b.h, b.h / 2);
         fillStroke(g, vertical(g, -b.h / 2, b.h / 2, [C.cabinetLight, C.mint]), 4);
-        plainText(g, 'Cook again! 🔁', 0, 1, 24, C.ink);
+        plainText(g, 'Home 🏠', 0, 1, 24, C.ink);
         g.restore();
       }
     });
@@ -2950,7 +2950,7 @@ export function createRenderer(ctx: G, voice: Sound) {
         g.save();
         g.translate(cx, tall ? layout.height * 0.92 : layout.height - 30);
         g.scale(pulse, pulse);
-        stickerText(g, 'Tap to cook! 🔁', 0, 0, tall ? 30 : 22, C.white);
+        stickerText(g, 'Tap to go on! ✨', 0, 0, tall ? 30 : 22, C.white);
         g.restore();
       }
     });
