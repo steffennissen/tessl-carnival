@@ -11,7 +11,7 @@ const milk: Ingredient = {
 
   pour: {
     stream: 'rgba(255, 255, 255, 0.95)',
-    meter: [C.sky, C.white],
+    meter: [C.skyDark, C.sky],
     color: C.white,
     liquid: true,
     /** A milk jug with a spout and a handle. */

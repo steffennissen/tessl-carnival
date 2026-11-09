@@ -1,5 +1,5 @@
 import { preferencesFor, savePreference } from '../../carnival';
-import type { Box } from './book';
+import { closeButton, type Box } from './book';
 import { settingsFrom, type LearnSettings } from './kit';
 import type { Layout } from './layout';
 
@@ -88,22 +88,22 @@ export function grownupPlaces(layout: Layout) {
   const left = (width - cw) / 2;
   const rows = SETTING_ROWS.map((row, i) => {
     if (tall) {
-      const top = 150 + i * 200;
-      const control: Box = { x: left, y: top + 88, w: cw, h: 72 };
+      const top = 150 + i * 205;
+      const control: Box = { x: left, y: top + 88, w: cw, h: 94 };
       return { row, label: { x: left, y: top + 22 }, note: { x: left, y: top + 58 }, control };
     }
     const top = 86 + i * 110;
-    const control: Box = { x: left + cw - 300, y: top + 18, w: 300, h: 64 };
+    const control: Box = { x: left + cw - 300, y: top + 10, w: 300, h: 80 };
     return { row, label: { x: left, y: top + 32 }, note: { x: left, y: top + 66 }, control };
   });
   const done: Box = tall
-    ? { x: width / 2 - 120, y: 150 + 3 * 200 + 10, w: 240, h: 66 }
-    : { x: width / 2 - 100, y: Math.min(height - 72, 424), w: 200, h: 54 };
+    ? { x: width / 2 - 120, y: 150 + 3 * 205 + 4, w: 240, h: 94 }
+    : { x: width / 2 - 110, y: Math.min(height - 96, 406), w: 220, h: 80 };
   return {
     page,
     tall,
     title: { x: width / 2, y: tall ? 78 : 46 },
-    close: { x: width - 52, y: 52, r: 30 },
+    close: closeButton(layout),
     noteWidth: tall ? cw : cw - 320,
     rows,
     done,

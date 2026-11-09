@@ -130,10 +130,15 @@ describe('the kitchen clock', () => {
       [390, 844, true],
       [600, 900, true],
       [1024, 768, true],
+      // A narrow computer window fills it too.
+      [500, 900, true],
+      [500, 780, true],
     ] as const) {
       const layout = layoutFor(w, h, full);
       const p = placesFor(layout);
-      const { x, y, r } = p.clock;
+      const { x, y } = p.clock;
+      // As big as it grows while its hands move, with its rim.
+      const r = p.clock.r * 1.08 + 4;
       expect(x - r).toBeGreaterThanOrEqual(0);
       expect(x + r).toBeLessThanOrEqual(layout.width);
       expect(y - r).toBeGreaterThanOrEqual(0);

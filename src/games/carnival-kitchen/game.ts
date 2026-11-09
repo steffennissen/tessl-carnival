@@ -45,6 +45,9 @@ import { stepOf } from './steps';
 
 const { width: WIDTH, height: HEIGHT } = theme.canvas;
 
+/** The most canvas pixels per CSS pixel, whatever the screen's density. */
+export const MOST_PIXELS = 2;
+
 /**
  * The round: which dish, its steps, the score, and passing the pointer and
  * the clock to the step being cooked. Each kind of step is its own file in
@@ -103,6 +106,29 @@ export function isLearning(state: KitchenState, index: number): boolean {
 /** The indices of the round's cooking steps: the recipe along the top, and its step numbers. */
 export function cookingSteps(state: KitchenState): number[] {
   return state.steps.flatMap((_, i) => (isLearning(state, i) ? [] : [i]));
+}
+
+/**
+ * In "Read it myself" mode a step's card waits with this many seconds left
+ * until it's tapped (or read out by its speaker), so it never closes under
+ * her finger while she's still reading. Let go, it closes in this long.
+ */
+export const CARD_HOLD = 1;
+
+/**
+ * Lets a waiting "Read it myself" card go: it closes by itself in a moment.
+ * Used once its speaker has finished reading it out.
+ */
+export function releaseCard(state: KitchenState): void {
+  if (state.banner > 0) state.banner = Math.min(state.banner, CARD_HOLD - 1e-3);
+}
+
+/**
+ * Keeps a "Read it myself" card up while its speaker reads it, closing a
+ * moment after the reading ends (see `releaseCard`).
+ */
+export function holdCard(state: KitchenState): void {
+  if (state.banner > 0) state.banner = Math.max(state.banner, CARD_HOLD - 1e-3);
 }
 
 /**
@@ -203,6 +229,22 @@ export function release(state: KitchenState, shape?: Shape): number | 'not yet' 
   return stepOf(currentKind(state)).release?.({ ...currentTurn(state), shape }) ?? null;
 }
 
+/**
+ * A gesture the browser took away (pointercancel: a system swipe, a call):
+ * a hold (pouring, shaking, baking) just stops, scoring nothing and using
+ * nothing up; anything else lets go as `release` does, so a dragged card or
+ * treat is put down.
+ */
+export function cancel(state: KitchenState, shape?: Shape): number | 'not yet' | null {
+  if (!taking(state)) return null;
+  const held = currentRun(state).state as { holding?: unknown } | null;
+  if (held && typeof held === 'object' && held.holding === true) {
+    held.holding = false;
+    return null;
+  }
+  return release(state, shape);
+}
+
 /** Advances the game by `dt` seconds. */
 export function tick(state: KitchenState, dt: number): void {
   if (state.feedback) {
@@ -211,7 +253,9 @@ export function tick(state: KitchenState, dt: number): void {
   }
   if (state.phase !== 'playing') return;
   if (state.banner > 0) {
-    state.banner = Math.max(0, state.banner - dt);
+    // Read it myself: the card waits at CARD_HOLD until it's tapped or read out.
+    const waits = state.learn.settings.readMyself && state.banner >= CARD_HOLD;
+    state.banner = Math.max(waits ? CARD_HOLD : 0, state.banner - dt);
     return;
   }
   stepOf(currentKind(state)).update?.(currentTurn(state), dt);
@@ -232,6 +276,12 @@ export const carnivalKitchen: CarnivalGame = {
     // open a menu. On a phone or tablet the canvas also covers the whole
     // screen. All of it is put back when the game stops.
     const canvasStyle = canvas.style.cssText;
+    // What the canvas is, for a screen reader.
+    const label = canvas.getAttribute('aria-label');
+    canvas.setAttribute(
+      'aria-label',
+      'Carnival Kitchen: cook a surprise dish step by step with Chef Bunny. Tap, hold and drag to chop, pour, stir and bake.',
+    );
     const bodyOverflow = document.body.style.overflow;
     const touchStyle = () => {
       canvas.style.touchAction = 'none';
@@ -308,11 +358,14 @@ export const carnivalKitchen: CarnivalGame = {
         touchStyle();
         document.body.style.overflow = bodyOverflow;
       }
-      // Canvas pixels per unit: as many as the screen shows, up to 3.
+      // Canvas pixels per unit: as many as the screen shows, but at most 2
+      // per CSS pixel (and 3 per unit). A 3× phone at full density would mean
+      // over twice the pixels to paint every frame, for art that looks the same.
       const shown = full
         ? Math.min(viewWidth / next.width, viewHeight / next.height)
         : canvas.getBoundingClientRect().width / next.width || 1;
-      const pixels = Math.min(3, Math.max(1, shown * (window.devicePixelRatio || 1)));
+      const density = Math.min(MOST_PIXELS, window.devicePixelRatio || 1);
+      const pixels = Math.min(3, Math.max(1, shown * density));
       const width = Math.round(next.width * pixels);
       const height = Math.round(next.height * pixels);
       if (sameLayout(layout, next) && canvas.width === width && canvas.height === height) return;
@@ -349,7 +402,7 @@ export const carnivalKitchen: CarnivalGame = {
     const renderer = createRenderer(ctx, sound);
 
     // The finger (or mouse) that's holding the spoon or the shaker. Other
-    // fingers moving or lifting don't touch its gesture; a new tap takes over.
+    // fingers pressing, moving or lifting don't touch its gesture.
     let activePointer: number | null = null;
 
     /**
@@ -418,9 +471,16 @@ export const carnivalKitchen: CarnivalGame = {
     };
     const onDown = (event: PointerEvent) => {
       event.preventDefault();
+      // A second finger while one is down is ignored: the first keeps its gesture.
+      if (activePointer !== null && event.pointerId !== activePointer) return;
       const at = track(event);
       sound.unlock();
       enterFullScreen();
+      if (renderer.leaveAsked()) {
+        // "Leave the kitchen?": ✓ goes back to the midway, anything else stays.
+        if (renderer.leaveTap(at.x, at.y) === 'leave') location.hash = '#/';
+        return;
+      }
       if (screen === 'book') {
         tapBook(at.x, at.y);
         return;
@@ -438,7 +498,8 @@ export const carnivalKitchen: CarnivalGame = {
         return;
       }
       if (renderer.hitHomeButton(at.x, at.y)) {
-        location.hash = '#/';
+        // A stray tap on 🏠 mustn't end the round: it asks first.
+        renderer.askLeave();
         return;
       }
       if (renderer.hitSoundButton(at.x, at.y)) {
@@ -520,6 +581,9 @@ export const carnivalKitchen: CarnivalGame = {
         if (did === 'place') renderer.sparkle(pointer.x, pointer.y);
         if (did === 'select' || did === 'unselect') sound.pop();
         if (did === 'remove') sound.whoosh();
+      } else if (event.type === 'pointercancel') {
+        // Taken away by the browser: a pour or a bake just stops, unscored.
+        cancel(state, layout.shape);
       } else if (release(state, layout.shape) === 'not yet') {
         renderer.notYet(pointer.x, pointer.y);
       }
@@ -534,12 +598,16 @@ export const carnivalKitchen: CarnivalGame = {
 
     let frame = 0;
     let last = performance.now();
+    // Whether the step card was being read out by its speaker last frame.
+    let wasReading = false;
     const loop = (time: number) => {
       // Cap the step so a background tab doesn't teleport everything.
       const dt = Math.min((time - last) / 1000, 0.05);
       last = time;
+      // While "Leave the kitchen?" is asked, the round waits.
+      const paused = renderer.leaveAsked();
       if (screen === 'title') {
-        if (gearHeld !== null) {
+        if (gearHeld !== null && !paused) {
           gearHeld += dt;
           if (gearHeld >= GEAR_HOLD) {
             gearHeld = null;
@@ -557,11 +625,17 @@ export const carnivalKitchen: CarnivalGame = {
         renderer.drawSpin(dt);
         if (renderer.spinDone()) spinning = false;
       } else {
-        // A card being read out by its speaker stays up until it's done.
-        if (renderer.cardReading() && state.banner > 0) state.banner = Math.max(state.banner, 0.5);
-        tick(state, dt);
-        saveScore();
-        if (decorating()) decorTick(decor, dt);
+        // A card being read out by its speaker stays up until it's done, then
+        // a moment more.
+        const reading = renderer.cardReading();
+        if (reading) holdCard(state);
+        else if (wasReading) releaseCard(state);
+        wasReading = reading;
+        if (!paused) {
+          tick(state, dt);
+          saveScore();
+          if (decorating()) decorTick(decor, dt);
+        }
         renderer.draw(state, pointer, dt, { decor, sticker, smart });
       }
       frame = requestAnimationFrame(loop);
@@ -574,6 +648,8 @@ export const carnivalKitchen: CarnivalGame = {
       sound.close();
       canvas.style.cssText = canvasStyle;
       document.body.style.overflow = bodyOverflow;
+      if (label === null) canvas.removeAttribute('aria-label');
+      else canvas.setAttribute('aria-label', label);
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);

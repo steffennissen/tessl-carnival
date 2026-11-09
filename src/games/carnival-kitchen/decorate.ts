@@ -68,6 +68,8 @@ export interface DecorPlaces {
   /** Where the dish sits in the scene, and how big it's drawn. */
   dish: { x: number; y: number; scale: number };
   title: { x: number; y: number };
+  /** How wide the title may be. */
+  titleW: number;
   /** Behind it all: a soft cloth on the counter. */
   panel: { x: number; y: number; w: number; h: number };
   /** The tray: one spot per treat in DECORATIONS, and its size. */
@@ -85,20 +87,36 @@ export interface DecorPlaces {
  * sits in the middle with the tray below it and "Done!" below that.
  */
 export function decorPlaces(shape: Shape): DecorPlaces {
+  // On a phone the treats and Done! are at least 60 CSS pixels across.
   if (shape === 'tall') {
     return {
-      dish: { x: 400, y: 280, scale: 1.3 },
-      title: { x: 400, y: 132 },
-      panel: { x: 112, y: 92, w: 576, h: 456 },
-      tray: DECORATIONS.map((_, i) => ({ x: 400 + (i - 2.5) * 80, y: 440 })),
-      trayRadius: 32,
-      trayTop: 405,
-      done: { x: 400, y: 512, w: 180, h: 58 },
+      dish: { x: 400, y: 240, scale: 1.1 },
+      title: { x: 400, y: 128 },
+      titleW: 520,
+      panel: { x: 104, y: 92, w: 592, h: 456 },
+      tray: DECORATIONS.map((_, i) => ({ x: 400 + (i - 2.5) * 96, y: 380 })),
+      trayRadius: 47,
+      trayTop: 330,
+      done: { x: 400, y: 482, w: 240, h: 94 },
+    };
+  }
+  if (shape === 'wide') {
+    // Held sideways: the tray spans the cloth, and Done! waits at the top right.
+    return {
+      dish: { x: 506, y: 245, scale: 1.2 },
+      title: { x: 420, y: 100 },
+      titleW: 300,
+      panel: { x: 222, y: 50, w: 568, h: 440 },
+      tray: DECORATIONS.map((_, i) => ({ x: 506 + (i - 2.5) * 82, y: 410 })),
+      trayRadius: 39,
+      trayTop: 366,
+      done: { x: 708, y: 100, w: 140, h: 80 },
     };
   }
   return {
     dish: { x: 500, y: 240, scale: 1.3 },
     title: { x: 500, y: 100 },
+    titleW: 502,
     panel: { x: 222, y: 60, w: 562, h: 420 },
     tray: DECORATIONS.map((_, i) => ({ x: 445 + (i - 2.5) * 70, y: 420 })),
     trayRadius: 30,
@@ -116,12 +134,18 @@ export function decorTaking(d: DecorState): boolean {
   return !d.done && d.age >= DECOR_WAIT;
 }
 
-/** The tray treat under a scene point, if any. */
+/** The tray treat under a scene point, if any: the nearest one in reach. */
 export function trayAt(places: DecorPlaces, x: number, y: number): DecorationKind | null {
-  const i = places.tray.findIndex(
-    (spot) => Math.hypot(x - spot.x, y - spot.y) <= places.trayRadius + 6,
-  );
-  return i < 0 ? null : DECORATIONS[i];
+  let best = -1;
+  let nearest = places.trayRadius + 6;
+  places.tray.forEach((spot, i) => {
+    const d = Math.hypot(x - spot.x, y - spot.y);
+    if (d <= nearest) {
+      nearest = d;
+      best = i;
+    }
+  });
+  return best < 0 ? null : DECORATIONS[best];
 }
 
 export function hitDone(places: DecorPlaces, x: number, y: number): boolean {

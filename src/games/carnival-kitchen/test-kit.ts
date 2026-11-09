@@ -1,7 +1,7 @@
 import type { G } from './art';
 import { layoutFor, type Shape } from './layout';
 import { dishById } from './dishes';
-import { createState, move, press, release, tick } from './game';
+import { createState, move, press, release, skipCard, tick } from './game';
 import {
   BANNER_TIME,
   CIRCLE,
@@ -90,6 +90,8 @@ export function playThrough(state: KitchenState, each: (dt: number) => void = ()
   for (let go = 0; state.phase === 'playing' && go < 3000; go++) {
     if (state.banner > 0) {
       tick(state, state.banner);
+      // A "Read it myself" card waits to be tapped.
+      skipCard(state);
       each(1 / 60);
       continue;
     }

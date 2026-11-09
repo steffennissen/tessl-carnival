@@ -4,7 +4,9 @@ import { dishById } from './dishes';
 import { createState } from './game';
 import { plainPlan } from './kit';
 import { layoutFor } from './layout';
-import { cardSpeakerAt, placesFor, recipeVeiled } from './render';
+import { closeButton } from './book';
+import { grownupPlaces, optionBoxes } from './grownups';
+import { badgeNameSize, cardSpeakerAt, leavePlaces, placesFor, recipeVeiled } from './render';
 import { cssScale, nextStep, playThrough, seeded } from './test-kit';
 
 interface Box {
@@ -40,11 +42,12 @@ describe('the badge of the dish being made', () => {
       expect(badge.x + badge.w).toBeLessThanOrEqual(layout.width);
       expect(badge.y + badge.h).toBeLessThanOrEqual(layout.height);
 
+      const r = places.buttonR + 4;
       const button = (spot: { x: number; y: number }) => ({
-        x: spot.x - 28,
-        y: spot.y - 28,
-        w: 56,
-        h: 56,
+        x: spot.x - r,
+        y: spot.y - r,
+        w: 2 * r,
+        h: 2 * r,
       });
       const blocked: Box[] = [
         button(places.sound),
@@ -85,4 +88,63 @@ describe('the recipe along the top', () => {
     expect(state.phase).not.toBe('playing');
     expect(recipeVeiled(state)).toBe(false);
   });
+});
+
+describe('buttons a finger taps on a phone', () => {
+  const phones = [
+    ['tall', 390, 844],
+    ['wide', 844, 390],
+  ] as const;
+
+  for (const [shape, w, h] of phones) {
+    const layout = layoutFor(w, h, true);
+    const scale = cssScale(shape);
+
+    it(`makes 🏠 and 🔊 at least 60 CSS pixels and well apart, ${shape}`, () => {
+      const p = placesFor(layout);
+      const { home, sound, buttonR } = p;
+      expect(home).not.toBeNull();
+      if (!home) return;
+      expect(buttonR * 2 * scale).toBeGreaterThanOrEqual(60);
+      for (const b of [home, sound]) {
+        expect(b.x - buttonR).toBeGreaterThanOrEqual(0);
+        expect(b.y - buttonR).toBeGreaterThanOrEqual(0);
+        expect(b.x + buttonR).toBeLessThanOrEqual(layout.width);
+      }
+      // At least 15 CSS pixels of gap between them.
+      expect(
+        (Math.hypot(home.x - sound.x, home.y - sound.y) - 2 * buttonR) * scale,
+      ).toBeGreaterThanOrEqual(15);
+    });
+
+    it(`asks "Leave the kitchen?" with ✓ and ✕ at least 60 CSS pixels, ${shape}`, () => {
+      const card = leavePlaces(layout);
+      for (const b of [card.yes, card.no]) {
+        expect(b.r * 2 * scale).toBeGreaterThanOrEqual(60);
+        expect(b.x - b.r).toBeGreaterThanOrEqual(card.box.x);
+        expect(b.x + b.r).toBeLessThanOrEqual(card.box.x + card.box.w);
+        expect(b.y + b.r).toBeLessThanOrEqual(card.box.y + card.box.h);
+      }
+      expect(card.box.x).toBeGreaterThanOrEqual(0);
+      expect(card.box.x + card.box.w).toBeLessThanOrEqual(layout.width);
+      expect(card.no.x - card.yes.x - card.yes.r - card.no.r).toBeGreaterThan(20);
+    });
+
+    it(`makes the book's and the grown-ups' buttons at least 60 CSS pixels, ${shape}`, () => {
+      const close = closeButton(layout);
+      expect(close.r * 2 * scale).toBeGreaterThanOrEqual(60);
+      expect(close.x + close.r).toBeLessThanOrEqual(layout.width);
+      expect(close.y - close.r).toBeGreaterThanOrEqual(0);
+      const g = grownupPlaces(layout);
+      for (const b of [...g.rows.flatMap((r) => optionBoxes(r.control)), g.done]) {
+        expect(b.w * scale).toBeGreaterThanOrEqual(60);
+        expect(b.h * scale).toBeGreaterThanOrEqual(60);
+      }
+    });
+
+    it(`writes the dish's name on its badge at about 14 CSS pixels or more, ${shape}`, () => {
+      const { badge } = placesFor(layout);
+      if (badge.h >= 100) expect(badgeNameSize(badge.w) * scale).toBeGreaterThanOrEqual(14);
+    });
+  }
 });

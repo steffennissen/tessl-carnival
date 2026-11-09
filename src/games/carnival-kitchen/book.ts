@@ -87,6 +87,15 @@ export function gridFor(area: Box, count: number): { cells: Box[]; scale: number
   return { cells, scale };
 }
 
+/**
+ * The ✕ that closes a page (the book, the grown-ups' page): in the top right
+ * corner, at least 60 CSS pixels across on a phone.
+ */
+export function closeButton(layout: Layout): { x: number; y: number; r: number } {
+  const r = layout.shape === 'tall' ? 50 : layout.shape === 'wide' ? 42 : 30;
+  return { x: layout.width - 14 - r, y: 14 + r, r };
+}
+
 /** Where the book's parts go on the canvas, for a layout. */
 export function bookPlaces(layout: Layout, count: number) {
   const { width, height } = layout;
@@ -98,7 +107,7 @@ export function bookPlaces(layout: Layout, count: number) {
     page,
     title: { x: width / 2, y: tall ? 62 : 46 },
     count: { x: width / 2, y: tall ? 114 : 86 },
-    close: { x: width - 52, y: 52, r: 30 },
+    close: closeButton(layout),
     ...gridFor(area, count),
   };
 }
