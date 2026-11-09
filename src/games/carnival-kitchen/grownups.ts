@@ -49,9 +49,14 @@ export function saveSetting<K extends keyof GrownupSettings>(
   savePreference(GAME, key, value);
 }
 
-/** The gear on the title screen, in the bottom right corner. */
+/**
+ * The gear on the title screen, in the bottom right corner: at least 60 CSS
+ * pixels across on a phone, so a grown-up's thumb finds it easily (it still
+ * has to be held).
+ */
 export function gearFor(layout: Layout): { x: number; y: number; r: number } {
-  if (layout.shape === 'tall') return { x: layout.width - 46, y: layout.height - 46, r: 24 };
+  if (layout.shape === 'tall') return { x: layout.width - 62, y: layout.height - 62, r: 48 };
+  if (layout.shape === 'wide') return { x: layout.width - 52, y: layout.height - 52, r: 40 };
   return { x: layout.width - 40, y: layout.height - 40, r: 22 };
 }
 

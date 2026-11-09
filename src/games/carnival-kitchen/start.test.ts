@@ -6,6 +6,9 @@ import { gearFor } from './grownups';
 import { layoutFor } from './layout';
 import { leavePlaces, placesFor } from './render';
 import { carnivalKitchen } from './game';
+import { loadCelebrated } from './ranks';
+import { shopPlaces, titlePlaces } from './shop';
+import { itemsOn } from './wardrobe';
 
 /**
  * The game's `start`, run without a browser: a pretend window, document and
@@ -250,5 +253,76 @@ describe('start', () => {
     p.tap(card.yes.x, card.yes.y);
     expect(p.location.hash).toBe('#/');
     stop();
+  });
+
+  it('buys a crown in the shop with taps, asking first', () => {
+    carnival.earnCoins('carnival-kitchen', 200);
+    const before = carnival.coinsFor('carnival-kitchen');
+    const p = phone();
+    const stop = carnivalKitchen.start(p.canvas as unknown as HTMLCanvasElement);
+    p.run(0.2);
+    const button = titlePlaces(p.layout).shop;
+    p.tap(button.x + button.w / 2, button.y + button.h / 2);
+    p.texts.length = 0;
+    p.run(0.2);
+    expect(p.texts).toContain('🛍️ Shop');
+    const shop = shopPlaces(p.layout);
+    const cell = shop.grid.cells[itemsOn('hats').findIndex((i) => i.id === 'crown')];
+    p.tap(cell.x + cell.w / 2, cell.y + cell.h / 2);
+    p.texts.length = 0;
+    p.run(0.2);
+    expect(p.texts).toContain('Buy the Crown?');
+    expect(carnival.coinsFor('carnival-kitchen')).toBe(before);
+    p.tap(shop.yes.x, shop.yes.y);
+    expect(carnival.coinsFor('carnival-kitchen')).toBe(before - 60);
+    expect(carnival.stickersFor('carnival-kitchen')['own:crown']).toBe(1);
+    expect(carnival.preferencesFor('carnival-kitchen')['wear-hat']).toBe('crown');
+    p.texts.length = 0;
+    p.run(0.2);
+    expect(p.texts).toContain('✓ On');
+    // ✕ goes back to the title screen.
+    p.tap(shop.close.x, shop.close.y);
+    p.texts.length = 0;
+    p.run(0.2);
+    expect(p.texts).toContain('Tap to cook!');
+    stop();
+  });
+
+  it('celebrates a new rank once, before cooking', () => {
+    carnival.earnSticker('carnival-kitchen', 'pizza', 3);
+    carnival.earnSticker('carnival-kitchen', 'soup', 2);
+    expect(loadCelebrated()).toBe(0);
+    const p = phone();
+    const stop = carnivalKitchen.start(p.canvas as unknown as HTMLCanvasElement);
+    p.run(0.2);
+    p.tap(p.layout.width / 2, p.layout.height / 2);
+    p.texts.length = 0;
+    p.run(0.5);
+    expect(p.texts).toContain('Drumroll...');
+    p.texts.length = 0;
+    p.run(2);
+    expect(p.texts).toContain('⭐ Junior Chef!');
+    expect(loadCelebrated()).toBe(1);
+    expect(carnival.preferencesFor('carnival-kitchen')['wear-kitchen']).toBe('candy');
+    // A tap too soon does nothing; once it's all shown, a tap goes on to cook.
+    p.tap(p.layout.width / 2, p.layout.height / 2);
+    p.run(3);
+    p.texts.length = 0;
+    p.run(0.1);
+    expect(p.texts).toContain('⭐ Junior Chef!');
+    p.tap(p.layout.width / 2, p.layout.height / 2);
+    p.texts.length = 0;
+    p.run(0.3);
+    expect(p.texts).not.toContain('⭐ Junior Chef!');
+    stop();
+    // Next time, no ceremony: straight to the dish spinner.
+    const again = phone();
+    const stop2 = carnivalKitchen.start(again.canvas as unknown as HTMLCanvasElement);
+    again.run(0.2);
+    again.tap(again.layout.width / 2, again.layout.height / 2);
+    again.texts.length = 0;
+    again.run(0.5);
+    expect(again.texts).not.toContain('Drumroll...');
+    stop2();
   });
 });

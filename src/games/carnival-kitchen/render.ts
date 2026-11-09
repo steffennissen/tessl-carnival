@@ -81,6 +81,38 @@ import { type Layout, type Shape, layoutFor } from './layout';
 import { NOTE, type Reading, type Sound } from './sound';
 import { SPINNER_DISH, SPIN_TIME, drawSpinner, reelPosition, spinEnd, spinTime } from './spinner';
 import { hintOf, iconOf, stepOf, titleOf } from './steps';
+import { type KitchenLook, drawDecorIcon, drawKitchen, sameKitchen } from './kitchens';
+import { drawApron, drawHatIcon } from './outfit-art';
+import {
+  RANKS,
+  bookDishes,
+  openDishes,
+  rankLine,
+  rankProgress,
+  rewardsFor,
+  surpriseHint,
+  surpriseUnlocked,
+} from './ranks';
+import {
+  type ShopEvent,
+  type ShopPlaces,
+  type ShopState,
+  previewOutfit,
+  shopPlaces,
+  titlePlaces,
+} from './shop';
+import {
+  DEFAULT_OUTFIT,
+  type Item,
+  type Outfit,
+  TABS,
+  canAfford,
+  itemById,
+  itemsOn,
+  lockedByRank,
+  owns,
+  saveUpLine,
+} from './wardrobe';
 
 /**
  * Drawing for Carnival Kitchen: sticker-style art with soft ink outlines,
@@ -173,9 +205,17 @@ export function placesFor(layout: Layout) {
         : { x: sx + W / 2 - 165, y: sy + 4, w: 330, h: 40 };
   // The kitchen clock: beside the scene at the right when there's room
   // (the badge is at the left), or on the wall where the shelf would be.
+  // Beside the scene it's as big as fits (overlapping the scene's edge a
+  // little, where only the wall is), so its numbers are about 11 CSS pixels
+  // on a phone held sideways.
+  const besideR = Math.min(72, (sx + 28) / 2 - 4);
   const clock =
     side >= 110
-      ? { x: sx + W + sx / 2, y: sy + 200, r: Math.min(72, sx / 2 - 16) }
+      ? {
+          x: Math.min(sx + W + sx / 2, width - (besideR * 1.06 + 2) - 6),
+          y: sy + 200,
+          r: besideR,
+        }
       : { x: sx + 742, y: sy + 196, r: 42 };
   // On a phone held sideways the buttons are 60 CSS pixels: home in the top
   // left corner, and the sound in the top right one when there's room
@@ -258,176 +298,26 @@ function tallClock(width: number, height: number, bunnyY: number) {
   return { x, y, r };
 }
 
+/** What the title screen shows about her: her coins and chef points. */
+export interface TitleInfo {
+  coins: number;
+  points: number;
+}
+
+/** What the shop needs to show: her coins, stickers, rank and outfit. */
+export interface ShopInfo {
+  coins: number;
+  stickers: Record<string, number>;
+  rank: number;
+  outfit: Outfit;
+}
+
 /** What the end of a round shows besides the round: decorating, and sticker news. */
 export interface RoundEnd {
   decor: DecorState;
   sticker: StickerNews;
   /** Whether the round earned its dish's Smart Chef star. */
   smart: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// The kitchen behind everything, drawn once
-
-/**
- * The kitchen, filling a canvas of any layout. The counter lines up with the
- * scene's counter, and the window and shelf sit where the scene expects them.
- */
-function drawKitchen(g: G, layout: Layout) {
-  const { width, height, sceneX } = layout;
-  const counter = layout.sceneY + 338;
-
-  // Wall, with a pattern of dots and little hearts.
-  g.fillStyle = vertical(g, 0, counter + 2, [C.wallTop, C.wallBottom]);
-  g.fillRect(0, 0, width, counter + 2);
-  const rows = Math.floor((counter - 86) / 36) + 1;
-  const cols = Math.ceil(width / 40) + 1;
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const x = col * 40 + (row % 2) * 20;
-      const y = 60 + row * 36;
-      if ((row + col) % 3 === 0) {
-        g.fillStyle = 'rgba(255, 95, 162, 0.13)';
-        heartPath(g, x, y, 6);
-        g.fill();
-      } else {
-        g.fillStyle = 'rgba(255, 255, 255, 0.7)';
-        circle(g, x, y, 2.6);
-        g.fill();
-      }
-    }
-  }
-
-  // A window with a sunny sky, at the scene's left (or the canvas's, if the
-  // scene is wider than the canvas).
-  g.save();
-  g.translate(Math.max(0, sceneX), counter - 338);
-  rounded(g, 26, 112, 150, 108, 18);
-  fillStroke(g, C.white);
-  rounded(g, 36, 122, 130, 88, 12);
-  fillStroke(g, vertical(g, 122, 210, [C.sky, C.skyLight]), 3);
-  g.fillStyle = C.butter;
-  circle(g, 140, 146, 14);
-  g.fill();
-  g.fillStyle = C.white;
-  for (const [x, y, r] of [
-    [62, 160, 11],
-    [76, 154, 14],
-    [92, 162, 10],
-    [100, 190, 8],
-    [112, 186, 11],
-    [124, 192, 8],
-  ]) {
-    circle(g, x, y, r);
-    g.fill();
-  }
-  g.strokeStyle = C.white;
-  g.lineWidth = 6;
-  g.beginPath();
-  g.moveTo(101, 122);
-  g.lineTo(101, 210);
-  g.moveTo(36, 166);
-  g.lineTo(166, 166);
-  g.stroke();
-  for (const side of [-1, 1]) {
-    const x = side < 0 ? 22 : 180;
-    g.beginPath();
-    g.moveTo(x, 104);
-    g.lineTo(x + side * -46, 104);
-    g.quadraticCurveTo(x + side * -18, 150, x + side * -6, 226);
-    g.lineTo(x, 226);
-    g.closePath();
-    fillStroke(g, C.pink, 3.5);
-  }
-  rounded(g, 12, 98, 178, 12, 6);
-  fillStroke(g, C.hotPink, 3.5);
-  g.restore();
-
-  // A shelf with jars and a little plant, at the scene's right, unless the
-  // kitchen clock hangs there. A tall canvas leaves it out: the meters and
-  // the plate stand there.
-  if (placesFor(layout).shelf) drawShelf(g, sceneX, counter - 338);
-
-  // The counter top and the cabinets below it.
-  g.fillStyle = vertical(g, counter, counter + 92, [C.counterTop, C.cream]);
-  g.fillRect(0, counter, width, 92);
-  g.strokeStyle = C.ink;
-  g.lineWidth = 4;
-  g.beginPath();
-  g.moveTo(0, counter);
-  g.lineTo(width, counter);
-  g.stroke();
-  rounded(g, -10, counter + 86, width + 20, 16, 8);
-  fillStroke(g, C.counterEdge);
-  g.fillStyle = C.cabinet;
-  g.fillRect(0, counter + 102, width, height - counter - 102);
-  const doors = Math.max(1, Math.round(width / 197));
-  const left = (width - (doors * 197 - 16)) / 2;
-  for (let y = counter + 114; y < height; y += 84) {
-    for (let i = 0; i < doors; i++) {
-      const x = left + i * 197;
-      rounded(g, x, y, 181, 70, 14);
-      fillStroke(g, C.cabinetLight, 3.5);
-      heartPath(g, x + 90.5, y + 14, 6);
-      fillStroke(g, C.hotPink, 2.5);
-    }
-  }
-
-  // Bunting along the top.
-  const sag = (x: number) => 10 + Math.sin((Math.PI * x) / width) * 22;
-  g.strokeStyle = C.ink;
-  g.lineWidth = 2.5;
-  g.beginPath();
-  for (let x = 0; x <= width; x += 10) g.lineTo(x, sag(x));
-  g.stroke();
-  const flags = [C.hotPink, C.butter, C.mint, C.sky, C.lavender];
-  const count = Math.round((width - 25) / 47.5) + 1;
-  const step = (width - 50) / (count - 1);
-  for (let i = 0; i < count; i++) {
-    const x = 25 + i * step;
-    const y = sag(x);
-    g.beginPath();
-    g.moveTo(x - 17, y);
-    g.lineTo(x + 17, sag(x + 17));
-    g.lineTo(x, y + 32);
-    g.closePath();
-    fillStroke(g, flags[i % flags.length], 3);
-  }
-}
-
-function drawShelf(g: G, dx: number, dy: number) {
-  g.save();
-  g.translate(dx, dy);
-  rounded(g, 664, 198, 128, 14, 6);
-  fillStroke(g, C.wood, 3.5);
-  rounded(g, 676, 152, 34, 46, 10);
-  fillStroke(g, C.mint, 3.5);
-  rounded(g, 672, 144, 42, 12, 5);
-  fillStroke(g, C.hotPink, 3);
-  heartPath(g, 693, 175, 7);
-  fillStroke(g, C.white, 2);
-  rounded(g, 718, 162, 30, 36, 9);
-  fillStroke(g, C.butter, 3.5);
-  rounded(g, 715, 155, 36, 10, 5);
-  fillStroke(g, C.lavender, 3);
-  starPath(g, 733, 181, 7);
-  fillStroke(g, C.white, 2);
-  for (const [x, y, rot] of [
-    [764, 150, -0.6],
-    [776, 144, 0],
-    [788, 150, 0.6],
-  ]) {
-    oval(g, x, y, 6, 13, rot);
-    fillStroke(g, C.leaf, 3);
-  }
-  g.beginPath();
-  g.moveTo(760, 166);
-  g.lineTo(792, 166);
-  g.lineTo(787, 198);
-  g.lineTo(765, 198);
-  g.closePath();
-  fillStroke(g, C.hotPink, 3.5);
-  g.restore();
 }
 
 /**
@@ -660,6 +550,8 @@ export function createRenderer(ctx: G, voice: Sound) {
   /** Chatter waiting for the end of the frame, and how much had been said when it was asked for. */
   let waiting: { line: string; spoken: number; show: boolean } | null = null;
   let kitchen: HTMLCanvasElement | null = null;
+  /** What Chef Bunny wears and the kitchen shows (wardrobe.ts). */
+  let look: Outfit = { ...DEFAULT_OUTFIT };
   let layout = layoutFor(0, 0, false);
   let places = placesFor(layout);
   // Canvas pixels per canvas unit, so the art is sharp on high-density screens.
@@ -683,7 +575,7 @@ export function createRenderer(ctx: G, voice: Sound) {
 
   /** The kitchen behind everything, then the scene's offset for the rest. */
   function begin() {
-    if (!kitchen) kitchen = paintKitchen(layout, pixels);
+    if (!kitchen) kitchen = paintKitchen(layout, pixels, look);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(kitchen, 0, 0);
     ctx.setTransform(pixels, 0, 0, pixels, layout.sceneX * pixels, layout.sceneY * pixels);
@@ -703,17 +595,17 @@ export function createRenderer(ctx: G, voice: Sound) {
     return null;
   }
 
-  function bunny(mood?: BunnyMood, age?: number) {
+  /** Her pose right now, looking at what's going on from `at`. */
+  function poseAt(at: Spot, mood?: BunnyMood, age?: number): BunnyPose {
     const chef = fx.chef;
-    const at = places.bunny;
     const target = lookTarget();
-    const look = target ? gaze({ x: at.x, y: at.y + 4 }, target, 3.2) : { x: 0, y: 0.6 };
+    const aim = target ? gaze({ x: at.x, y: at.y + 4 }, target, 3.2) : { x: 0, y: 0.6 };
     const ease = Math.min(1, fx.dt * 10);
-    fx.look.x += (look.x - fx.look.x) * ease;
-    fx.look.y += (look.y - fx.look.y) * ease;
+    fx.look.x += (aim.x - fx.look.x) * ease;
+    fx.look.y += (aim.y - fx.look.y) * ease;
     // She leans toward the cooking: right, unless what she's looking at is left of her.
     const side = target && target.x < at.x - 20 ? -1 : 1;
-    const pose: BunnyPose = {
+    return {
       mood: mood ?? chef.mood,
       age: age ?? chef.moodAge,
       t: fx.time,
@@ -722,7 +614,12 @@ export function createRenderer(ctx: G, voice: Sound) {
       look: fx.look,
       lean: chef.lean * side,
     };
-    onCanvas(() => drawBunny(ctx, at, pose));
+  }
+
+  function bunny(mood?: BunnyMood, age?: number) {
+    const at = places.bunny;
+    const pose = poseAt(at, mood, age);
+    onCanvas(() => drawBunny(ctx, at, pose, look));
   }
 
   /**
@@ -803,6 +700,8 @@ export function createRenderer(ctx: G, voice: Sound) {
   /** The dish spinner while it runs (see spinner.ts), or null. */
   let spin: {
     dish: Dish;
+    /** The dishes on the reel: the ones a round can pick. */
+    dishes: Dish[];
     start: number;
     end: number;
     age: number;
@@ -1662,11 +1561,31 @@ export function createRenderer(ctx: G, voice: Sound) {
     stickerText(g, '?', x, y + 2 * s, 30 * s, C.lavender);
   }
 
+  /** A wrapped present with a "?", for the surprise dish's page. */
+  function drawPresent(g: G, x: number, y: number, s: number, hop: number) {
+    const top = y - hop;
+    rounded(g, x - 34 * s, top - 18 * s, 68 * s, 48 * s, 8 * s);
+    fillStroke(g, C.hotPink, 3);
+    rounded(g, x - 40 * s, top - 32 * s, 80 * s, 16 * s, 6 * s);
+    fillStroke(g, C.pink, 3);
+    g.fillStyle = C.butter;
+    g.fillRect(x - 6 * s, top - 32 * s, 12 * s, 62 * s);
+    for (const side of [-1, 1]) {
+      oval(g, x + side * 12 * s, top - 40 * s, 12 * s, 8 * s, side * 0.4);
+      fillStroke(g, C.butter, 2.5);
+    }
+    circle(g, x, top + 6 * s, 13 * s);
+    fillStroke(g, C.white, 2.5);
+    stickerText(g, '?', x, top + 7 * s, 22 * s, C.hotPink);
+  }
+
   function drawBookPage(stickers: Record<string, number>) {
     const g = ctx;
     const t = fx.time;
-    const b = bookPlaces(layout, DISHES.length);
+    const dishes = bookDishes();
+    const b = bookPlaces(layout, dishes.length);
     const tall = layout.shape === 'tall';
+    const unwrapped = surpriseUnlocked(stickers);
     dim(0.3);
     rounded(g, b.page.x, b.page.y, b.page.w, b.page.h, 32);
     fillStroke(g, C.cream, 5, C.hotPink);
@@ -1687,13 +1606,15 @@ export function createRenderer(ctx: G, voice: Sound) {
       'center',
       b.page.w - 2 * (b.close.r + 50),
     );
-    plainText(
-      g,
-      `📖 ${countLine(stickers, DISHES)}`,
+    // How many dishes, and how many more until the surprise.
+    const hint = surpriseHint(stickers);
+    fitted(
+      `📖 ${countLine(stickers, openDishes())}${hint ? ` · ${hint}` : ' · 🎂 Surprise unlocked!'}`,
       b.count.x,
       b.count.y,
       tall ? 26 : 20,
       C.purple,
+      b.page.w - 2 * (b.close.r + 30),
     );
 
     // Close: or tap anywhere that isn't a dish you've cooked.
@@ -1701,14 +1622,32 @@ export function createRenderer(ctx: G, voice: Sound) {
     fillStroke(g, C.white, 3.5);
     plainText(g, '✕', b.close.x, b.close.y + 1, b.close.r * 0.9, C.ink);
 
-    DISHES.forEach((dish, i) => {
+    dishes.forEach((dish, i) => {
       const cell: Box = b.cells[i];
       const s = b.scale;
       const cx = cell.x + cell.w / 2;
       const level = starsOf(stickers, dish.id);
+      const wrapped = !!dish.locked && !unwrapped;
       rounded(g, cell.x + 4, cell.y + 4, cell.w - 8, cell.h - 8, 18 * s);
-      fillStroke(g, level ? C.white : C.lavenderLight, 3, level ? C.ink : C.lavender);
-      if (level) {
+      fillStroke(
+        g,
+        level ? C.white : dish.locked ? C.butter : C.lavenderLight,
+        3,
+        level ? C.ink : dish.locked ? C.gold : C.lavender,
+      );
+      if (wrapped || (dish.locked && !level)) {
+        // The surprise: a present, wrapped until every other dish is cooked,
+        // then bouncing to be opened.
+        drawPresent(g, cx, cell.y + 56 * s, s, unwrapped ? Math.abs(Math.sin(t * 4)) * 6 * s : 0);
+        fitted(
+          unwrapped ? 'Tap me!' : 'Surprise!',
+          cx,
+          cell.y + 104 * s,
+          13 * s,
+          C.hotPink,
+          cell.w - 16,
+        );
+      } else if (level) {
         g.save();
         g.translate(cx, cell.y + 47 * s);
         g.scale(0.36 * s, 0.36 * s);
@@ -1788,7 +1727,11 @@ export function createRenderer(ctx: G, voice: Sound) {
     stickerText(g, 'Tap to cook!', 0, 2, 34, C.white);
     g.restore();
 
-    onCanvas(drawBookButton);
+    onCanvas(() => {
+      drawBookButton();
+      drawShopButton();
+      drawRankBadge();
+    });
   }
 
   /**
@@ -1865,6 +1808,531 @@ export function createRenderer(ctx: G, voice: Sound) {
     plainText(g, 'Done', d.x + d.w / 2, d.y + d.h / 2 + 1, 26, C.ink);
   }
 
+  // -------------------------------------------------------------------------
+  // The title screen's shop button and rank badge
+
+  /** What the title screen shows about her: coins and chef points. */
+  let titleInfo: TitleInfo = { coins: 0, points: 0 };
+
+  /** The shop button, with her coins on a little badge at its corner. */
+  function drawShopButton() {
+    const g = ctx;
+    const box = titlePlaces(layout).shop;
+    const wiggle = Math.sin(fx.time * 2.2 + 1) * 0.03;
+    g.save();
+    g.translate(box.x + box.w / 2, box.y + box.h / 2);
+    g.rotate(wiggle);
+    rounded(g, -box.w / 2, -box.h / 2, box.w, box.h, box.h / 2);
+    fillStroke(g, vertical(g, -box.h / 2, box.h / 2, [C.butter, C.gold]), 4);
+    g.fillStyle = C.ink;
+    const icon = Math.min(44, box.h * 0.5);
+    emoji(g, '🛍️', -box.w / 2 + box.h * 0.5, 2, icon);
+    stickerText(
+      g,
+      'Shop',
+      box.h * 0.32,
+      2,
+      Math.min(30, box.h * 0.4),
+      C.hotPink,
+      'center',
+      box.w - box.h,
+    );
+    // Her coins, on a little badge at its bottom corner.
+    const coins = String(titleInfo.coins);
+    const r = Math.min(20, box.h * 0.3);
+    g.font = font(r * 1.1);
+    const pill = Math.max(2 * r, g.measureText(coins).width + r * 2.6);
+    const px = box.w / 2 - pill + r * 0.6;
+    const py = box.h / 2 - r * 0.1;
+    rounded(g, px, py - r, pill, 2 * r, r);
+    fillStroke(g, C.white, 3);
+    drawCoin(g, px + r * 0.95, py, r * 0.72);
+    plainText(g, coins, px + r * 1.8 + (pill - r * 1.8) / 2 - r * 0.2, py + 1, r * 1.1, C.ink);
+    g.restore();
+  }
+
+  /** Her chef rank, with a bar of how far to the next one. */
+  function drawRankBadge() {
+    const g = ctx;
+    const box = titlePlaces(layout).rank;
+    const progress = rankProgress(titleInfo.points);
+    const rank = RANKS[progress.rank];
+    rounded(g, box.x, box.y, box.w, box.h, Math.min(30, box.h / 2));
+    fillStroke(g, vertical(g, box.y, box.y + box.h, [C.white, C.lavenderLight]), 3.5);
+    const r = box.h * 0.36;
+    const cx = box.x + box.h * 0.5;
+    const cy = box.y + box.h / 2;
+    circle(g, cx, cy, r);
+    fillStroke(g, vertical(g, cy - r, cy + r, [C.butter, C.gold]), 3);
+    g.fillStyle = C.ink;
+    emoji(g, rank.icon, cx, cy + 1, r * 1.15);
+    const left = cx + r + 10;
+    const right = box.x + box.w - 16;
+    const size = Math.min(26, box.h * 0.32);
+    stickerText(
+      g,
+      rank.name,
+      (left + right) / 2,
+      box.y + box.h * 0.34,
+      size,
+      C.purple,
+      'center',
+      right - left,
+    );
+    // The bar: gold up to where she is, with the next rank's star at its end.
+    const barY = box.y + box.h * 0.68;
+    const barH = Math.max(10, box.h * 0.16);
+    rounded(g, left, barY - barH / 2, right - left - 14, barH, barH / 2);
+    fillStroke(g, C.white, 2.5);
+    const fill = (right - left - 14) * clamp01(progress.share);
+    if (fill > 2) {
+      rounded(g, left, barY - barH / 2, Math.max(barH, fill), barH, barH / 2);
+      fillStroke(g, vertical(g, barY - barH / 2, barY + barH / 2, [C.butter, C.gold]), 2.5);
+    }
+    starPath(g, right - 8, barY, barH * 0.95, Math.sin(fx.time * 2) * 0.2);
+    fillStroke(g, progress.next === null ? C.gold : C.lavenderLight, 2.5);
+  }
+
+  // -------------------------------------------------------------------------
+  // The shop and wardrobe
+
+  /** A gold coin. */
+  function drawCoin(g: G, x: number, y: number, r: number) {
+    circle(g, x, y, r);
+    fillStroke(g, vertical(g, y - r, y + r, [C.butter, C.gold]), Math.max(1.5, r * 0.16));
+    starPath(g, x, y, r * 0.5);
+    g.fillStyle = C.white;
+    g.fill();
+  }
+
+  /** An item's picture, centred on (x, y), `s` times its usual size (about 100 across). */
+  function drawItemPicture(g: G, item: Item, x: number, y: number, s: number) {
+    g.save();
+    g.translate(x, y);
+    g.scale(s, s);
+    if (item.slot === 'hat') {
+      g.translate(0, 26);
+      g.scale(0.56, 0.56);
+      drawHatIcon(g, item.id, fx.time);
+    } else if (item.slot === 'apron') {
+      g.scale(1.05, 1.05);
+      drawApron(g, item.id, -28, -30);
+    } else {
+      drawDecorIcon(g, item.id, item.slot);
+    }
+    g.restore();
+  }
+
+  /** Coins flying from her purse to what she bought, and the "Yay!" on it. */
+  const shopFx: {
+    flash: { id: string; age: number } | null;
+    coins: { x0: number; y0: number; x1: number; y1: number; age: number }[];
+  } = { flash: null, coins: [] };
+
+  function shopStatus(item: Item, info: ShopInfo): string {
+    if (info.outfit[item.slot] === item.id) {
+      return info.outfit[item.slot] !== '' && item.slot !== 'shelf' && item.slot !== 'lights'
+        ? 'You have it on!'
+        : 'Tap to take it off';
+    }
+    if (owns(item, info.stickers, info.rank)) return 'Yours! Tap to use it';
+    if (lockedByRank(item, info.rank)) return `Become a ${RANKS[item.rank ?? 0].name}!`;
+    if (!canAfford(item, info.coins)) return saveUpLine(item, info.coins);
+    return `${item.price} coins: tap to buy!`;
+  }
+
+  function drawShopPage(shop: ShopState, info: ShopInfo, dt: number) {
+    const g = ctx;
+    const t = fx.time;
+    const p = shopPlaces(layout);
+    dim(0.3);
+    rounded(g, p.page.x, p.page.y, p.page.w, p.page.h, 32);
+    fillStroke(g, C.cream, 5, C.hotPink);
+
+    // Her coins, the title and ✕.
+    const c = p.coins;
+    rounded(g, c.x, c.y, c.w, c.h, c.h / 2);
+    fillStroke(g, C.white, 3.5);
+    drawCoin(g, c.x + c.h / 2, c.y + c.h / 2, c.h * 0.34);
+    stickerText(
+      g,
+      String(info.coins),
+      c.x + c.h + (c.w - c.h) / 2 - 6,
+      c.y + c.h / 2 + 1,
+      c.h * 0.48,
+      C.gold,
+      'center',
+      c.w - c.h - 10,
+    );
+    stickerText(
+      g,
+      '🛍️ Shop',
+      p.title.x,
+      p.title.y,
+      p.tall ? 42 : 36,
+      vertical(g, p.title.y - 22, p.title.y + 22, [C.hotPink, C.purple]),
+      'center',
+      Math.max(80, p.close.x - p.close.r - c.x - c.w - 20),
+    );
+    circle(g, p.close.x, p.close.y, p.close.r);
+    fillStroke(g, C.white, 3.5);
+    plainText(g, '✕', p.close.x, p.close.y + 1, p.close.r * 0.9, C.ink);
+
+    // Chef Bunny trying things on, and what the tried thing is.
+    const pv = p.preview;
+    rounded(g, pv.x, pv.y, pv.w, pv.h, 24);
+    fillStroke(g, C.lavenderLight, 3, C.lavender);
+    const wearing = previewOutfit(shop, info.outfit);
+    const b = p.bunny;
+    const pose = poseAt({ x: b.x, y: b.y });
+    g.save();
+    g.translate(b.x, b.y);
+    g.scale(b.scale, b.scale);
+    shadow(g, 0, 150, 60, 10);
+    drawBunny(g, { x: 0, y: 0 }, { ...pose, lean: 0 }, wearing);
+    g.restore();
+    const tried = shop.tried ? itemById(shop.tried) : undefined;
+    const cap = p.caption;
+    if (tried) {
+      if (tried.slot !== 'hat' && tried.slot !== 'apron' && p.tall) {
+        drawItemPicture(g, tried, cap.x + cap.w / 2, cap.y + 170, 1.1);
+      }
+      stickerText(
+        g,
+        tried.name,
+        cap.x + cap.w / 2,
+        cap.y + 22,
+        p.tall ? 30 : 22,
+        C.hotPink,
+        'center',
+        cap.w,
+      );
+      const status = shopStatus(tried, info);
+      g.font = font(p.tall ? 22 : 16);
+      const fit = Math.min(1, cap.w / Math.max(1, g.measureText(status).width));
+      plainText(
+        g,
+        status,
+        cap.x + cap.w / 2,
+        cap.y + (p.tall ? 66 : 54),
+        (p.tall ? 22 : 16) * fit,
+        C.purple,
+      );
+    } else {
+      const hint = 'Tap something to try it!';
+      g.font = font(p.tall ? 22 : 16);
+      const fit = Math.min(1, cap.w / Math.max(1, g.measureText(hint).width));
+      plainText(g, hint, cap.x + cap.w / 2, cap.y + 40, (p.tall ? 22 : 16) * fit, C.purple);
+    }
+
+    // The tabs.
+    TABS.forEach((tab, i) => {
+      const box = p.tabs[i];
+      const on = shop.tab === tab.id;
+      rounded(g, box.x, box.y, box.w, box.h, Math.min(26, box.h / 2));
+      fillStroke(g, on ? vertical(g, box.y, box.y + box.h, [C.pink, C.hotPink]) : C.white, 3.5);
+      g.fillStyle = C.ink;
+      const size = Math.min(box.h * 0.42, 34);
+      emoji(g, tab.icon, box.x + box.w / 2, box.y + box.h * 0.38, size);
+      fitText(
+        g,
+        tab.label,
+        box.x + box.w / 2,
+        box.y + box.h * 0.8,
+        Math.min(20, box.h * 0.22),
+        on ? C.white : C.purple,
+        box.w - 10,
+      );
+    });
+
+    // The items.
+    const items = itemsOn(shop.tab);
+    const s = p.grid.scale;
+    if (shopFx.flash) shopFx.flash.age += dt;
+    items.forEach((item, i) => {
+      const cell = p.grid.cells[i];
+      const cx = cell.x + cell.w / 2;
+      const on = info.outfit[item.slot] === item.id;
+      const mine = owns(item, info.stickers, info.rank);
+      const locked = lockedByRank(item, info.rank);
+      const short = !mine && !locked && !canAfford(item, info.coins);
+      const tried = shop.tried === item.id;
+      rounded(g, cell.x + 4, cell.y + 4, cell.w - 8, cell.h - 8, 18 * s);
+      fillStroke(
+        g,
+        locked ? C.lavenderLight : on ? C.butter : C.white,
+        on || tried ? 4.5 : 3,
+        on ? C.gold : tried ? C.hotPink : locked ? C.lavender : C.ink,
+      );
+      const flash = shopFx.flash && shopFx.flash.id === item.id ? shopFx.flash : null;
+      if (flash && flash.age < 1.6) {
+        g.save();
+        g.translate(cx, cell.y + 52 * s);
+        g.rotate(t);
+        g.fillStyle = 'rgba(255, 229, 138, 0.8)';
+        for (let k = 0; k < 8; k++) {
+          g.rotate(Math.PI / 4);
+          g.beginPath();
+          g.moveTo(0, 0);
+          g.lineTo(-10 * s, -60 * s);
+          g.lineTo(10 * s, -60 * s);
+          g.closePath();
+          g.fill();
+        }
+        g.restore();
+      }
+      const pop = flash ? 1 + Math.sin(Math.min(1, flash.age / 0.5) * Math.PI) * 0.25 : 1;
+      g.globalAlpha = locked ? 0.55 : 1;
+      drawItemPicture(g, item, cx, cell.y + 52 * s, 0.82 * s * pop);
+      g.globalAlpha = 1;
+      fitText(g, item.name, cx, cell.y + 99 * s, 13 * s, C.ink, cell.w - 14);
+      // What it costs, or that it's on, or which rank gives it.
+      const chip = { x: cell.x + 14 * s, y: cell.y + 110 * s, w: cell.w - 28 * s, h: 22 * s };
+      rounded(g, chip.x, chip.y, chip.w, chip.h, chip.h / 2);
+      if (on) {
+        fillStroke(g, C.mint, 2.5);
+        plainText(g, '✓ On', cx, chip.y + chip.h / 2 + 1, 13 * s, C.ink);
+      } else if (mine) {
+        fillStroke(g, C.white, 2.5, C.mint);
+        plainText(g, 'Mine!', cx, chip.y + chip.h / 2 + 1, 13 * s, C.leafDark);
+      } else if (locked) {
+        fillStroke(g, C.white, 2.5, C.lavender);
+        fitText(
+          g,
+          `🔒 ${RANKS[item.rank ?? 0].name}`,
+          cx,
+          chip.y + chip.h / 2 + 1,
+          12 * s,
+          C.purple,
+          chip.w - 8,
+        );
+      } else {
+        g.globalAlpha = short ? 0.6 : 1;
+        fillStroke(g, short ? C.white : C.butter, 2.5, short ? C.starEdge : C.ink);
+        drawCoin(g, cx - 18 * s, chip.y + chip.h / 2, 8 * s);
+        plainText(g, String(item.price), cx + 8 * s, chip.y + chip.h / 2 + 1, 14 * s, C.ink);
+        g.globalAlpha = 1;
+      }
+      if (flash && flash.age < 1.6) {
+        stickerText(g, 'Yay!', cx + cell.w * 0.22, cell.y + 22 * s, 20 * s, C.hotPink);
+      }
+    });
+
+    // Coins flying to what she bought.
+    for (const coin of shopFx.coins) {
+      coin.age += dt;
+      const k = clamp01(coin.age / 0.6);
+      if (coin.age < 0 || k >= 1) continue;
+      const x = coin.x0 + (coin.x1 - coin.x0) * k;
+      const y = coin.y0 + (coin.y1 - coin.y0) * k - Math.sin(k * Math.PI) * 80;
+      drawCoin(g, x, y, 12);
+    }
+    shopFx.coins = shopFx.coins.filter((coin) => coin.age < 0.6);
+
+    // "Buy it?"
+    if (shop.confirm) {
+      const item = itemById(shop.confirm);
+      if (item) drawConfirm(item, p);
+    }
+  }
+
+  function drawConfirm(item: Item, p: ShopPlaces) {
+    const g = ctx;
+    dim(0.3);
+    const { card, yes, no } = p;
+    rounded(g, card.x, card.y, card.w, card.h, 36);
+    fillStroke(g, C.cream, 5, C.hotPink);
+    const tall = p.tall;
+    drawItemPicture(g, item, card.x + card.w / 2, card.y + (tall ? 104 : 84), tall ? 1.3 : 1);
+    stickerText(
+      g,
+      `Buy the ${item.name}?`,
+      card.x + card.w / 2,
+      card.y + (tall ? 200 : 160),
+      tall ? 34 : 28,
+      C.hotPink,
+      'center',
+      card.w - 40,
+    );
+    const cy = card.y + (tall ? 248 : 200);
+    drawCoin(g, card.x + card.w / 2 - 30, cy, tall ? 18 : 15);
+    stickerText(g, String(item.price), card.x + card.w / 2 + 14, cy + 1, tall ? 30 : 26, C.gold);
+    const buttons: [typeof yes, string, string][] = [
+      [yes, '✓', C.mint],
+      [no, '✕', C.pink],
+    ];
+    for (const [b, mark, fill] of buttons) {
+      circle(g, b.x, b.y, b.r);
+      fillStroke(g, fill, 4);
+      plainText(g, mark, b.x, b.y + 2, b.r * 1.1, C.ink);
+    }
+  }
+
+  /** Text that shrinks to fit `maxWidth`, on any context. */
+  function fitText(
+    g: G,
+    text: string,
+    x: number,
+    y: number,
+    size: number,
+    color: string,
+    maxWidth: number,
+  ) {
+    g.font = font(size);
+    const wide = g.measureText(text).width;
+    plainText(g, text, x, y, wide > maxWidth ? (size * maxWidth) / wide : size, color);
+  }
+
+  // -------------------------------------------------------------------------
+  // The rank ceremony
+
+  /** The ceremony going on, or null. */
+  let ceremony: { rank: number; age: number; drum: number; said: number; oldHat: string } | null =
+    null;
+  /** Seconds before a tap can end the ceremony. */
+  const CEREMONY_READY = 4.6;
+  /** When the drumroll stops and the new rank is shown. */
+  const DRUMS = 1.6;
+
+  function drawCeremonyScreen(dt: number) {
+    const c = ceremony;
+    if (!c) return;
+    const g = ctx;
+    c.age += dt;
+    const t = fx.time;
+    const tall = layout.shape === 'tall';
+    const cx = layout.width / 2;
+    const reward = rewardsFor(c.rank);
+
+    // The drumroll, then ta-da!
+    if (c.age < DRUMS) {
+      c.drum -= dt;
+      if (c.drum <= 0) {
+        c.drum = 0.07;
+        sound.hiss(0.06, { volume: 0.22, from: 900, filter: 'lowpass' });
+        sound.tone(96 + c.age * 20, 0.05, { type: 'triangle', volume: 0.12 });
+      }
+    } else if (c.said === 0) {
+      c.said = 1;
+      sound.tada();
+      sound.chime([NOTE.C6, NOTE.E6, NOTE.G6, NOTE.C7], 0.1, 0.16);
+      sound.say(rankLine(c.rank));
+      for (let k = 0; k < 4; k++) {
+        burst(
+          cx - layout.sceneX + (k - 1.5) * 160,
+          -layout.sceneY + 40,
+          22,
+          ['confetti', 'star', 'heart', 'confetti'],
+          CONFETTI,
+          320,
+          300,
+        );
+      }
+      fx.chef.mood = 'party';
+      fx.chef.moodAge = 0;
+    } else if (c.said === 1 && c.age >= 3.4) {
+      c.said = 2;
+      sound.chime([NOTE.G5, NOTE.C6, NOTE.E6], 0.12, 0.14);
+      if (reward.kitchen) {
+        sound.say(`Here's a new hat, and the ${reward.kitchen.name} kitchen!`);
+      }
+    }
+
+    // A spotlight on Chef Bunny.
+    dim(0.5);
+    const stage = tall
+      ? { x: cx, y: layout.height * 0.47, s: 1.7 }
+      : { x: cx, y: layout.height * 0.5, s: 1.15 };
+    onCanvas(() => {
+      const glow = g.createRadialGradient(stage.x, stage.y, 20, stage.x, stage.y, 260 * stage.s);
+      glow.addColorStop(0, 'rgba(255, 247, 236, 0.75)');
+      glow.addColorStop(1, 'rgba(255, 247, 236, 0)');
+      g.fillStyle = glow;
+      g.fillRect(0, 0, layout.width, layout.height);
+    });
+
+    // She bows as the rank is announced, and the new hat drops onto her head.
+    const shown = c.age - DRUMS;
+    const bow = shown > 0 && shown < 1.1 ? Math.sin((shown / 1.1) * Math.PI) : 0;
+    const drop = clamp01((shown - 0.5) / 0.6);
+    const hatLift = shown < 0.5 ? 0 : (1 - easeOutBack(drop)) * 260;
+    const hat = shown < 0.5 ? c.oldHat : (reward.hat?.id ?? c.oldHat);
+    const pose = poseAt({ x: stage.x, y: stage.y });
+    onCanvas(() => {
+      g.save();
+      g.translate(stage.x, stage.y);
+      g.scale(stage.s, stage.s);
+      shadow(g, 0, 150, 70, 12);
+      drawBunny(
+        g,
+        { x: 0, y: 0 },
+        {
+          ...pose,
+          lean: 0,
+          mood: shown < 0 ? 'idle' : bow > 0.1 ? 'idle' : pose.mood,
+          bow,
+          hatLift,
+        },
+        { hat: shown >= 0.5 && drop <= 0 ? '' : hat, apron: look.apron },
+      );
+      g.restore();
+
+      // The drumroll, and then the rank's ribbon.
+      const top = tall ? layout.height * 0.16 : 70;
+      if (shown < 0) {
+        const beat = Math.abs(Math.sin(c.age * 22)) * 6;
+        g.fillStyle = C.ink;
+        emoji(g, '🥁', cx, top + beat, tall ? 70 : 54);
+        stickerText(g, 'Drumroll...', cx, top + (tall ? 80 : 58), tall ? 40 : 32, C.white);
+      } else {
+        const pop = easeOutBack(clamp01(shown / 0.4));
+        g.save();
+        g.translate(cx, top);
+        g.scale(pop, pop);
+        const w = tall ? 520 : 460;
+        rounded(g, -w / 2, -40, w, 80, 40);
+        fillStroke(g, horizontal(g, -w / 2, w / 2, [C.hotPink, C.pink, C.hotPink]), 5);
+        stickerText(
+          g,
+          `${RANKS[c.rank].icon} ${RANKS[c.rank].name}!`,
+          0,
+          2,
+          tall ? 46 : 40,
+          C.white,
+          'center',
+          w - 40,
+        );
+        g.restore();
+      }
+      // What it gives: the hat and the kitchen.
+      if (c.age >= 3.4 && reward.kitchen) {
+        const k = easeOutBack(clamp01((c.age - 3.4) / 0.4));
+        const w = tall ? 540 : 330;
+        const at = tall
+          ? { x: cx, y: layout.height * 0.8 }
+          : { x: Math.min(layout.width - w / 2 - 16, cx + 110 + w / 2), y: layout.height * 0.5 };
+        g.save();
+        g.translate(at.x, at.y);
+        g.scale(k, k);
+        rounded(g, -w / 2, -54, w, 108, 30);
+        fillStroke(g, C.cream, 4, C.purple);
+        drawItemPicture(g, reward.kitchen, -w / 2 + 62, 0, tall ? 0.9 : 0.75);
+        const mid = 56;
+        stickerText(g, 'New kitchen:', mid, -20, tall ? 26 : 20, C.purple, 'center', w - 140);
+        stickerText(g, reward.kitchen.name, mid, 18, tall ? 34 : 26, C.hotPink, 'center', w - 140);
+        g.restore();
+      }
+      if (c.age >= CEREMONY_READY) {
+        const pulse = 1 + Math.sin(t * 4) * 0.05;
+        g.save();
+        g.translate(cx, tall ? layout.height * 0.92 : layout.height - 30);
+        g.scale(pulse, pulse);
+        stickerText(g, 'Tap to cook! 🔁', 0, 0, tall ? 30 : 22, C.white);
+        g.restore();
+      }
+    });
+  }
+
   return {
     reset() {
       const keep = fx.particles;
@@ -1880,12 +2348,23 @@ export function createRenderer(ctx: G, voice: Sound) {
      * picked it. Chef Bunny says "Let's make..." when it lands, so the first
      * step's card doesn't say it again.
      */
-    startSpin(dish: Dish) {
-      const count = DISHES.length;
-      const target = Math.max(0, DISHES.indexOf(dish));
+    startSpin(dish: Dish, reel: Dish[] = DISHES) {
+      const dishes = reel.includes(dish) ? reel : [...reel, dish];
+      const count = dishes.length;
+      const target = Math.max(0, dishes.indexOf(dish));
       const start = Math.floor(Math.random() * count);
       const end = spinEnd(start, target, count);
-      spin = { dish, start, end, age: 0, pos: start, ticked: start, tickAge: 9, landed: false };
+      spin = {
+        dish,
+        dishes,
+        start,
+        end,
+        age: 0,
+        pos: start,
+        ticked: start,
+        tickAge: 9,
+        landed: false,
+      };
       announced = dish;
       sound.whoosh();
     },
@@ -1942,7 +2421,7 @@ export function createRenderer(ctx: G, voice: Sound) {
         dim(0.25);
         const at = spinnerSpot();
         const view = {
-          dishes: DISHES,
+          dishes: spin.dishes,
           pos,
           speed,
           landed: spin.landed ? spin.age - SPIN_TIME : -1,
@@ -2037,7 +2516,8 @@ export function createRenderer(ctx: G, voice: Sound) {
      * Draws the title screen, waiting for a tap to start cooking. `gearHeld`
      * (0 to 1) is how far through holding the grown-ups' gear.
      */
-    drawTitle(dt: number, gearHeld = 0) {
+    drawTitle(dt: number, gearHeld = 0, info?: TitleInfo) {
+      if (info) titleInfo = info;
       update(dt);
       begin();
       bunny();
@@ -2046,6 +2526,137 @@ export function createRenderer(ctx: G, voice: Sound) {
       drawButtons();
       drawParticles();
       drawLeave(dt);
+    },
+
+    /**
+     * What she wears and puts up in the kitchen. The kitchen is painted
+     * again only when it changes.
+     */
+    setOutfit(outfit: Outfit) {
+      const before: KitchenLook = look;
+      look = { ...outfit };
+      if (!sameKitchen(before, look)) kitchen = null;
+    },
+
+    /** Chef Bunny says her rank and how to reach the next (a tap on the rank badge). */
+    sayRank(points: number) {
+      const { rank, next } = rankProgress(points);
+      sound.pop();
+      sound.say(
+        next === null
+          ? `You're a ${RANKS[rank].name}! The best chef of all!`
+          : `You're a ${RANKS[rank].name}! Cook more dishes to be a ${RANKS[next].name}!`,
+      );
+      fx.chef.mood = 'cheer';
+      fx.chef.moodAge = 0;
+    },
+
+    /** Draws the shop and wardrobe page. */
+    drawShop(dt: number, shop: ShopState, info: ShopInfo) {
+      update(dt);
+      begin();
+      onCanvas(() => drawShopPage(shop, info, dt));
+      drawParticles();
+    },
+
+    /** Sounds, words and sparkles for a tap on the shop. */
+    shopEvent(event: ShopEvent, shop: ShopState) {
+      if (!event) return;
+      const p = shopPlaces(layout);
+      const cellOf = (item: Item) => p.grid.cells[itemsOn(shop.tab).indexOf(item)];
+      const sparkle = (item: Item, count: number) => {
+        const cell = cellOf(item) as Box | undefined;
+        if (!cell) return;
+        burst(
+          cell.x + cell.w / 2 - layout.sceneX,
+          cell.y + cell.h * 0.4 - layout.sceneY,
+          count,
+          ['star', 'heart', 'star', 'dot'],
+          CONFETTI,
+          260,
+        );
+      };
+      const cheer = (mood: BunnyMood) => {
+        fx.chef.mood = mood;
+        fx.chef.moodAge = 0;
+      };
+      switch (event.kind) {
+        case 'tab':
+          sound.pop();
+          break;
+        case 'wear':
+          sound.bloop();
+          sparkle(event.item, 8);
+          cheer('cheer');
+          sound.say(`${event.item.name}!`);
+          break;
+        case 'off':
+          sound.whoosh();
+          break;
+        case 'ask':
+          sound.pop();
+          sound.say(`Buy the ${event.item.name} for ${event.item.price} coins?`);
+          break;
+        case 'bought': {
+          sound.tada();
+          const cell = cellOf(event.item) as Box | undefined;
+          if (cell) {
+            const from = p.coins;
+            for (let k = 0; k < 6; k++) {
+              shopFx.coins.push({
+                x0: from.x + from.h / 2,
+                y0: from.y + from.h / 2,
+                x1: cell.x + cell.w / 2,
+                y1: cell.y + cell.h * 0.4,
+                age: -k * 0.08,
+              });
+            }
+          }
+          shopFx.flash = { id: event.item.id, age: 0 };
+          sparkle(event.item, 24);
+          cheer('party');
+          sound.say(`You bought the ${event.item.name}!`);
+          break;
+        }
+        case 'short':
+          sound.boop();
+          cheer('encourage');
+          sound.say(`Save up ${event.short} more ${event.short === 1 ? 'coin' : 'coins'}!`);
+          break;
+        case 'locked':
+          sound.boop();
+          cheer('encourage');
+          sound.say(`Become a ${RANKS[event.item.rank ?? 0].name} to get it!`);
+          break;
+        case 'cancel':
+        case 'close':
+          sound.whoosh();
+          break;
+      }
+    },
+
+    /**
+     * Starts the ceremony for a new rank: a drumroll, the rank, Chef Bunny
+     * bowing as her new hat drops on, confetti, and the new kitchen. Call it
+     * before putting the rank's hat on her (`setOutfit`), so the hat she had
+     * comes off first.
+     */
+    startCeremony(rank: number) {
+      ceremony = { rank, age: 0, drum: 0, said: 0, oldHat: look.hat };
+      fx.chef.mood = 'idle';
+    },
+
+    /** Draws a frame of the rank ceremony. */
+    drawCeremony(dt: number) {
+      update(dt);
+      begin();
+      drawCeremonyScreen(dt);
+      drawParticles();
+    },
+
+    /** Whether the ceremony has shown everything, so a tap can move on. */
+    ceremonyReady() {
+      return !!ceremony && ceremony.age >= CEREMONY_READY;
     },
 
     /** Draws the grown-ups' settings page. */
@@ -2157,15 +2768,18 @@ export function createRenderer(ctx: G, voice: Sound) {
   };
 }
 
-/** The kitchen for a layout, painted once at the canvas's pixel density. */
-function paintKitchen(layout: Layout, pixels: number) {
+/**
+ * The kitchen for a layout, with what she's put up, painted once at the
+ * canvas's pixel density (kitchens.ts draws it).
+ */
+function paintKitchen(layout: Layout, pixels: number, look: KitchenLook) {
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(layout.width * pixels);
   canvas.height = Math.round(layout.height * pixels);
   const g = canvas.getContext('2d');
   if (g) {
     g.scale(pixels, pixels);
-    drawKitchen(g, layout);
+    drawKitchen(g, layout, look, placesFor(layout).shelf);
   }
   return canvas;
 }
