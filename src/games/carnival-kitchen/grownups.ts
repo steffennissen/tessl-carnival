@@ -4,8 +4,8 @@ import { settingsFrom, type LearnSettings } from './kit';
 import type { Layout } from './layout';
 
 /**
- * The grown-ups' settings: Learning on or off, the level, and "Read it
- * myself". They open from a small gear on the title screen that has to be
+ * The grown-ups' settings: Learning on or off, the level, "Read it myself",
+ * and kitchen surprises (chaos/) on or off. They open from a small gear on the title screen that has to be
  * held for GEAR_HOLD seconds, so a young cook doesn't wander in by accident
  * but a grown-up finds it easily ("Hold for grown-ups"). They're saved with
  * the carnival's shared preferences, so they're remembered between visits.
@@ -19,13 +19,33 @@ const GAME = 'carnival-kitchen';
 /** Seconds the gear must be held to open the settings. */
 export const GEAR_HOLD = 1.5;
 
+/**
+ * Everything on the grown-ups' page: the learning settings, and whether
+ * kitchen surprises happen (see chaos/).
+ */
+export interface GrownupSettings extends LearnSettings {
+  /** Now and then a short, silly surprise in the middle of cooking. On unless turned off. */
+  surprises: boolean;
+}
+
+/** The page's settings from saved preferences (or anything), checked. */
+export function grownupSettingsFrom(saved: Record<string, unknown>): GrownupSettings {
+  return {
+    ...settingsFrom(saved),
+    surprises: typeof saved.surprises === 'boolean' ? saved.surprises : true,
+  };
+}
+
 /** The settings saved for this game, or the defaults. */
-export function loadSettings(): LearnSettings {
-  return settingsFrom(preferencesFor(GAME));
+export function loadSettings(): GrownupSettings {
+  return grownupSettingsFrom(preferencesFor(GAME));
 }
 
 /** Saves one setting, so it's remembered next time. */
-export function saveSetting<K extends keyof LearnSettings>(key: K, value: LearnSettings[K]): void {
+export function saveSetting<K extends keyof GrownupSettings>(
+  key: K,
+  value: GrownupSettings[K],
+): void {
   savePreference(GAME, key, value);
 }
 
@@ -42,11 +62,11 @@ export function onGear(layout: Layout, x: number, y: number): boolean {
 }
 
 /** One row of the settings page: a setting and its two choices. */
-export interface SettingRow<K extends keyof LearnSettings = keyof LearnSettings> {
+export interface SettingRow<K extends keyof GrownupSettings = keyof GrownupSettings> {
   key: K;
   label: string;
   note: string;
-  options: [string, LearnSettings[K]][];
+  options: [string, GrownupSettings[K]][];
 }
 
 export const SETTING_ROWS: SettingRow[] = [
@@ -77,6 +97,15 @@ export const SETTING_ROWS: SettingRow[] = [
       ['Off', false],
     ],
   },
+  {
+    key: 'surprises',
+    label: 'Surprises',
+    note: 'Now and then a silly kitchen surprise, never a fail',
+    options: [
+      ['On', true],
+      ['Off', false],
+    ],
+  },
 ];
 
 /** Where the settings page's parts go on the canvas, for a layout. */
@@ -86,19 +115,22 @@ export function grownupPlaces(layout: Layout) {
   const page: Box = { x: 10, y: 10, w: width - 20, h: height - 20 };
   const cw = Math.min(page.w - 60, 700);
   const left = (width - cw) / 2;
+  const n = SETTING_ROWS.length;
+  // Each row's height: as roomy as before when there's space, closer together when not.
+  const gap = tall ? Math.min(205, (height - 280) / n) : Math.min(110, (height - 168) / n);
   const rows = SETTING_ROWS.map((row, i) => {
     if (tall) {
-      const top = 150 + i * 205;
-      const control: Box = { x: left, y: top + 88, w: cw, h: 94 };
+      const top = 150 + i * gap;
+      const control: Box = { x: left, y: top + 84, w: cw, h: Math.min(94, gap - 92) };
       return { row, label: { x: left, y: top + 22 }, note: { x: left, y: top + 58 }, control };
     }
-    const top = 86 + i * 110;
-    const control: Box = { x: left + cw - 300, y: top + 10, w: 300, h: 80 };
-    return { row, label: { x: left, y: top + 32 }, note: { x: left, y: top + 66 }, control };
+    const top = 68 + i * gap;
+    const control: Box = { x: left + cw - 300, y: top + 2, w: 300, h: Math.min(80, gap - 4) };
+    return { row, label: { x: left, y: top + 28 }, note: { x: left, y: top + 56 }, control };
   });
   const done: Box = tall
-    ? { x: width / 2 - 120, y: 150 + 3 * 205 + 4, w: 240, h: 94 }
-    : { x: width / 2 - 110, y: Math.min(height - 96, 406), w: 220, h: 80 };
+    ? { x: width / 2 - 120, y: 150 + n * gap + 4, w: 240, h: 94 }
+    : { x: width / 2 - 110, y: Math.min(height - 96, 68 + n * gap + 4), w: 220, h: 80 };
   return {
     page,
     tall,
@@ -124,7 +156,7 @@ const inside = (b: Box, x: number, y: number) =>
 
 /** What a tap on the settings page does: change a setting, close the page, or nothing. */
 export type GrownupTap =
-  { key: keyof LearnSettings; value: LearnSettings[keyof LearnSettings] } | 'close' | null;
+  { key: keyof GrownupSettings; value: GrownupSettings[keyof GrownupSettings] } | 'close' | null;
 
 export function grownupTap(
   places: ReturnType<typeof grownupPlaces>,
@@ -143,8 +175,8 @@ export function grownupTap(
 
 /** The settings with one changed. */
 export function withSetting(
-  settings: LearnSettings,
-  tap: { key: keyof LearnSettings; value: LearnSettings[keyof LearnSettings] },
-): LearnSettings {
-  return settingsFrom({ ...settings, [tap.key]: tap.value });
+  settings: GrownupSettings,
+  tap: { key: keyof GrownupSettings; value: GrownupSettings[keyof GrownupSettings] },
+): GrownupSettings {
+  return grownupSettingsFrom({ ...settings, [tap.key]: tap.value });
 }

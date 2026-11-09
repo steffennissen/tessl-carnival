@@ -191,6 +191,53 @@ least 8 seconds after her last line, and only if the voice isn't already
 speaking; she never cuts anything off. With the sound off, the line still
 shows in her bubble.
 
+## Kitchen surprises
+
+Now and then something silly happens in the middle of cooking: a short
+surprise that's fun, never a fail. At most one comes in a round, in about 1
+round in 3 (`CHAOS_CHANCE`), and never in the first round of a visit. It
+waits for a cooking step after the first one, 2 to 3.5 seconds after that
+step's card has gone (so its instruction has been read out), and starts once
+she isn't holding anything. Learning moments, the dish spinner, decorating
+and the step cards never get one. If its step ends first, it tries the next
+cooking step it fits. The grown-ups' **Surprises** setting turns them off.
+
+| Surprise          | What happens                                                                                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Flashlight**    | The lights flicker and go dim, and a soft circle of light follows her finger (or the mouse) while she keeps cooking. After 8 seconds, or when the step ends, the lights come back: "Phew!". |
+| **Counter cat**   | A cat hops onto the counter and sits on the work. Tap her 3 times to pet her: hearts and a purr each time, then she hops off. Taps anywhere else do nothing.                                |
+| **Bubbling over** | Only when stirring, mixing, pouring or blending: foam spills over the rim and 8 big bubbles float up. Tap each one to pop it (a tap a little outside a bubble counts).                      |
+| **Sprinkle snow** | It snows sprinkles! A bowl follows her finger (or the mouse) along the counter: catch 10. Missed ones just melt away, and after 20 seconds the last ones jump in by themselves.             |
+| **Wobbly table**  | Everything on the counter wobbles. Tap the wobbly table leg twice to push a wedge under it, and it settles.                                                                                 |
+
+Nothing is ever lost:
+
+- While the cat, the bubbles, the sprinkles or the wobble is on, the step
+  waits: every tap goes to the surprise, and no timer runs and no meter
+  fills (the stirring clock stops, a floating egg holds still). The step's
+  own state, the score and the streak aren't touched.
+- The flashlight doesn't stop anything: she cooks on in its light.
+- Finishing a surprise adds 5 points (`CHAOS_BONUS`), once, with a "+5"
+  and sparkles.
+
+Chef Bunny reacts: raised brows and a big smile, and "Oh no, the lights! Use your
+flashlight!" as it starts, her bubble saying what to do while it's on ("A
+kitty! Tap her / 3 more times!"), and a cheer at the end ("Bye bye,
+kitty!"). Her lines are said like her other chatter: only when the voice is
+free (she waits up to 3 seconds for it), so she never talks over an
+instruction.
+
+**Adding a surprise** is one new file, `chaos/<id>.ts`, whose default export
+is a `Chaos` (`chaos/rules.ts`); `chaos/index.ts` finds it. It says which
+steps it `fits`, whether it `interrupts` the cooking, its `start`, `update`,
+`press` and `move` rules, when it's `done`, Chef Bunny's `says` and
+`bubble` lines, how to `draw` itself over the cooking (and `observe` for its
+sounds), and `solve` for tests. `tilt` can rock the cooking itself, as the
+wobbly table does. Everything it rolls comes from the `random` its `start`
+gets, seeded by the round, so tests repeat. `chaos/chaos.test.ts` checks the
+planning, the pausing, each surprise from start to end, and draws each one
+in all three layouts.
+
 ## Scoring
 
 - **Each step is worth up to 100 points**, split evenly between its actions:
@@ -306,6 +353,7 @@ doesn't wander in.
 | Learning       | On, Off          | On      | One learning moment (math or reading) woven into each round. Off: just cooking.                               |
 | Level          | Level 1, Level 2 | Level 1 | Level 1 is early 2nd grade, Level 2 late 2nd grade: bigger numbers, harder words.                             |
 | Read it myself | On, Off          | Off     | Cards and questions show their words and wait; the voice only reads when 🔊 is tapped, lighting up each word. |
+| Surprises      | On, Off          | On      | Now and then a short, silly kitchen surprise (see "Kitchen surprises"). Off: none.                            |
 
 They're saved with the carnival's shared preferences (`savePreference`), so
 they're remembered between visits. `grownups.ts` has the page's layout and
@@ -1118,6 +1166,10 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
   screen's book button. `book.test.ts` tests it.
 - `grownups.ts`: the grown-ups' settings: the gear, the page's layout and
   hit testing, and loading and saving them. `grownups.test.ts` tests it.
+- `chaos/`: the kitchen surprises, one file each, `rules.ts` (planning,
+  pausing, the bonus: plain functions), `index.ts` (finds them, and what
+  `game.ts` calls) and `show.ts` (drawing them, and Chef Bunny's cue). See
+  "Kitchen surprises".
 - `activities/`: one file per learning activity, and `index.ts`, which finds
   them and plans each round (`planRound`). See "Learning".
 - `layout.ts`: how the canvas fits the screen (page, wide or tall), and
