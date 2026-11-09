@@ -81,6 +81,26 @@ import {
 } from './game';
 import { type GrownupSettings, gearFor, grownupPlaces, optionBoxes } from './grownups';
 import {
+  JUDGES,
+  JUDGING,
+  hurryTo,
+  judgingMoment,
+  judgingPlaces,
+  judgingTimes,
+  verdictLine,
+} from './cookoff';
+import {
+  type JudgingView,
+  type TurnCardKind,
+  drawChefPicker,
+  drawCookoffButton,
+  drawJudging,
+  drawMenu,
+  drawTurnCard,
+  tasteLine,
+} from './cookoff-draw';
+import type { Cookoff } from './cookoff';
+import {
   FEEDBACK_TIME,
   bannerTime,
   clockText,
@@ -393,6 +413,20 @@ export interface StandEnd {
   /** After this dish: the boss's next dish, their trophy, or the end of the visit. */
   next: 'next dish' | 'trophy' | 'done';
 }
+
+/** A cook-off page (see cookoff.ts): its menu, picking chefs, a card between rounds, the judges. */
+export type CookoffScreen =
+  | { page: 'menu' }
+  | { page: 'chefs'; picking: number; taken: number[] }
+  | {
+      page: 'card';
+      kind: TurnCardKind;
+      cookoff: Cookoff;
+      lines: [string, string];
+      age: number;
+      ready: boolean;
+    }
+  | { page: 'judging' };
 
 /** A scene of the food stand that comes between rounds (see `startStage`). */
 export type StageKind = 'arrive' | 'entrance' | 'progress' | 'trophy';
@@ -1880,6 +1914,7 @@ export function createRenderer(ctx: G, voice: Sound) {
       drawBookButton();
       drawShopButton();
       drawRankBadge();
+      drawCookoffButton(ctx, titlePlaces(layout).cookoff, t);
     });
   }
 
@@ -2921,7 +2956,133 @@ export function createRenderer(ctx: G, voice: Sound) {
     });
   }
 
+  // -------------------------------------------------------------------------
+  // The cook-off's judging (cookoff.ts has its timing, cookoff-draw.ts draws it)
+
+  let judging: { view: JudgingView; age: number; drum: number } | null = null;
+
+  /** Plays the judging's sounds and sparkles as each moment comes. */
+  function observeJudging(dt: number) {
+    const j = judging;
+    if (!j) return;
+    const before = j.age;
+    j.age += dt;
+    const age = j.age;
+    const { view } = j;
+    const chefs = view.cookoff.chefs.length;
+    const times = judgingTimes(chefs);
+    const p = judgingPlaces(layout);
+    const crossed = (at: number) => before < at && age >= at;
+    const toScene = (x: number, y: number) => [x - layout.sceneX, y - layout.sceneY] as const;
+    if (age < times.start(0)) {
+      j.drum -= dt;
+      if (j.drum <= 0) {
+        j.drum = 0.07;
+        const loud = 0.06 + 0.1 * clamp01(age / times.start(0));
+        sound.hiss(0.06, { volume: loud, from: 380, filter: 'lowpass' });
+        sound.tone(96 + Math.random() * 20, 0.06, { type: 'triangle', volume: loud * 0.8 });
+      }
+    }
+    for (let c = 0; c < chefs; c++) {
+      if (crossed(times.start(c))) {
+        sound.whoosh();
+        const dish = view.cookoff.dish.name;
+        sound.say(
+          view.cookoff.mode === 'best'
+            ? `Here comes your ${dish}!`
+            : `${view.cookoff.chefs[c].name}'s ${dish}!`,
+        );
+      }
+      JUDGES.forEach((_, i) => {
+        const judge = p.judges[i];
+        if (crossed(times.taste(c, i))) sound.say(tasteLine(view, c, i));
+        if (crossed(times.taste(c, i) + JUDGING.taste * 0.3)) {
+          sound.crack();
+          burst(
+            ...toScene(judge.x, judge.y - 100 * judge.scale),
+            6,
+            ['dot', 'dot', 'star'],
+            [C.butter, C.carrotLight, C.white],
+            120,
+          );
+        }
+        if (crossed(times.card(c, i))) sound.pop();
+        if (crossed(times.card(c, i) + JUDGING.flip / 2)) {
+          const value = view.cards[c][i];
+          sound.ding();
+          sound.say(`${value}!`);
+          const card = p.cards[i];
+          burst(
+            ...toScene(card.x, card.y),
+            value >= 9 ? 18 : 8,
+            ['star', 'heart', 'dot'],
+            [C.gold, C.hotPink, C.butter],
+            200,
+          );
+        }
+      });
+      if (crossed(times.total(c))) sound.chime([NOTE.C6, NOTE.E6, NOTE.G6], 0.1, 0.14);
+    }
+    if (crossed(times.verdict)) {
+      sound.fanfare();
+      sound.say(`${verdictLine(view.cookoff, view.verdict)} You earned ${view.coins} coins!`);
+      for (let k = 0; k < 4; k++) {
+        burst(
+          ...toScene(layout.width / 2 + (k - 1.5) * 160, 40),
+          22,
+          ['confetti', 'star', 'heart', 'confetti'],
+          CONFETTI,
+          320,
+          300,
+        );
+      }
+    }
+    const party = view.verdict.kind !== 'close';
+    if (party && age >= times.verdict && age < times.verdict + 3.5) confettiRain();
+  }
+
   return {
+    /**
+     * Starts the cook-off's judging: a drumroll, each judge tasting and
+     * holding up a card, each chef's total, then the verdict.
+     */
+    startJudging(view: JudgingView) {
+      judging = { view, age: 0, drum: 0 };
+      sound.whoosh();
+      sound.say('Time for the judges! Drumroll, please!');
+    },
+
+    /** A tap during the judging: on to the next judge's card, or the verdict (never past it). */
+    hurryJudging() {
+      if (!judging) return;
+      judging.age = hurryTo(judging.age, judging.view.cookoff.chefs.length);
+      judging.drum = 9;
+    },
+
+    /** Whether the judging has shown its verdict long enough for a tap to finish. */
+    judgingReady() {
+      return !!judging && judgingMoment(judging.age, judging.view.cookoff.chefs.length).ready;
+    },
+
+    /** Draws a frame of a cook-off page. */
+    drawCookoff(dt: number, view: CookoffScreen) {
+      update(dt);
+      begin();
+      const t = fx.time;
+      if (view.page === 'menu') onCanvas(() => drawMenu(ctx, layout, t));
+      else if (view.page === 'chefs') {
+        onCanvas(() => drawChefPicker(ctx, layout, view.picking, view.taken, t));
+      } else if (view.page === 'card') {
+        const { kind, cookoff, lines, age, ready } = view;
+        onCanvas(() => drawTurnCard(ctx, layout, kind, cookoff, lines, t, age, ready, look));
+      } else if (judging) {
+        observeJudging(dt);
+        const shown = judging;
+        onCanvas(() => drawJudging(ctx, layout, shown.view, shown.age, t));
+      }
+      drawParticles();
+    },
+
     /**
      * Starts a stand scene: a customer arriving ('arrive'), a boss's
      * fanfare entrance with their order ('entrance'), "Dish 2 of 3" between
