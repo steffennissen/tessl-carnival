@@ -128,6 +128,8 @@ const birthdayCake: Ingredient = {
 
   /** The finished cake, with candles in a gentle arc across its top for the party. */
   partyCake: {
+    // The plate, and the lit candles' flames above the top.
+    box: { x: ORIGIN.x - 166, y: ORIGIN.y - 94, w: 332, h: 218 },
     draw(g, { round }) {
       g.save();
       g.translate(ORIGIN.x, ORIGIN.y);

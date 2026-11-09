@@ -111,6 +111,8 @@ const cupcake: Ingredient = {
 
   /** The finished cupcake, with candles round its middle tier for a party. */
   partyCake: {
+    // The frosting's widest tier, the lit candles' flames and the case's shadow.
+    box: { x: ORIGIN.x - 114, y: ORIGIN.y - 150, w: 228, h: 264 },
     draw(g, { round }) {
       g.save();
       g.translate(ORIGIN.x, ORIGIN.y);

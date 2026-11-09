@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { CUSTOMERS, withGuest } from '../customers';
 import { dishById } from '../dishes';
+import { allIngredients } from '../ingredients';
 import { createState, press, release, tick } from '../game';
 import { currentTurn } from '../kit';
 import {
@@ -14,6 +16,11 @@ import {
 } from '../test-kit';
 import {
   BLOW_TIME,
+  CROWD_SIZE,
+  crowdFor,
+  friendBox,
+  partyGuests,
+  startParty,
   FAR_SHARE,
   LIT_PAUSE,
   PARTY_CANDLES,
@@ -22,6 +29,7 @@ import {
   blowButton,
   flameOf,
   solveParty,
+  type PartyOptions,
   type PartyState,
 } from './party';
 
@@ -89,15 +97,51 @@ describe('party', () => {
     expect(state.scores[5]).toBe(100);
   });
 
-  it('has a Blow! button at least 60 CSS pixels across on a phone, clear of everything', () => {
-    for (const shape of ['page', 'wide', 'tall'] as const) {
-      const b = blowButton(shape);
-      if (shape !== 'page') expect(b.r * 2 * cssScale(shape)).toBeGreaterThanOrEqual(60);
-      const box = { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 };
-      for (const clear of keepClear(shape, PARTY_CANDLES + 1)) {
-        expect(overlaps(box, clear), shape).toBe(false);
+  for (const cake of allIngredients().filter((i) => i.partyCake)) {
+    const art = cake.partyCake!;
+    it(`fits Blow! (60 CSS pixels or more on a phone) beside ${cake.id}, clear of its plate and everything`, () => {
+      for (const shape of ['page', 'wide', 'tall'] as const) {
+        const b = blowButton(shape, art.box);
+        if (shape !== 'page') expect(b.r * 2 * cssScale(shape)).toBeGreaterThanOrEqual(60);
+        const box = { x: b.x - b.r, y: b.y - b.r, w: b.r * 2, h: b.r * 2 };
+        expect(overlaps(box, art.box), `${cake.id} ${shape}`).toBe(false);
+        expect(box.y + box.h, shape).toBeLessThanOrEqual(shape === 'tall' ? 546 : 500);
+        for (const clear of keepClear(shape, 7)) {
+          expect(overlaps(box, clear), `${cake.id} ${shape}`).toBe(false);
+        }
       }
-    }
+    });
+
+    it(`gathers the crowd round ${cake.id} where nobody hides behind it or anyone else`, () => {
+      for (let seed = 1; seed <= 9; seed++) {
+        const ids = partyGuests('benny', seeded(seed));
+        expect(ids).not.toContain('benny');
+        const crowd = crowdFor(art.box, ids);
+        expect(crowd.length, cake.id).toBe(CROWD_SIZE);
+        const boxes = crowd.map((f) => friendBox(f.id, f.x, f.y, f.scale));
+        boxes.forEach((box, i) => {
+          expect(overlaps(box, art.box), `${cake.id} ${crowd[i].id}`).toBe(false);
+          boxes.slice(i + 1).forEach((other) => expect(overlaps(box, other)).toBe(false));
+          for (const shape of ['page', 'wide', 'tall'] as const) {
+            for (const clear of keepClear(shape, 7)) {
+              expect(overlaps(box, clear), `${cake.id} ${crowd[i].id} ${shape}`).toBe(false);
+            }
+          }
+        });
+      }
+    });
+  }
+
+  it("leaves the round's own customer out of the crowd: they're already watching", () => {
+    const state = ready('cupcakes', 'party');
+    const s = party(state);
+    expect(s.crowd.length).toBe(CROWD_SIZE);
+    const turn = { kind: 'party', cake: 'cupcake', guest: s.crowd[0].id } as const;
+    const again = startParty(turn, seeded(1));
+    expect(again.crowd.map((f) => f.id)).not.toContain(s.crowd[0].id);
+    // The food stand tells the party who it's for.
+    const [step] = withGuest([{ kind: 'party', cake: 'cupcake' }], CUSTOMERS[2]);
+    expect((step as PartyOptions).guest).toBe(CUSTOMERS[2].id);
   });
 
   it('cooks and draws to the end in every layout', () => {
