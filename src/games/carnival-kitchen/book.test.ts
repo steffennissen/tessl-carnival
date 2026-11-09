@@ -10,9 +10,12 @@ import {
   inBox,
   starsOf,
   twoLines,
+  trophyAt,
+  trophyShelf,
 } from './book';
 import { DISHES } from './dishes';
 import { layoutFor } from './layout';
+import { bookDishes } from './ranks';
 
 const LAYOUTS = {
   page: layoutFor(1200, 800, false),
@@ -65,6 +68,32 @@ describe('recipe book', () => {
       });
       expect(cellAt(b.cells, b.close.x, b.close.y)).toBe(-1);
       expect(cellAt(b.cells, 1, 1)).toBe(-1);
+    });
+
+    it(`fits the trophy shelf beside the dishes and the surprise in the ${name} layout`, () => {
+      const count = bookDishes().length;
+      const b = bookPlaces(layout, count);
+      const { box, slots } = trophyShelf(layout, 3);
+      expect(b.cells).toHaveLength(count);
+      expect(b.scale).toBeGreaterThan(0.7);
+      expect(box.x).toBeGreaterThanOrEqual(b.page.x);
+      expect(box.y).toBeGreaterThanOrEqual(b.page.y);
+      expect(box.x + box.w).toBeLessThanOrEqual(b.page.x + b.page.w);
+      expect(box.y + box.h).toBeLessThanOrEqual(b.page.y + b.page.h);
+      const apart = (a: typeof box, c: typeof box) =>
+        a.x + a.w <= c.x || c.x + c.w <= a.x || a.y + a.h <= c.y || c.y + c.h <= a.y;
+      // Clear of every dish's cell (the wrapped surprise too) and the ✕.
+      for (const cell of b.cells) expect(apart(box, cell)).toBe(true);
+      const { close } = b;
+      expect(
+        apart(box, { x: close.x - close.r, y: close.y - close.r, w: 2 * close.r, h: 2 * close.r }),
+      ).toBe(true);
+      // Beside the title, not under it: the title has the middle of the page.
+      if (layout.shape !== 'tall') expect(box.x + box.w).toBeLessThan(b.title.x - 150);
+      slots.forEach((slot, i) => {
+        expect(trophyAt(layout, slot.x + slot.w / 2, slot.y + slot.h / 2)).toBe(i);
+        expect(cellAt(b.cells, slot.x + slot.w / 2, slot.y + slot.h / 2)).toBe(-1);
+      });
     });
 
     it(`puts the book button on the canvas in the ${name} layout`, () => {

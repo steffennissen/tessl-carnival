@@ -28,6 +28,7 @@ import {
   withGuest,
 } from './customers';
 import { DISHES, dishById } from './dishes';
+import { playableDishes } from './ranks';
 import { createState } from './game';
 import { playThrough, seeded } from './test-kit';
 import type { PayOptions } from './steps/pay';
@@ -109,6 +110,17 @@ describe('bosses', () => {
       expect(new Set(dishes.map((d) => d.id)).size).toBe(3);
       expect(dishes[0].id).not.toBe(previous.id);
     }
+  });
+
+  it('only order dishes she can cook: the Birthday Cake once it is unlocked', () => {
+    const locked = DISHES.filter((d) => d.locked);
+    expect(locked.length).toBeGreaterThan(0);
+    for (let seed = 1; seed < 60; seed++) {
+      const dishes = bossDishes(playableDishes({}), seeded(seed));
+      expect(dishes.some((d) => d.locked)).toBe(false);
+    }
+    const all = Object.fromEntries(DISHES.map((d) => [d.id, 3]));
+    expect(playableDishes(all)).toEqual(DISHES);
   });
 
   it('go through their three dishes, then give the trophy exactly once', () => {
