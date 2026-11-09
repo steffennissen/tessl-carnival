@@ -313,7 +313,7 @@ export function placesFor(layout: Layout) {
     sound: wide
       ? roomRight
         ? { x: width - 50, y: 50 }
-        : { x: sx + 125 - buttonR, y: 46 }
+        : { x: 44 + 2 * buttonR + 20, y: 46 }
       : { x: sx + 40, y: sy + 80 },
     score: { x: sx + W - 168, y: sy + 58 },
     combo: { x: sx + W - 93, y: sy + 126 },
