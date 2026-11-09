@@ -25,6 +25,8 @@ const cupcakes: Dish = {
       extras: [],
       count: 3,
     },
+    // The show-off finish: candles, and the party friends sing.
+    { kind: 'party', cake: 'cupcake', minutes: 5 },
   ],
 
   draw(g, time, state) {

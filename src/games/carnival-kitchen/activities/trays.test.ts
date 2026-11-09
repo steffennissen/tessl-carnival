@@ -17,7 +17,15 @@ describe('tray arrays', () => {
       random: seeded(),
       start: 900,
     });
-    expect(steps.map((s) => s.kind)).toEqual(['crack', 'pour', 'mix', 'bake', 'tray', 'top']);
+    expect(steps.map((s) => s.kind)).toEqual([
+      'crack',
+      'pour',
+      'mix',
+      'bake',
+      'tray',
+      'top',
+      'party',
+    ]);
     const sushi = trays.weave({
       dish: dishById('sushi-rolls'),
       level: 2,

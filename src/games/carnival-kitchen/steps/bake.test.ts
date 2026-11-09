@@ -39,7 +39,7 @@ describe('bake', () => {
     for (let i = 0; i < 200; i++) tick(state, 0.05);
     expect(b.index).toBe(1);
     expect(b.level).toBe(1);
-    expect(state.scores[3]).toBeGreaterThan(0);
+    expect(state.scores[4]).toBeGreaterThan(0);
     expect(state.phase).toBe('over');
   });
 

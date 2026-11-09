@@ -2,7 +2,7 @@ import { C, type G, face, fillStroke, oval, rounded, shadow, vertical } from '..
 import { findStep, type Ingredient, type KitchenState } from '../kit';
 import type { SauceOptions, SpreadArt } from '../steps/sauce';
 import { drawStack, leanOf, type StackOptions, type StackState } from '../steps/stack';
-import type { ToppingSpot } from '../steps/top';
+import type { TopOptions, TopState, ToppingSpot } from '../steps/top';
 import { artOf } from './index';
 
 /**
@@ -145,6 +145,17 @@ export function sundaeToppings(toppings: readonly ToppingSpot[]): ToppingSpot[] 
   }));
 }
 
+/** The toppings on top when nobody put any on: cream and a cherry. */
+const CAP: ToppingSpot[] = [
+  { id: 'whipped-cream', x: 0, y: -20 },
+  { id: 'cherry', x: 4, y: -44 },
+];
+
+/** How tall the sundae is to the top of its scoops, above its foot. */
+function sundaeHeight(round: KitchenState | null): number {
+  return RIM + scoopsIn(round).length * SCOOP_H;
+}
+
 const sundaeGlass: Ingredient = {
   id: 'sundae-glass',
   label: 'sundae',
@@ -227,6 +238,40 @@ const sundaeGlass: Ingredient = {
         toppings: [],
       });
       g.restore();
+    },
+  },
+
+  /**
+   * The finished sundae, with a tower of scoops growing on it: its toppings
+   * ride up on top of the tower.
+   */
+  towerBase: {
+    height: sundaeHeight,
+    count: (round) => scoopsIn(round).length,
+    draw(g, { t, round }) {
+      const spread = chocolateIn(round);
+      drawSundae(g, {
+        t,
+        scoops: scoopsIn(round, 0.3),
+        chocolate: spread || !round ? 1 : 0,
+        spread: spread ?? undefined,
+        toppings: [],
+      });
+    },
+    drawCap(g, { round }) {
+      const top = round && findStep<TopState, TopOptions>(round, 'top');
+      const spots = top ? sundaeToppings(top.state.spots) : null;
+      // Moved from the sundae's own units to the top of the tower.
+      const lift = sundaeHeight(round);
+      const cap = spots ? spots.map((s) => ({ ...s, y: s.y + lift })) : CAP;
+      const order = [...cap].sort((a, b) => Number(a.id === 'cherry') - Number(b.id === 'cherry'));
+      for (const spot of order) {
+        g.save();
+        g.translate(spot.x, spot.y);
+        g.scale(1.7, 1.7);
+        artOf(spot.id, 'topping').draw(g);
+        g.restore();
+      }
     },
   },
 

@@ -114,6 +114,15 @@ export function cookoffPlan(
 export const roundRandom = (cookoff: Cookoff) => seededRandom(cookoff.seed + 7919);
 
 /**
+ * Whether a round has kitchen surprises (chaos/): as the grown-ups set it,
+ * but never in two chefs, where a surprise at a random moment would make the
+ * two rounds differ. Beat your best (and a normal round, `mode` null) keeps them.
+ */
+export function surprisesOn(setting: boolean, mode: CookoffMode | null): boolean {
+  return setting && mode !== 'duo';
+}
+
+/**
  * Keeps the chef's round that just ended. Returns what comes next: the
  * next chef's turn ('pass', and `turn` moves on), or the judges.
  */
@@ -379,6 +388,23 @@ export function judgingMoment(age: number, chefs: number): JudgingMoment {
   return { chef, tasting, shown, totals, verdict, ready: age >= times.ready };
 }
 
+/**
+ * Where a tap during the judging jumps to: the next judge's card flipping
+ * up, or once every card is up, the verdict. Never past the verdict, so a
+ * tap can hurry the judges but never skip how it ends.
+ */
+export function hurryTo(age: number, chefs: number): number {
+  const times = judgingTimes(chefs);
+  if (age >= times.verdict) return age;
+  for (let c = 0; c < chefs; c++) {
+    for (let j = 0; j < JUDGES.length; j++) {
+      const at = times.card(c, j);
+      if (at > age + 0.05) return at;
+    }
+  }
+  return times.verdict;
+}
+
 // ---------------------------------------------------------------------------
 // Where everything goes
 
@@ -437,7 +463,7 @@ export function chefPlaces(layout: Layout) {
 
 /**
  * A big card between rounds: Chef Bunny's challenge, a chef's turn, or "Pass
- * the iPad to Player 2!". It waits for a tap anywhere.
+ * it to Player 2!". It waits for a tap anywhere.
  */
 export function turnCardPlaces(layout: Layout) {
   const box = cookoffBox(layout);
@@ -445,7 +471,7 @@ export function turnCardPlaces(layout: Layout) {
     return {
       card: offset(box, { x: 30, y: 60, w: 540, h: 780 }),
       figure: { x: box.x + 300, y: box.y + 470, scale: 1.4 },
-      dish: { x: box.x + 300, y: box.y + 200, scale: 0.8 },
+      dish: { x: box.x + 300, y: box.y + 170, scale: 0.7 },
       lines: [box.y + 570, box.y + 640, box.y + 700].map((y) => ({ x: box.x + 300, y })),
       width: 500,
       tap: { x: box.x + 300, y: box.y + 790 },
@@ -486,6 +512,7 @@ export function judgingPlaces(layout: Layout) {
       table: offset(box, { x: 10, y: 556, w: 580, h: 46 }),
       dish: { ...at(300, 690), scale: 0.75 },
       banner: offset(box, { x: 30, y: 230, w: 540, h: 110 }),
+      coins: offset(box, { x: 230, y: 712, w: 140, h: 48 }),
       podium: [
         { ...at(160, 650), scale: 1 },
         { ...at(440, 650), scale: 1 },
@@ -514,6 +541,7 @@ export function judgingPlaces(layout: Layout) {
     table: offset(box, { x: 30, y: 314, w: 740, h: 40 }),
     dish: { ...at(400, 410), scale: 0.5 },
     banner: offset(box, { x: 150, y: 120, w: 500, h: 96 }),
+    coins: offset(box, { x: 10, y: 430, w: 140, h: 48 }),
     podium: [
       { ...at(220, 420), scale: 0.85 },
       { ...at(490, 420), scale: 0.85 },

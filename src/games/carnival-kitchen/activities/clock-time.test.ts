@@ -17,6 +17,7 @@ import type { ReadClockOptions } from '../steps/read-clock';
 import type { SetClockOptions } from '../steps/set-clock';
 import { seeded } from '../test-kit';
 import clockTime, {
+  doing,
   elapsedStep,
   fitsLevel,
   handsHelp,
@@ -32,6 +33,12 @@ import { planRound } from './index';
 const at = (h: number, m: number) => h * 60 + m;
 
 describe('clock time', () => {
+  it('names every kind of cooking step in its sentences, the finishers too', () => {
+    const cooking = new Set(DISHES.flatMap((d) => d.steps.map((s) => s.kind)));
+    for (const kind of cooking) expect(doing({ kind }), kind).not.toBe('Cooking');
+    expect(doing({ kind: 'party' })).toBe('The party');
+  });
+
   it('fits every dish, and comes up more often than other activities', () => {
     expect(DISHES.every((d) => clockTime.fits(d))).toBe(true);
     expect(clockTime.weight).toBeGreaterThan(1);

@@ -53,7 +53,7 @@ describe('circles: stirring, sauce and batter', () => {
 
   it('spreads the sauce and mixes the batter the same way', () => {
     for (const [dish, kind, index] of [
-      ['pizza', 'sauce', 1],
+      ['pizza', 'sauce', 2],
       ['pancakes', 'mix', 2],
     ] as const) {
       const state = ready(dish, kind);

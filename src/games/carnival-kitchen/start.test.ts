@@ -450,7 +450,7 @@ describe('start', () => {
     stop2();
   });
 
-  it('plays a two chefs cook-off: picking chefs, passing the iPad, and the judges', () => {
+  it('plays a two chefs cook-off: picking chefs, passing it on, and the judges', () => {
     const id = 'carnival-kitchen';
     const stickers = carnival.stickersFor(id);
     const p = phone();
@@ -487,17 +487,17 @@ describe('start', () => {
     // Decorating times out; then the pass card, with no customer or coins yet.
     p.texts.length = 0;
     p.run(25);
-    expect(p.texts).toContain('Pass the iPad to Player 2!');
+    expect(p.texts).toContain('Pass it to Player 2!');
     expect(earn).not.toHaveBeenCalled();
     p.run(1);
     p.tap(p.layout.width / 2, p.layout.height / 2);
     cookUntil(p, () => record.mock.calls.length === 2);
     expect(record).toHaveBeenCalledTimes(2);
     // Decorating times out again, then the judges.
-    p.run(21);
-    expect(earn).toHaveBeenCalledTimes(1);
+    p.run(18);
+    expect(earn).not.toHaveBeenCalled();
     p.texts.length = 0;
-    p.run(judgingTimes(2).ready);
+    p.run(4 + judgingTimes(2).ready);
     // The judges: a drumroll, each chef's dish, their cards, the verdict.
     expect(p.texts).toContain('🥁 The judges! 🥁');
     expect(
@@ -538,8 +538,20 @@ describe('start', () => {
     const earn = vi.mocked(carnival.earnCoins);
     cookUntil(p, () => record.mock.calls.length === 1);
     p.texts.length = 0;
-    p.run(25 + judgingTimes(1).ready);
+    // Decorating times out; then taps hurry the judges from card to card,
+    // and on to the verdict, but never past it.
+    p.run(18);
+    p.run(4);
     expect(p.texts).toContain('🥁 The judges! 🥁');
+    for (let tap = 0; tap < 6; tap++) {
+      p.tap(p.layout.width / 2, p.layout.height / 2);
+      p.run(0.3);
+    }
+    p.texts.length = 0;
+    p.run(0.2);
+    expect(p.texts).toContain('💖 So close! 💖');
+    expect(p.texts).not.toContain('All done! 🎉');
+    p.run(judgingTimes(1).ready - judgingTimes(1).verdict);
     expect(p.texts).toContain('💖 So close! 💖');
     expect(p.texts.some((text) => /^Only \d+ points to go!$/.test(text))).toBe(true);
     expect(earn).toHaveBeenCalledTimes(1);

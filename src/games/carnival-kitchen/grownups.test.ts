@@ -16,7 +16,7 @@ import {
 import { CARD_SKIP_AFTER, DEFAULT_SETTINGS, NO_LEARNING, plainPlan } from './kit';
 import { layoutFor } from './layout';
 import { bookButtonFor } from './book';
-import { seeded } from './test-kit';
+import { cssScale, seeded } from './test-kit';
 
 const LAYOUTS = {
   page: layoutFor(1200, 800, false),
@@ -32,16 +32,23 @@ const middle = (b: { x: number; y: number; w: number; h: number }) => ({
 });
 
 describe("grown-ups' settings", () => {
-  it('starts with learning on, Level 1, and the voice reading', () => {
-    expect(loadSettings()).toEqual(DEFAULT_SETTINGS);
+  it('starts with learning on, Level 1, the voice reading and surprises on', () => {
+    expect(loadSettings()).toEqual({ ...DEFAULT_SETTINGS, surprises: true });
   });
 
   it('remembers what a grown-up chose', () => {
     saveSetting('level', 2);
     saveSetting('readMyself', true);
-    expect(loadSettings()).toEqual({ learning: true, level: 2, readMyself: true });
+    saveSetting('surprises', false);
+    expect(loadSettings()).toEqual({
+      learning: true,
+      level: 2,
+      readMyself: true,
+      surprises: false,
+    });
     saveSetting('level', 1);
     saveSetting('readMyself', false);
+    saveSetting('surprises', true);
   });
 
   it('needs the gear held for a moment', () => {
@@ -94,10 +101,26 @@ describe("grown-ups' settings", () => {
     });
   }
 
-  it('has the three settings', () => {
-    expect(SETTING_ROWS.map((r) => r.key)).toEqual(['learning', 'level', 'readMyself']);
-    expect(withSetting(DEFAULT_SETTINGS, { key: 'level', value: 2 }).level).toBe(2);
-    expect(withSetting(DEFAULT_SETTINGS, { key: 'learning', value: false }).learning).toBe(false);
+  it('makes every choice and Done at least 60 CSS pixels on a phone', () => {
+    for (const shape of ['wide', 'tall'] as const) {
+      const p = grownupPlaces(LAYOUTS[shape]);
+      for (const b of [...p.rows.flatMap((r) => optionBoxes(r.control)), p.done]) {
+        expect(Math.min(b.w, b.h) * cssScale(shape)).toBeGreaterThanOrEqual(60);
+      }
+    }
+  });
+
+  it('has the four settings', () => {
+    const settings = { ...DEFAULT_SETTINGS, surprises: true };
+    expect(SETTING_ROWS.map((r) => r.key)).toEqual([
+      'learning',
+      'level',
+      'readMyself',
+      'surprises',
+    ]);
+    expect(withSetting(settings, { key: 'level', value: 2 }).level).toBe(2);
+    expect(withSetting(settings, { key: 'learning', value: false }).learning).toBe(false);
+    expect(withSetting(settings, { key: 'surprises', value: false }).surprises).toBe(false);
   });
 
   it('lets a card be tapped away only in "Read it myself" mode, after a moment', () => {

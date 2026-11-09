@@ -1,6 +1,6 @@
 import { C, type G, face, fillStroke, oval, palette, vertical } from '../art';
-import type { Ingredient } from '../kit';
-import type { ToppingSpot } from '../steps/top';
+import { findStep, type Ingredient, type KitchenState } from '../kit';
+import type { TopOptions, TopState, ToppingSpot } from '../steps/top';
 import { artOf } from './index';
 
 const K = palette({
@@ -85,6 +85,12 @@ export function cupcakeToppings(toppings: readonly ToppingSpot[]): ToppingSpot[]
   return toppings.map((s) => ({ id: s.id, x: s.x - ORIGIN.x, y: s.y - ORIGIN.y }));
 }
 
+/** The round's toppings on the cupcake, in its own units, if it had any. */
+function toppingsOf(round: KitchenState | null): ToppingSpot[] {
+  const top = round && findStep<TopState, TopOptions>(round, 'top');
+  return top ? cupcakeToppings(top.state.spots) : [];
+}
+
 /** A big cupcake with pink frosting, waiting for its toppings. */
 const cupcake: Ingredient = {
   id: 'cupcake',
@@ -100,6 +106,26 @@ const cupcake: Ingredient = {
       g.translate(ORIGIN.x, ORIGIN.y);
       drawCupcake(g, cupcakeToppings(toppings));
       g.restore();
+    },
+  },
+
+  /** The finished cupcake, with candles round its middle tier for a party. */
+  partyCake: {
+    // The frosting's widest tier, the lit candles' flames and the case's shadow.
+    box: { x: ORIGIN.x - 114, y: ORIGIN.y - 150, w: 228, h: 264 },
+    draw(g, { round }) {
+      g.save();
+      g.translate(ORIGIN.x, ORIGIN.y);
+      drawCupcake(g, toppingsOf(round), 'joy');
+      g.restore();
+    },
+    candles(count) {
+      return Array.from({ length: count }, (_, i) => {
+        const x = count === 1 ? 0 : -66 + (132 * i) / (count - 1);
+        // Round the frosting's middle tier, the outer ones a little lower.
+        const y = -62 + 16 * (1 - Math.cos((x / 92) * (Math.PI / 2)));
+        return { x: ORIGIN.x + x, y: ORIGIN.y + y };
+      });
     },
   },
 };

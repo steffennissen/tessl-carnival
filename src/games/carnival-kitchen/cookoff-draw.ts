@@ -211,7 +211,7 @@ export type TurnCardKind = 'challenge' | 'turn' | 'pass';
 
 /**
  * The card between rounds: Chef Bunny's challenge, Player 1's turn, or
- * "Pass the iPad to Player 2!". `age` is how long it has been up; once
+ * "Pass it to Player 2!". `age` is how long it has been up; once
  * `ready`, it says to tap.
  */
 export function drawTurnCard(
@@ -475,9 +475,13 @@ export function drawJudge(
   g.restore();
 }
 
+/** Each judge's paw colour, holding up their card. */
+const PAWS = [C.white, C.lavender, C.carrotLight] as const;
+
 /**
  * A score card on a stick, centred on (x, y), `w` by `h`. `flip` (0 to 1)
- * turns it round: its starry back first, then the number.
+ * turns it round: its starry back first, then the number. The stick slants
+ * down to a paw beside the judge's head, so it never covers their face.
  */
 export function drawScoreCard(
   g: G,
@@ -487,19 +491,24 @@ export function drawScoreCard(
   h: number,
   value: number,
   flip: number,
+  paw: string = C.white,
 ) {
   const turn = Math.cos(clamp01(flip) * Math.PI);
   const front = flip >= 0.5;
+  const px = x + w * 0.6;
+  const py = y + h / 2 + 34;
   g.lineCap = 'round';
   g.strokeStyle = C.ink;
   g.lineWidth = 9;
   g.beginPath();
-  g.moveTo(x, y + h / 2);
-  g.lineTo(x, y + h / 2 + 40);
+  g.moveTo(x + w * 0.2, y + h / 2 - 4);
+  g.lineTo(px, py);
   g.stroke();
   g.strokeStyle = C.woodLight;
   g.lineWidth = 5;
   g.stroke();
+  circle(g, px, py, 11);
+  fillStroke(g, paw, 3);
   g.save();
   g.translate(x, y);
   g.scale(Math.max(0.04, Math.abs(turn)), 1);
@@ -644,7 +653,7 @@ export function drawJudging(g: G, layout: Layout, view: JudgingView, age: number
     p.cards.forEach((c, i) => {
       if (now.shown[showing] <= i) return;
       const flip = clamp01((age - times.card(showing, i)) / JUDGING.flip);
-      drawScoreCard(g, c.x, c.y, c.w, c.h, view.cards[showing][i], flip);
+      drawScoreCard(g, c.x, c.y, c.w, c.h, view.cards[showing][i], flip, PAWS[i]);
     });
   }
 
@@ -763,10 +772,10 @@ function drawVerdict(
   stickerText(g, bottom, 0, b.h * 0.26, b.h * 0.2, C.butter, 'center', b.w - 30);
   g.restore();
   if (age > 0.6) {
-    const coins = `🪙 +${view.coins}`;
-    rounded(g, b.x + b.w / 2 - 70, b.y + b.h + 8, 140, 44, 22);
+    const c = p.coins;
+    rounded(g, c.x, c.y, c.w, c.h, c.h / 2);
     fillStroke(g, C.white, 3.5);
-    plainText(g, coins, b.x + b.w / 2, b.y + b.h + 31, 26, C.ink);
+    plainText(g, `🪙 +${view.coins}`, c.x + c.w / 2, c.y + c.h / 2 + 1, 26, C.ink);
   }
 
   if (ready) {

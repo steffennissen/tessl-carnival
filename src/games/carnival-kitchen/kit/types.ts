@@ -314,6 +314,11 @@ export interface Step<O extends StepBasics = StepBasics, S = unknown, F = unknow
    */
   learning?: boolean;
   /**
+   * A show-off finish (a dough toss, a party): a short spectacle that a
+   * kitchen surprise never interrupts.
+   */
+  finisher?: boolean;
+  /**
    * Chef Bunny's two lines right now, instead of the hint: for a step whose
    * hint changes as it goes, such as a question after a wrong try.
    */

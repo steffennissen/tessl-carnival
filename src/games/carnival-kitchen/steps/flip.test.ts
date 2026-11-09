@@ -32,16 +32,15 @@ describe('flip', () => {
     expect(f.index).toBe(0);
   });
 
-  it('ends the round after the last pancake', () => {
+  it('moves on to the flambé after the last pancake', () => {
     const state = ready('pancakes', 'flip');
     const f = pan(state);
     for (const go of f.goes) {
       f.needle = go.target;
       press(state, 0, 0);
     }
-    expect(state.phase).toBe('over');
+    expect(state.stepIndex).toBe(4);
     expect(state.scores[3]).toBe(100);
-    expect(press(state, 0, 0)).toBe(true);
     expect(f.results).toHaveLength(4);
   });
 });

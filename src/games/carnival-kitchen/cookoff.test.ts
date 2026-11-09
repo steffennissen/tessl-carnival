@@ -28,6 +28,8 @@ import {
   judgingMoment,
   judgingPlaces,
   judgingTimes,
+  hurryTo,
+  surprisesOn,
   menuPlaces,
   roundRandom,
   seededRandom,
@@ -146,6 +148,13 @@ describe('two chefs', () => {
       }
     });
   }
+
+  it('has no kitchen surprises, so the rounds stay the same; beat your best keeps them', () => {
+    expect(surprisesOn(true, 'duo')).toBe(false);
+    expect(surprisesOn(true, 'best')).toBe(true);
+    expect(surprisesOn(true, null)).toBe(true);
+    expect(surprisesOn(false, 'best')).toBe(false);
+  });
 
   it('plans a learning moment when learning is on, the same for both', () => {
     const c = createCookoff('duo', pizza, 99, [CHEFS[0], CHEFS[1]]);
@@ -300,6 +309,26 @@ describe('the judging scene', () => {
   });
 });
 
+describe('a tap during the judging', () => {
+  it('hurries on to the next card, then the verdict, never past it', () => {
+    for (const chefs of [1, 2]) {
+      const times = judgingTimes(chefs);
+      expect(hurryTo(0, chefs)).toBe(times.card(0, 0));
+      expect(hurryTo(times.card(0, 0), chefs)).toBe(times.card(0, 1));
+      expect(hurryTo(times.card(chefs - 1, 2), chefs)).toBe(times.verdict);
+      expect(hurryTo(times.verdict + 0.5, chefs)).toBe(times.verdict + 0.5);
+      let age = 0;
+      for (let tap = 0; tap < 20; tap++) {
+        const next = hurryTo(age, chefs);
+        expect(next).toBeGreaterThanOrEqual(age);
+        expect(next).toBeLessThanOrEqual(Math.max(age, times.verdict));
+        age = next;
+      }
+      expect(age).toBe(times.verdict);
+    }
+  });
+});
+
 describe('places', () => {
   for (const [name, layout] of Object.entries(LAYOUTS)) {
     describe(name, () => {
@@ -334,6 +363,22 @@ describe('places', () => {
         ])
           expect(inside(b, layout)).toBe(true);
         expect(overlaps(j.pills[0], j.pills[1])).toBe(false);
+        // The coins sit clear of the judges, the verdict, the chefs and the button.
+        expect(inside(j.coins, layout)).toBe(true);
+        const judges = j.judges.map((p) => ({
+          x: p.x - 50 * p.scale,
+          y: p.y - 195 * p.scale,
+          w: 100 * p.scale,
+          h: 195 * p.scale,
+        }));
+        const chefs = j.podium.map((p) => ({
+          x: p.x - 60,
+          y: p.y - 195 * p.scale,
+          w: 120,
+          h: 195 * p.scale + 56,
+        }));
+        for (const o of [...judges, ...chefs, j.banner, j.button, ...j.pills])
+          expect(overlaps(j.coins, o)).toBe(false);
         for (const p of j.pills) expect(overlaps(p, j.ribbon)).toBe(false);
         for (const c of j.cards) {
           const card = { x: c.x - c.w / 2, y: c.y - c.h / 2, w: c.w, h: c.h };
@@ -412,7 +457,7 @@ describe('drawing', () => {
           age,
           age > 1,
         );
-        drawTurnCard(g, layout, 'pass', c, ['Pass the iPad!', 'Go!'], 1, age, age > 1);
+        drawTurnCard(g, layout, 'pass', c, ['Pass it!', 'Go!'], 1, age, age > 1);
         drawTurnCard(g, layout, 'challenge', best, challengeLines(pizza, 300), 1, age, age > 1);
       }
       for (const view of views()) {

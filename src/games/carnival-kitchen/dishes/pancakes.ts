@@ -9,6 +9,8 @@ const pancakes: Dish = {
     { kind: 'pour', pours: ['flour', 'milk'], amounts: ['1½ cups', '1 cup'] },
     { kind: 'mix', vessel: 'mixing-bowl', contents: 'batter' },
     { kind: 'flip', item: 'pancake' },
+    // The show-off finish: pretend flames, like a chef's crêpes Suzette.
+    { kind: 'flambe', item: 'pancake', minutes: 2 },
   ],
   // The eggs, or the flour and milk, can go in the bowl first.
   either: [[0, 1]],

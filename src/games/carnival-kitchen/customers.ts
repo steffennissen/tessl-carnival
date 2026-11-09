@@ -308,6 +308,8 @@ export function serveLine(stars: number, dish: Dish): string {
 export function withGuest(steps: readonly RecipeStep[], guest: Guest): RecipeStep[] {
   return steps.map((step) => {
     if (step.kind === 'ticket') return { ...step, from: title(guest) };
+    // They're already watching the party, so they aren't in its crowd.
+    if (step.kind === 'party') return { ...step, guest: guest.id };
     if (step.kind === 'pay') {
       const pay = step as PayOptions;
       const text = pay.text

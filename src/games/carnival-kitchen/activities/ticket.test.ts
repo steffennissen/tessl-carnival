@@ -89,8 +89,16 @@ describe('order tickets', () => {
       random: seeded(2),
       start: 900,
     });
-    expect(plan.map((s) => s.kind)).toEqual(['ticket', 'chop', 'sauce', 'top', 'ask', 'bake']);
-    const top = plan[3] as TopOptions;
+    expect(plan.map((s) => s.kind)).toEqual([
+      'ticket',
+      'chop',
+      'dough-toss',
+      'sauce',
+      'top',
+      'ask',
+      'bake',
+    ]);
+    const top = plan[4] as TopOptions;
     const order = top.order;
     expect(order).toBeDefined();
     if (!order) return;
@@ -100,14 +108,14 @@ describe('order tickets', () => {
       activity: 'ticket',
       settings: DEFAULT_SETTINGS,
     });
-    state.stepIndex = 3;
+    state.stepIndex = 4;
     nextStep(state);
     const ids = current<TopState>(state)
       .spots.map((s) => s.id)
       .sort();
     const want = order.lines.flatMap((l) => Array(l.count).fill(l.id)).sort();
     expect(ids).toEqual(want);
-    const ask = plan[4] as AskOptions;
+    const ask = plan[5] as AskOptions;
     expect(ask.question.choices[ask.question.answer]).toMatch(/^\d+$/);
   });
 

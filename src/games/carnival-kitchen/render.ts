@@ -33,6 +33,8 @@ import {
   tickChef,
   type ChefEvent,
 } from './chef';
+import { surpriseBubble } from './chaos';
+import { createShow, showSurprise, surpriseTilt } from './chaos/show';
 import {
   type Box,
   bookButtonFor,
@@ -77,10 +79,11 @@ import {
   starsFor,
   totalScore,
 } from './game';
-import { gearFor, grownupPlaces, optionBoxes } from './grownups';
+import { type GrownupSettings, gearFor, grownupPlaces, optionBoxes } from './grownups';
 import {
   JUDGES,
   JUDGING,
+  hurryTo,
   judgingMoment,
   judgingPlaces,
   judgingTimes,
@@ -110,7 +113,6 @@ import {
   roundTime,
   stepMinutes,
   wordNow,
-  type LearnSettings,
   type Dish,
   type Effects,
   type Feedback,
@@ -843,6 +845,26 @@ export function createRenderer(ctx: G, voice: Sound) {
 
   /** Seconds since the dish badge was tapped. */
   let badgeAge = 9;
+
+  /** The round's kitchen surprise, as shown (see chaos/show.ts). */
+  const surprise = createShow();
+
+  /**
+   * The round's kitchen surprise over the cooking (chaos/): it draws itself,
+   * and Chef Bunny reacts as it starts and ends. Her line waits for the voice
+   * to be free, so it never talks over an instruction.
+   */
+  function drawSurprise(state: KitchenState, pointer: Pointer, dt: number) {
+    const screen = { x: -layout.sceneX, y: -layout.sceneY, w: layout.width, h: layout.height };
+    const context = { g: ctx, t: fx.time, dt, pointer, shape: layout.shape, screen, effects };
+    const news = showSurprise(surprise, state, context);
+    if (news) {
+      fx.chef.mood = news.kind === 'start' ? 'encourage' : 'cheer';
+      fx.chef.moodAge = 0;
+      if (news.kind === 'end') fx.said = { text: news.line, age: 0 };
+    }
+    if (surprise.line && sound.chatter(surprise.line.text)) surprise.line = null;
+  }
 
   /** Seconds the "Leave the kitchen?" card has been up, or -1 when it isn't. */
   let leaveAge = -1;
@@ -1925,7 +1947,7 @@ export function createRenderer(ctx: G, voice: Sound) {
   }
 
   /** The grown-ups' settings page. */
-  function drawGrownupPage(settings: LearnSettings) {
+  function drawGrownupPage(settings: GrownupSettings) {
     const g = ctx;
     const p = grownupPlaces(layout);
     dim(0.3);
@@ -3030,6 +3052,13 @@ export function createRenderer(ctx: G, voice: Sound) {
       sound.say('Time for the judges! Drumroll, please!');
     },
 
+    /** A tap during the judging: on to the next judge's card, or the verdict (never past it). */
+    hurryJudging() {
+      if (!judging) return;
+      judging.age = hurryTo(judging.age, judging.view.cookoff.chefs.length);
+      judging.drum = 9;
+    },
+
     /** Whether the judging has shown its verdict long enough for a tap to finish. */
     judgingReady() {
       return !!judging && judgingMoment(judging.age, judging.view.cookoff.chefs.length).ready;
@@ -3477,7 +3506,7 @@ export function createRenderer(ctx: G, voice: Sound) {
     },
 
     /** Draws the grown-ups' settings page. */
-    drawGrownups(dt: number, settings: LearnSettings) {
+    drawGrownups(dt: number, settings: GrownupSettings) {
       update(dt);
       begin();
       onCanvas(() => drawGrownupPage(settings));
@@ -3538,14 +3567,25 @@ export function createRenderer(ctx: G, voice: Sound) {
         drawWaitingGuest(end.stand, state);
       }
 
-      // The step being cooked draws itself on the scene (not while serving).
+      // The step being cooked draws itself on the scene (not while serving; tilted by a wobbly table).
       const run = currentRun(state);
       const serving = state.phase === 'over' && end.decor.done && !served(end);
+      const tilt = surpriseTilt(state, fx.time);
+      ctx.save();
+      if (tilt) {
+        ctx.translate(tilt.x, tilt.y);
+        ctx.rotate(tilt.angle);
+        ctx.translate(-tilt.x, -tilt.y);
+      }
       if (!serving) stepOf(run.kind).draw(viewFor(state, run, pointer, dt));
+      ctx.restore();
+      if (state.phase === 'playing') drawSurprise(state, pointer, dt);
 
       // The finished dish, waiting to be decorated before the stars.
       if (state.phase === 'over' && !end.decor.done) {
         drawDecorate(state, end.decor);
+        // A surprise that ended with the last step still shows its "+5".
+        drawSurprise(state, pointer, dt);
         bunny();
         onCanvas(() => drawSpeech(ctx, ['Drag a treat', 'onto your dish!'], places.speech));
         drawButtons();
@@ -3569,7 +3609,8 @@ export function createRenderer(ctx: G, voice: Sound) {
       bunny();
       if (state.phase === 'playing' && state.banner === 0) {
         const said = fx.said;
-        const lines = stepOf(run.kind).bubble?.(currentTurn(state)) ?? hintOf(run);
+        const lines =
+          surpriseBubble(state) ?? stepOf(run.kind).bubble?.(currentTurn(state)) ?? hintOf(run);
         onCanvas(() => drawSpeech(ctx, said ? [said.text] : lines, places.speech));
       }
       drawHud(state);
