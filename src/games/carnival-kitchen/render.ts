@@ -107,6 +107,10 @@ import { SPINNER_DISH, SPIN_TIME, drawSpinner, reelPosition, spinEnd, spinTime }
 import {
   ARRIVE,
   ARRIVE_PLACES,
+  ARRIVE_SPEAKER,
+  arriveEnd,
+  guestReach,
+  onStageX,
   BOSS_PLACES,
   ENTRANCE,
   GUEST,
@@ -2032,7 +2036,7 @@ export function createRenderer(ctx: G, voice: Sound) {
 
   /** The customer, small, waiting at the stand while she cooks. */
   function drawWaitingGuest(stand: StandEnd, state: KitchenState) {
-    const spot = guestSpot(layout, places);
+    const spot = guestSpot(layout, places, guestReach(stand.visit.guest.kind));
     const decorating = state.phase === 'over';
     const pose: GuestPose = {
       t: fx.time,
@@ -2110,7 +2114,7 @@ export function createRenderer(ctx: G, voice: Sound) {
     const counted = countedSoFar(drops, landed);
     const stars = starsFor(totalScore(state), maxScore(state));
     const leaving = stand.visit.guest.boss ? 0 : Math.max(0, age - times.leave);
-    const gx = P.guest.x + leaving * 320;
+    const gx = onStageX(P.guest.x, stand.visit.guest.kind, P.guest.scale) + leaving * 320;
     dim(0.22 * clamp01(age / 0.3));
     onStage(() => {
       const g = ctx;
@@ -2166,6 +2170,9 @@ export function createRenderer(ctx: G, voice: Sound) {
     age: number;
     /** Tapped to move on (the trophy waits for a tap). */
     finished: boolean;
+    /** "Read it myself": the arrival waits for a tap, and its 🔊 reads it out. */
+    reader: boolean;
+    reading: Reading | null;
     /** The coins in the jar before the trophy's bonus. */
     before: number;
     landed: number;
@@ -2173,8 +2180,8 @@ export function createRenderer(ctx: G, voice: Sound) {
   } | null = null;
 
   /** Seconds until a stage scene ends by itself, and before a tap can skip it. */
-  function stageTimes(kind: StageKind) {
-    if (kind === 'arrive') return { skip: ARRIVE.skip, end: ARRIVE.end };
+  function stageTimes(kind: StageKind, reader = false) {
+    if (kind === 'arrive') return { skip: ARRIVE.skip, end: arriveEnd(reader) };
     if (kind === 'entrance') return { skip: ENTRANCE.skip, end: ENTRANCE.end };
     if (kind === 'progress') return { skip: PROGRESS.skip, end: PROGRESS.end };
     return { skip: TROPHY.skip, end: Infinity };
@@ -2228,12 +2235,13 @@ export function createRenderer(ctx: G, voice: Sound) {
     });
   }
 
-  function drawArrive(visit: Visit, age: number, dt: number) {
+  function drawArrive(visit: Visit, age: number, dt: number, reader: boolean) {
     const P = ARRIVE_PLACES;
     const dish = visitDish(visit);
     const before = age - dt;
     if (before < ARRIVE.walk && age >= ARRIVE.walk) {
-      sound.say(greeting(visit.guest, dish).join(' '));
+      // Read it myself: the words wait on screen, and the 🔊 reads them.
+      if (!reader) sound.say(greeting(visit.guest, dish).join(' '));
       fx.chef.mood = 'cheer';
       fx.chef.moodAge = 0;
     }
@@ -2270,6 +2278,11 @@ export function createRenderer(ctx: G, voice: Sound) {
       g.restore();
       g.restore();
       drawTag(g, P.tag.x, P.tag.y, title(visit.guest));
+      if (reader) {
+        const reading = stage?.reading;
+        const S = ARRIVE_SPEAKER;
+        drawSpeaker(g, S.x, S.y, S.r, !!reading && !reading.done(), fx.time);
+      }
       g.font = font(17);
       const lineW = g.measureText(visit.guest.line).width + 28;
       rounded(g, P.line.x - lineW / 2, P.line.y - 15, lineW, 30, 15);
@@ -2312,7 +2325,7 @@ export function createRenderer(ctx: G, voice: Sound) {
       const banner = kind === 'entrance' ? '⭐ A VIP is here! ⭐' : `⭐ ${dishCount(visit)} ⭐`;
       drawRibbon(g, P.banner, banner);
       g.save();
-      g.translate(P.guest.x, P.guest.y);
+      g.translate(onStageX(P.guest.x, visit.guest.kind, P.guest.scale), P.guest.y);
       g.scale(pop, pop);
       drawGuest(g, visit.guest, 0, 0, P.guest.scale, {
         t: fx.time,
@@ -2384,7 +2397,8 @@ export function createRenderer(ctx: G, voice: Sound) {
           'center',
           420,
         );
-        drawGuest(g, visit.guest, P.guest.x, P.guest.y, P.guest.scale, {
+        const gx = onStageX(P.guest.x, visit.guest.kind, P.guest.scale);
+        drawGuest(g, visit.guest, gx, P.guest.y, P.guest.scale, {
           t: fx.time,
           mood: 'happy',
           age: (age - TROPHY.rise) % 1.4,
@@ -2422,15 +2436,42 @@ export function createRenderer(ctx: G, voice: Sound) {
      * a boss's dishes ('progress'), or the boss's trophy ('trophy'). `before`
      * is the coins in the jar before the trophy's bonus.
      */
-    startStage(kind: StageKind, visit: Visit, before = 0) {
-      stage = { kind, visit, age: 0, finished: false, before, landed: 0, drum: 9 };
+    startStage(kind: StageKind, visit: Visit, before = 0, readMyself = false) {
+      stage = {
+        kind,
+        visit,
+        age: 0,
+        finished: false,
+        reader: readMyself && kind === 'arrive',
+        reading: null,
+        before,
+        landed: 0,
+        drum: 9,
+      };
       if (kind === 'arrive') sound.chime([NOTE.E6, NOTE.C6], 0.22, 0.14);
       if (kind === 'entrance' || kind === 'trophy') sound.whoosh();
     },
 
     /** Whether the stand scene is over, so the round (or the next visit) can start. */
     stageDone() {
-      return !stage || stage.finished || stage.age >= stageTimes(stage.kind).end;
+      return !stage || stage.finished || stage.age >= stageTimes(stage.kind, stage.reader).end;
+    },
+
+    /** Whether a canvas point is on the arrival's 🔊 ("Read it myself"). */
+    hitStageSpeaker(x: number, y: number) {
+      if (!stage?.reader || stage.age < ARRIVE.walk) return false;
+      const at = stageAt();
+      const S = ARRIVE_SPEAKER;
+      const sx = at.x + (S.x - 400) * at.scale;
+      const sy = at.y + (S.y - 250) * at.scale;
+      return Math.hypot(x - sx, y - sy) <= (S.r + 8) * at.scale;
+    },
+
+    /** Reads the customer's order out loud (the arrival's 🔊). */
+    readStage() {
+      if (!stage) return;
+      sound.pop();
+      stage.reading = sound.read(greeting(stage.visit.guest, visitDish(stage.visit)).join(' '));
     },
 
     /**
@@ -2440,7 +2481,7 @@ export function createRenderer(ctx: G, voice: Sound) {
      */
     skipStage() {
       if (!stage) return;
-      const times = stageTimes(stage.kind);
+      const times = stageTimes(stage.kind, stage.reader);
       if (stage.age < times.skip) return;
       if (stage.kind === 'trophy') {
         const end = trophyTimes(trophyCoins().drops.length).coinsEnd;
@@ -2459,7 +2500,7 @@ export function createRenderer(ctx: G, voice: Sound) {
       if (s) {
         s.age += dt;
         bunny();
-        if (s.kind === 'arrive') drawArrive(s.visit, s.age, dt);
+        if (s.kind === 'arrive') drawArrive(s.visit, s.age, dt, s.reader);
         else if (s.kind === 'trophy') drawTrophyScene(s.visit, s.age, s.before);
         else drawBoss(s.visit, s.age, s.kind);
       }

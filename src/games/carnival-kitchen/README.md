@@ -173,7 +173,10 @@ drawing and places, and the scenes in `render.ts`).
   counter and asks for it, out loud and in a speech bubble: "Hi! I'm Benny
   Bear. Can I have Pizza, please?", with the dish in a thought cloud and
   their name tag and a line about them ("I love honey on everything!"). A tap
-  after a moment moves on; otherwise cooking starts after 5 seconds. The
+  after a moment moves on; otherwise cooking starts after 5 seconds. With
+  "Read it myself" on, the order isn't read out: it waits for a tap, like
+  the step cards, and a 🔊 beside the customer (at least 60 CSS pixels on a
+  phone) reads it. The
   customers are Benny Bear, Fifi Fox, Kiki Kitten, Pip Penguin, Freddie Frog,
   Ellie Elephant, Polly Pig, Ollie Owl and Lulu the Lobster, never the same
   one twice in a row.
@@ -205,14 +208,16 @@ drawing and places, and the scenes in `render.ts`).
 
 About one visit in six (`BOSS_CHANCE`), a boss comes instead: never in the
 first two visits of a session, never twice in a row, and never for a dish
-from the recipe book. The bosses are the Carnival King (a lion with a crown
-and a cape), Sparky the Dragon and Lulu's Grandma (with glasses and a lace
+from the recipe book. The bosses are the Carnival King (a lion with a big
+mane, round ears, a muzzle, a crown and a cape), Sparky the Dragon and Lulu's Grandma (with glasses and a lace
 cap).
 
 - **The entrance** replaces the dish spinner: the kitchen goes dark, a
   spotlight sweeps about to a drumroll, then the boss pops up in it with a
   fanfare and confetti, and says their order out loud: three different
-  dishes, shown numbered on an order card.
+  dishes, shown numbered on an order card. Every guest is drawn wholly on
+  the screen in every layout, wings and claws too (`guestReach`,
+  `onStageX`).
 - **Three dishes in a row,** each a whole round with its stars, sticker,
   learning moment and coins, served to the boss (who stays). Between them a
   card says "Dish 2 of 3", ticks off the dishes served and lights up the

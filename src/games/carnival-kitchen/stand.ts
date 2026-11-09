@@ -72,13 +72,43 @@ export interface Around {
 export const GUEST = { w: 130, h: 168 } as const;
 
 /**
+ * How far a guest reaches either side of their middle at scale 1: their
+ * paws, and a dragon's wings, a lobster's claws, an elephant's ears.
+ */
+export function guestReach(kind: GuestKind): number {
+  const reach: Partial<Record<GuestKind, number>> = {
+    fox: 68,
+    elephant: 76,
+    king: 66,
+    dragon: 112,
+    lobster: 92,
+    grandma: 92,
+  };
+  return reach[kind] ?? 60;
+}
+
+/**
+ * Where a guest stands on the stage, moved in from `x` just enough that all
+ * of them (wings and claws too) stays on it.
+ */
+export function onStageX(x: number, kind: GuestKind, scale: number): number {
+  const reach = guestReach(kind) * scale + 4;
+  return Math.min(Math.max(x, STAGE.x + reach), STAGE.x + STAGE.w - reach);
+}
+
+/**
  * Where the customer waits while she cooks, in canvas units: `x`, `y` their
  * feet, `scale` their size. Small, and clear of the cooking and the HUD: in
  * the kitchen window above Chef Bunny on a computer, in the kitchen beside
  * the scene on a wide phone held sideways, and below Chef Bunny (or beside
  * her, under her speech bubble) on a phone held upright.
  */
-export function guestSpot(layout: Layout, around: Around): { x: number; y: number; scale: number } {
+export function guestSpot(
+  layout: Layout,
+  around: Around,
+  reach = GUEST.w / 2,
+): { x: number; y: number; scale: number } {
+  const wide = Math.max(GUEST.w, reach * 2 + 8);
   const { sceneX: sx, sceneY: sy, height } = layout;
   if (layout.shape === 'tall') {
     const { bunny, speech, clock } = around;
@@ -87,7 +117,7 @@ export function guestSpot(layout: Layout, around: Around): { x: number; y: numbe
     const below = { x0: 6, x1: Math.min(clockLeft, 236), y0: bunny.y + 136, y1: height - 8 };
     // Or beside her, under her speech bubble, left of the clock.
     const beside = { x0: speech.x, x1: clockLeft, y0: speech.y + 92, y1: height - 8 };
-    const fit = (r: typeof below) => Math.min(1, (r.x1 - r.x0) / GUEST.w, (r.y1 - r.y0) / GUEST.h);
+    const fit = (r: typeof below) => Math.min(1, (r.x1 - r.x0) / wide, (r.y1 - r.y0) / GUEST.h);
     const room = fit(below) >= 0.6 ? below : beside;
     const scale = Math.max(0.4, fit(room));
     return { x: (room.x0 + room.x1) / 2, y: room.y1, scale };
@@ -96,11 +126,11 @@ export function guestSpot(layout: Layout, around: Around): { x: number; y: numbe
     // Beside the scene at the right, under the kitchen clock.
     const top = around.clock.y + around.clock.r * 1.08 + 12;
     const feet = sy + 440;
-    const scale = Math.min(1, (sx - 14) / GUEST.w, (feet - top) / GUEST.h);
+    const scale = Math.min(1, (sx - 14) / wide, (feet - top) / GUEST.h);
     return { x: sx + 800 + sx / 2, y: feet, scale };
   }
   // In the kitchen window, above Chef Bunny's speech bubble.
-  return { x: sx + 101, y: sy + 226, scale: 0.6 };
+  return { x: sx + 101, y: sy + 226, scale: Math.min(0.6, 150 / wide) };
 }
 
 /**
@@ -187,6 +217,17 @@ export const TROPHY_PLACES = {
 
 /** A customer arriving: walking up, then their order. */
 export const ARRIVE = { walk: 0.9, skip: 1.4, end: 5 } as const;
+
+/**
+ * When a customer's arrival ends by itself: after ARRIVE.end, or never with
+ * "Read it myself" on, when it waits for a tap like the step cards do.
+ */
+export function arriveEnd(readMyself: boolean): number {
+  return readMyself ? Infinity : ARRIVE.end;
+}
+
+/** The arrival's 🔊 ("Read it myself"), in stage units: left of the customer, under their bubble. */
+export const ARRIVE_SPEAKER = { x: 236, y: 236, r: 40 } as const;
 /** A boss arriving: a drumroll in the dark, then the reveal and the order. */
 export const ENTRANCE = { drum: 1.6, skip: 3.2, end: 9.5 } as const;
 /** Between a boss's dishes: "Dish 2 of 3". */
@@ -556,15 +597,69 @@ const DRAW: Record<GuestKind, (g: G, look: Look) => void> = {
       g.fillStyle = C.ink;
       g.fill();
     }
-    // The mane.
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2;
-      circle(g, Math.cos(a) * 42, -118 + Math.sin(a) * 42, 16);
+    // A big mane all round the head, with round ears peeking out of it.
+    circle(g, 0, -118, 58);
+    fillStroke(g, C.carrot);
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      circle(g, Math.cos(a) * 52, -118 + Math.sin(a) * 52, 14);
       fillStroke(g, i % 2 ? K.mane : C.carrot, 3);
     }
-    head(g, C.butter, -118, 38);
-    face(g, 0, -120, 1.1, look.faceMood);
-    nose(g, 0, -112, C.carrotDark);
+    circle(g, 0, -118, 50);
+    g.fillStyle = C.carrot;
+    g.fill();
+    for (const side of [-1, 1]) {
+      circle(g, side * 30, -150, 12);
+      fillStroke(g, C.butter, 3);
+      circle(g, side * 30, -150, 6);
+      g.fillStyle = C.pink;
+      g.fill();
+    }
+    head(g, C.butter, -116, 38);
+    // Eyes (happy arcs, dots, or wide), a cream muzzle, a nose and a little "w" mouth.
+    g.strokeStyle = C.ink;
+    g.fillStyle = C.ink;
+    g.lineWidth = 3;
+    g.lineCap = 'round';
+    for (const side of [-1, 1]) {
+      g.beginPath();
+      if (look.faceMood === 'joy') {
+        g.arc(side * 13, -122, 5, Math.PI * 1.15, Math.PI * 1.85);
+        g.stroke();
+      } else {
+        circle(g, side * 13, -124, look.faceMood === 'wow' ? 5 : 4.4);
+        g.fill();
+      }
+    }
+    for (const side of [-1, 1]) {
+      oval(g, side * 9, -103, 12, 10);
+      g.fillStyle = C.cream;
+      g.fill();
+      g.fillStyle = 'rgba(255, 110, 160, 0.45)';
+      oval(g, side * 24, -112, 6, 4);
+      g.fill();
+    }
+    g.beginPath();
+    g.moveTo(-7, -113);
+    g.lineTo(7, -113);
+    g.quadraticCurveTo(0, -103, -7, -113);
+    g.closePath();
+    g.fillStyle = C.ink;
+    g.fill();
+    g.beginPath();
+    g.arc(-4.5, -101, 4.5, 0, Math.PI);
+    g.arc(4.5, -101, 4.5, 0, Math.PI);
+    g.stroke();
+    g.fillStyle = C.ink;
+    for (const [dx, dy] of [
+      [-14, -103],
+      [-18, -99],
+      [14, -103],
+      [18, -99],
+    ]) {
+      circle(g, dx, dy, 1.6);
+      g.fill();
+    }
     // The crown.
     g.beginPath();
     g.moveTo(-28, -150);

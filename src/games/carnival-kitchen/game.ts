@@ -481,7 +481,7 @@ export const carnivalKitchen: CarnivalGame = {
     const showStage = (kind: StageKind, before = 0) => {
       if (!visit) return;
       staging = kind;
-      renderer.startStage(kind, visit, before);
+      renderer.startStage(kind, visit, before, settings.readMyself);
     };
 
     /** Whether the finished dish is being decorated, before the stars. */
@@ -633,8 +633,10 @@ export const carnivalKitchen: CarnivalGame = {
         return;
       }
       if (staging) {
-        // A guest arriving, a boss, the trophy: a tap moves on once it has shown a moment.
-        renderer.skipStage();
+        // A guest arriving, a boss, the trophy: a tap moves on once it has
+        // shown a moment. Read it myself: the arrival's 🔊 reads the order.
+        if (renderer.hitStageSpeaker(at.x, at.y)) renderer.readStage();
+        else renderer.skipStage();
         return;
       }
       if (screen === 'kitchen' && state.phase === 'playing' && renderer.hitBadge(at.x, at.y)) {

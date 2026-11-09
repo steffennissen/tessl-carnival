@@ -4,7 +4,16 @@ import { dishById } from './dishes';
 import { layoutFor } from './layout';
 import { placesFor } from './render';
 import {
+  ARRIVE,
+  ARRIVE_PLACES,
+  ARRIVE_SPEAKER,
+  BOSS_PLACES,
   GUEST,
+  SERVE_PLACES,
+  TROPHY_PLACES,
+  arriveEnd,
+  guestReach,
+  onStageX,
   SERVE,
   STAGE,
   coinArc,
@@ -24,7 +33,9 @@ import {
   walletSpot,
 } from './stand';
 import type { Box } from './kit';
-import { fakeCanvas, overlaps } from './test-kit';
+import { cssScale, fakeCanvas, overlaps } from './test-kit';
+
+const KINDS = [...CUSTOMERS, ...BOSSES].map((g) => g.kind);
 
 const LAYOUTS = {
   page: layoutFor(1200, 800, false),
@@ -57,6 +68,13 @@ describe('where the stand goes', () => {
     const places = placesFor(layout);
 
     it(`puts the waiting customer clear of the HUD, Chef Bunny and the clock (${name})`, () => {
+      for (const kind of KINDS) {
+        const spot = guestSpot(layout, places, guestReach(kind));
+        // Wings, claws and ears too.
+        const reach = guestReach(kind) * spot.scale;
+        expect(spot.x - reach, kind).toBeGreaterThanOrEqual(0);
+        expect(spot.x + reach, kind).toBeLessThanOrEqual(layout.width);
+      }
       const spot = guestSpot(layout, places);
       const w = GUEST.w * spot.scale;
       const h = GUEST.h * spot.scale;
@@ -88,6 +106,46 @@ describe('where the stand goes', () => {
       expect(overlaps(box, recipe)).toBe(false);
     });
 
+    it(`keeps every guest and boss wholly on the canvas in the stand's scenes (${name})`, () => {
+      const at = stageSpot(layout, places);
+      const toCanvas = (x: number) => at.x + (x - 400) * at.scale;
+      for (const place of [
+        ARRIVE_PLACES.guest,
+        BOSS_PLACES.guest,
+        SERVE_PLACES.guest,
+        TROPHY_PLACES.guest,
+      ]) {
+        for (const kind of KINDS) {
+          const x = onStageX(place.x, kind, place.scale);
+          const reach = guestReach(kind) * place.scale;
+          expect(x - reach, kind).toBeGreaterThanOrEqual(STAGE.x);
+          expect(x + reach, kind).toBeLessThanOrEqual(STAGE.x + STAGE.w);
+          expect(toCanvas(x - reach), kind).toBeGreaterThanOrEqual(0);
+          expect(toCanvas(x + reach), kind).toBeLessThanOrEqual(layout.width);
+        }
+      }
+    });
+
+    it(`makes the arrival's 🔊 big enough for a finger (${name})`, () => {
+      const at = stageSpot(layout, places);
+      const S = ARRIVE_SPEAKER;
+      // On a 390×844 phone, upright or sideways: at least 60 CSS pixels.
+      if (layout === LAYOUTS['tall phone'] || layout === LAYOUTS['wide phone']) {
+        expect(2 * S.r * at.scale * cssScale(layout.shape)).toBeGreaterThanOrEqual(60);
+      }
+      // Clear of the customer, their bubble and their name tag.
+      const speaker = { x: S.x - S.r, y: S.y - S.r, w: 2 * S.r, h: 2 * S.r };
+      const P = ARRIVE_PLACES;
+      expect(overlaps(speaker, P.bubble)).toBe(false);
+      expect(overlaps(speaker, { x: P.tag.x - 140, y: P.tag.y - 19, w: 280, h: 38 })).toBe(false);
+      // Only customers arrive this way (a boss has an entrance of their own).
+      for (const guest of CUSTOMERS) {
+        const left = P.guest.x - guestReach(guest.kind) * P.guest.scale;
+        expect(speaker.x + speaker.w, guest.kind).toBeLessThanOrEqual(left);
+      }
+      expect(speaker.x).toBeGreaterThanOrEqual(STAGE.x);
+    });
+
     it(`fits the stand's scenes on the canvas (${name})`, () => {
       const at = stageSpot(layout, places);
       const left = at.x + (STAGE.x - 400) * at.scale;
@@ -103,6 +161,13 @@ describe('where the stand goes', () => {
       }
     });
   }
+});
+
+describe('a customer arriving', () => {
+  it('ends by itself, unless Read it myself is on: then it waits for a tap', () => {
+    expect(arriveEnd(false)).toBe(ARRIVE.end);
+    expect(arriveEnd(true)).toBe(Infinity);
+  });
 });
 
 describe('serving and the jar', () => {

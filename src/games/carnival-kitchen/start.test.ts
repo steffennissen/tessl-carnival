@@ -190,10 +190,11 @@ describe('start', () => {
     // Tap to cook, then wait for the dish spinner, and the customer to order.
     p.tap(p.layout.width / 2, p.layout.height / 2);
     p.texts.length = 0;
-    p.run(5);
+    // The spinner takes up to 4.6 seconds, and the customer talks once they've walked up.
+    p.run(7);
     expect(p.texts.some((text) => text.startsWith("Hi! I'm"))).toBe(true);
     expect(p.texts.some((text) => /^Can I have .+, please\?$/.test(text))).toBe(true);
-    p.run(5);
+    p.run(3);
     const [cx, cy] = p.scene(CIRCLE.x, CIRCLE.y);
     const record = vi.mocked(carnival.recordScore);
     // Cook without knowing the steps: taps, holds and stirring circles.
