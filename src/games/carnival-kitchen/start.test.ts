@@ -14,7 +14,11 @@ import { carnivalKitchen } from './game';
 
 vi.mock('../../carnival', async (importOriginal) => {
   const real = await importOriginal<typeof import('../../carnival')>();
-  return { ...real, recordScore: vi.fn(real.recordScore) };
+  return {
+    ...real,
+    recordScore: vi.fn(real.recordScore),
+    earnCoins: vi.fn(real.earnCoins),
+  };
 });
 // Plain cooking, so a round can be played without answering questions.
 vi.mock('./grownups', async (importOriginal) => {
@@ -153,6 +157,7 @@ function phone() {
 
 beforeEach(() => {
   vi.mocked(carnival.recordScore).mockClear();
+  vi.mocked(carnival.earnCoins).mockClear();
 });
 
 afterEach(() => {
@@ -178,12 +183,16 @@ describe('start', () => {
     expect(p.attributes.get('aria-label')).toBe('Old label');
   });
 
-  it('records the score once per round', () => {
+  it('records the score and earns the coins once per round', () => {
     const p = phone();
     const stop = carnivalKitchen.start(p.canvas as unknown as HTMLCanvasElement);
     p.run(0.2);
-    // Tap to cook, then wait for the dish spinner.
+    // Tap to cook, then wait for the dish spinner, and the customer to order.
     p.tap(p.layout.width / 2, p.layout.height / 2);
+    p.texts.length = 0;
+    p.run(5);
+    expect(p.texts.some((text) => text.startsWith("Hi! I'm"))).toBe(true);
+    expect(p.texts.some((text) => /^Can I have .+, please\?$/.test(text))).toBe(true);
     p.run(5);
     const [cx, cy] = p.scene(CIRCLE.x, CIRCLE.y);
     const record = vi.mocked(carnival.recordScore);
@@ -199,11 +208,20 @@ describe('start', () => {
       p.run(0.1);
     }
     expect(record).toHaveBeenCalledTimes(1);
-    // Decorating, the stars and more frames don't record it again.
-    p.run(25);
+    const earn = vi.mocked(carnival.earnCoins);
+    expect(earn).toHaveBeenCalledTimes(1);
+    const [, coins] = earn.mock.calls[0];
+    expect(coins).toBeGreaterThanOrEqual(10);
+    expect(coins).toBeLessThanOrEqual(40);
+    // Decorating, serving the dish, the stars and more frames don't record it again.
+    p.texts.length = 0;
+    p.run(30);
+    expect(p.texts).toContain(`+${coins}`);
+    expect(p.texts.some((text) => text.includes(`🪙 +${coins}`))).toBe(true);
     p.tap(...p.scene(400, 250));
     p.run(1);
     expect(record).toHaveBeenCalledTimes(1);
+    expect(earn).toHaveBeenCalledTimes(1);
     stop();
   });
 

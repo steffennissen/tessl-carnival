@@ -1,6 +1,32 @@
-import { earnSticker, recordScore, stickersFor, theme, type CarnivalGame } from '../../carnival';
+import {
+  coinsFor,
+  earnCoins,
+  earnSticker,
+  recordScore,
+  stickersFor,
+  theme,
+  type CarnivalGame,
+} from '../../carnival';
 import { planRound } from './activities';
-import { bookButtonFor, bookPlaces, cellAt, inBox } from './book';
+import { bookButtonFor, bookPlaces, cellAt, inBox, trophyAt } from './book';
+import {
+  BOSSES,
+  CUSTOMERS,
+  afterDish,
+  bossDishes,
+  bossDue,
+  claimTrophy,
+  createTill,
+  createVisit,
+  nextDish,
+  paidCoins,
+  pickGuest,
+  roundCoins,
+  trophiesOf,
+  withGuest,
+  type Guest,
+  type Visit,
+} from './customers';
 import {
   createDecor,
   decorMove,
@@ -39,7 +65,7 @@ import {
   type RoundPlan,
 } from './kit';
 import { fillsScreen, isTouchDevice, layoutFor, sameLayout, toScene, type Shape } from './layout';
-import { createRenderer } from './render';
+import { createRenderer, type RoundEnd, type StageKind, type StandEnd } from './render';
 import { createSound } from './sound';
 import { stepOf } from './steps';
 
@@ -376,6 +402,20 @@ export const carnivalKitchen: CarnivalGame = {
     };
 
     let state = createState(pickDish());
+    // The food stand: the guest being cooked for, and this session's visits
+    // so far (a boss never comes in the first two, or twice in a row).
+    let visit: Visit | null = null;
+    let stand: StandEnd | null = null;
+    let visits = 0;
+    let lastGuest: Guest | null = null;
+    let lastBoss: Guest | null = null;
+    let lastWasBoss = false;
+    // A stand scene showing between rounds (a guest arriving, a boss, the trophy).
+    let staging: StageKind | null = null;
+    // The longest perfect streak this round, for the customer's tip.
+    let streak = 0;
+    // Earns each round's coins once, however often it's asked.
+    const till = createTill();
     // The title screen waits for a tap to start cooking; the recipe book
     // opens from it; the kitchen is where the cooking (and decorating) is.
     let screen: 'title' | 'book' | 'grownups' | 'kitchen' = 'title';
@@ -417,8 +457,31 @@ export const carnivalKitchen: CarnivalGame = {
         sticker = stickerNews(before, earnSticker(carnivalKitchen.id, id, level));
         smart = smartChef(state);
         if (smart) earnSticker(carnivalKitchen.id, smartSticker(state.dish.id), 1);
+        // The customer pays: the coins go in the jar.
+        if (stand) {
+          noteStreak();
+          const coins = roundCoins({ stars: level, streak, smart, paid: paidCoins(state) });
+          const jar = coinsFor(carnivalKitchen.id);
+          const earned = till.settle(state, coins, (n) => earnCoins(carnivalKitchen.id, n));
+          if (earned !== null) stand = { ...stand, coins, before: jar };
+        }
         scoreRecorded = true;
       }
+    };
+
+    /** Keeps the round's longest perfect streak. */
+    const noteStreak = () => {
+      streak = Math.max(streak, state.combo);
+    };
+
+    /** What the renderer shows after the cooking: decorating, serving, the end card. */
+    const roundEnd = (): RoundEnd => ({ decor, sticker, smart, stand: stand ?? undefined });
+
+    /** Shows a stand scene: a guest arriving, a boss, "Dish 2 of 3", or the trophy. */
+    const showStage = (kind: StageKind, before = 0) => {
+      if (!visit) return;
+      staging = kind;
+      renderer.startStage(kind, visit, before);
     };
 
     /** Whether the finished dish is being decorated, before the stars. */
@@ -429,19 +492,71 @@ export const carnivalKitchen: CarnivalGame = {
      * at random is shown on the dish spinner first (`spin`), which lands on
      * it; a chosen dish starts straight away unless `spin` says otherwise.
      */
-    const newRound = (dish?: Dish, { spin = dish === undefined }: { spin?: boolean } = {}) => {
-      lastDish = dish ?? pickDish(Math.random, lastDish);
-      const plan = planRound(lastDish, settings, Math.random, lastActivity);
+    const cook = (dish: Dish, spin: boolean) => {
+      lastDish = dish;
+      const plan = planRound(dish, settings, Math.random, lastActivity);
       lastActivity = plan.activity ?? lastActivity;
-      state = createState(lastDish, Math.random, plan);
+      // An order ticket comes from the guest, and "the customer pays" is them paying.
+      const steps = visit ? withGuest(plan.steps, visit.guest) : plan.steps;
+      state = createState(dish, Math.random, { ...plan, steps });
       scoreRecorded = false;
       decor = createDecor();
       sticker = null;
       smart = false;
+      streak = 0;
+      stand = visit
+        ? { visit, coins: null, before: coinsFor(carnivalKitchen.id), next: afterDish(visit) }
+        : null;
       screen = 'kitchen';
+      staging = null;
       renderer.reset();
       spinning = spin;
-      if (spin) renderer.startSpin(lastDish);
+      if (spin) renderer.startSpin(dish);
+    };
+
+    /**
+     * A new visit to the stand. A customer orders `dish`, or a dish picked at
+     * random on the dish spinner, and walks up once it lands. Now and then
+     * (never for a dish from the recipe book) a boss comes instead, with a
+     * fanfare, and orders three dishes.
+     */
+    const newRound = (dish?: Dish) => {
+      const boss = dish === undefined && bossDue(visits, Math.random, lastWasBoss);
+      visits += 1;
+      lastWasBoss = boss;
+      if (boss) {
+        lastBoss = pickGuest(BOSSES, Math.random, lastBoss);
+        visit = createVisit(lastBoss, bossDishes(DISHES, Math.random, lastDish));
+        cook(visit.dishes[0], false);
+        showStage('entrance');
+        return;
+      }
+      lastGuest = pickGuest(CUSTOMERS, Math.random, lastGuest);
+      const next = dish ?? pickDish(Math.random, lastDish);
+      visit = createVisit(lastGuest, [next]);
+      cook(next, dish === undefined);
+      // With the spinner, they walk up once it lands (see the loop).
+      if (dish) showStage('arrive');
+    };
+
+    /** After a dish's end card: the boss's next dish, their trophy, or a new visit. */
+    const afterRound = () => {
+      const after = visit ? afterDish(visit) : 'done';
+      if (visit && after === 'next dish') {
+        cook(nextDish(visit), false);
+        showStage('progress');
+      } else if (visit && after === 'trophy') {
+        const before = coinsFor(carnivalKitchen.id);
+        const wins = trophiesOf(stickersFor(carnivalKitchen.id))[visit.guest.id] ?? 0;
+        const prize = claimTrophy(visit, wins);
+        if (prize) {
+          earnSticker(carnivalKitchen.id, prize.sticker, prize.level);
+          earnCoins(carnivalKitchen.id, prize.coins);
+        }
+        showStage('trophy', before);
+      } else {
+        newRound();
+      }
     };
 
     /** Where the event is, in canvas units. The pointer keeps scene units. */
@@ -459,6 +574,12 @@ export const carnivalKitchen: CarnivalGame = {
     };
     /** A tap on the recipe book: an earned dish cooks it, anywhere else closes it. */
     const tapBook = (x: number, y: number) => {
+      // A trophy on the shelf: Chef Bunny says whose it is.
+      const trophy = trophyAt(layout, x, y, BOSSES.length);
+      if (trophy >= 0) {
+        renderer.sayTrophy(trophy, trophiesOf(bookStickers)[BOSSES[trophy].id] ?? 0);
+        return;
+      }
       const i = cellAt(bookPlaces(layout, DISHES.length).cells, x, y);
       const dish = DISHES[i] as Dish | undefined;
       if (dish && (bookStickers[dish.id] ?? 0) >= 1) {
@@ -511,6 +632,11 @@ export const carnivalKitchen: CarnivalGame = {
         renderer.skipSpin();
         return;
       }
+      if (staging) {
+        // A guest arriving, a boss, the trophy: a tap moves on once it has shown a moment.
+        renderer.skipStage();
+        return;
+      }
       if (screen === 'kitchen' && state.phase === 'playing' && renderer.hitBadge(at.x, at.y)) {
         // The dish's badge: Chef Bunny says what we're making. Not a step press.
         renderer.sayDish(state.dish);
@@ -552,13 +678,18 @@ export const carnivalKitchen: CarnivalGame = {
         if (did === 'pick') sound.pop();
         if (did === 'place') renderer.sparkle(pointer.x, pointer.y);
       } else if (state.phase === 'over') {
-        // A short pause first, so a last excited tap doesn't skip the stars.
-        if (!renderer.endShown()) return;
+        // While serving, a tap hurries on to the end card. Then a short
+        // pause, so a last excited tap doesn't skip the stars.
+        if (!renderer.endShown()) {
+          renderer.skipServe(roundEnd());
+          return;
+        }
         saveScore();
-        newRound();
+        afterRound();
       } else {
         if (!press(state, pointer.x, pointer.y, layout.shape))
           renderer.notYet(pointer.x, pointer.y);
+        noteStreak();
       }
     };
     const onMove = (event: PointerEvent) => {
@@ -587,6 +718,7 @@ export const carnivalKitchen: CarnivalGame = {
       } else if (release(state, layout.shape) === 'not yet') {
         renderer.notYet(pointer.x, pointer.y);
       }
+      noteStreak();
       saveScore();
     };
     canvas.addEventListener('pointerdown', onDown);
@@ -623,7 +755,19 @@ export const carnivalKitchen: CarnivalGame = {
       } else if (spinning) {
         // The round doesn't tick while the spinner runs.
         renderer.drawSpin(dt);
-        if (renderer.spinDone()) spinning = false;
+        if (renderer.spinDone()) {
+          spinning = false;
+          // The customer walks up to the counter and asks for the dish.
+          showStage('arrive');
+        }
+      } else if (staging) {
+        renderer.drawStage(dt);
+        if (renderer.stageDone()) {
+          const shown = staging;
+          staging = null;
+          // After the trophy, the next visit.
+          if (shown === 'trophy') newRound();
+        }
       } else {
         // A card being read out by its speaker stays up until it's done, then
         // a moment more.
@@ -633,10 +777,11 @@ export const carnivalKitchen: CarnivalGame = {
         wasReading = reading;
         if (!paused) {
           tick(state, dt);
+          noteStreak();
           saveScore();
           if (decorating()) decorTick(decor, dt);
         }
-        renderer.draw(state, pointer, dt, { decor, sticker, smart });
+        renderer.draw(state, pointer, dt, roundEnd());
       }
       frame = requestAnimationFrame(loop);
     };
