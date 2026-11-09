@@ -39,6 +39,8 @@ import type { Reading } from '../sound';
 export interface TicketOptions extends StepBasics {
   kind: 'ticket';
   order: Order;
+  /** Who it's from, when a customer at the stand ordered it: "Benny Bear". */
+  from?: string;
 }
 
 declare module '../kit/types' {
@@ -193,7 +195,17 @@ const ticket: Step<TicketOptions, TicketState, TicketFx> = {
     fillStroke(g, C.cream, 3.5);
     g.fillStyle = C.pink;
     g.fillRect(paper.x + 2, paper.y + 2, paper.w - 4, 12);
-    stickerText(g, '🧾 Order', paper.x + paper.w / 2 + 10, paper.y + 40, 30, C.purple);
+    const heading = options.from ? `🧾 ${options.from}'s order` : '🧾 Order';
+    stickerText(
+      g,
+      heading,
+      paper.x + paper.w / 2 + 10,
+      paper.y + 40,
+      30,
+      C.purple,
+      'center',
+      paper.w - 2 * (speaker.x - paper.x + speaker.r) + 10,
+    );
     const highlight = wordNow(fx.reading);
     drawSpeaker(g, speaker.x, speaker.y, speaker.r, highlight >= 0, t);
     // Dashes under the heading (and the speaker), like a real ticket.

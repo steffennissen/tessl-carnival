@@ -96,13 +96,45 @@ export function closeButton(layout: Layout): { x: number; y: number; r: number }
   return { x: layout.width - 14 - r, y: 14 + r, r };
 }
 
+/** How tall the trophy shelf is on a phone held upright, along the bottom of the book. */
+const TALL_SHELF = 136;
+
+/**
+ * The trophy shelf: a golden trophy for each boss (see customers.ts), or a
+ * grey "?" for one not won yet. At the top left of the page, beside the
+ * title, or along the bottom on a phone held upright. `slots` is one box per
+ * trophy, under the shelf's label.
+ */
+export function trophyShelf(layout: Layout, count = 3): { box: Box; label: number; slots: Box[] } {
+  const box: Box =
+    layout.shape === 'tall'
+      ? { x: 22, y: layout.height - 24 - TALL_SHELF, w: layout.width - 44, h: TALL_SHELF }
+      : { x: 24, y: 16, w: 204, h: 88 };
+  const label = layout.shape === 'tall' ? 24 : 18;
+  const w = box.w / count;
+  const slots = Array.from({ length: count }, (_, i) => ({
+    x: box.x + i * w,
+    y: box.y + label + 6,
+    w,
+    h: box.h - label - 8,
+  }));
+  return { box, label, slots };
+}
+
+/** The trophy shelf's slot under a canvas point, or -1. */
+export function trophyAt(layout: Layout, x: number, y: number, count = 3): number {
+  return trophyShelf(layout, count).slots.findIndex((b) => inBox(b, x, y));
+}
+
 /** Where the book's parts go on the canvas, for a layout. */
 export function bookPlaces(layout: Layout, count: number) {
   const { width, height } = layout;
   const page: Box = { x: 10, y: 10, w: width - 20, h: height - 20 };
   const tall = layout.shape === 'tall';
   const header = tall ? 150 : 100;
-  const area: Box = { x: 22, y: 10 + header, w: width - 44, h: height - header - 30 };
+  // On a phone held upright the trophy shelf takes the bottom of the page.
+  const shelf = tall ? TALL_SHELF + 10 : 0;
+  const area: Box = { x: 22, y: 10 + header, w: width - 44, h: height - header - 30 - shelf };
   return {
     page,
     title: { x: width / 2, y: tall ? 62 : 46 },

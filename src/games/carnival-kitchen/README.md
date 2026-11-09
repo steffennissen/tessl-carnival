@@ -48,7 +48,8 @@ A round goes like this:
    the dish that was picked, with its big picture and name, while Chef Bunny
    says "Let's make ...!". It takes about 4 seconds; once it has landed, a tap
    skips the rest of the wait, and taps before that do nothing. A dish picked
-   from the recipe book skips the spinner.
+   from the recipe book skips the spinner. Then a customer walks up to the
+   stand and orders it (see "The food stand").
 3. **The steps**, one card at a time. A ribbon on the first card says what
    we're making, a card names each step with its number and how many
    minutes it takes ("Step 1 of 4 · ⏰ 5 min"), a voice reads it out, and Chef
@@ -190,6 +191,85 @@ Nothing is ever wasted:
   button needs no permission and works on every device.
 - A chop always cuts the nearest dotted line, and scores something whenever
   the knife is close to it.
+
+## The food stand
+
+Every round is cooked for a customer at Chef Bunny's food stand
+(`customers.ts` for who comes and what they pay, `stand.ts` for their
+drawing and places, and the scenes in `render.ts`).
+
+- **A customer walks up.** Once the dish spinner lands (or a dish is picked
+  from the recipe book, the Birthday Cake too once it's unlocked), a little bell rings and a customer walks up to the
+  counter and asks for it, out loud and in a speech bubble: "Hi! I'm Benny
+  Bear. Can I have Pizza, please?", with the dish in a thought cloud and
+  their name tag and a line about them ("I love honey on everything!"). A tap
+  after a moment moves on; otherwise cooking starts after 5 seconds. With
+  "Read it myself" on, the order isn't read out: it waits for a tap, like
+  the step cards, and a 🔊 beside the customer (at least 60 CSS pixels on a
+  phone) reads it. The
+  customers are Benny Bear, Fifi Fox, Kiki Kitten, Pip Penguin, Freddie Frog,
+  Ellie Elephant, Polly Pig, Ollie Owl and Lulu the Lobster, never the same
+  one twice in a row.
+- **They watch her cook,** small and out of the way: in the kitchen window
+  above Chef Bunny on a computer, beside the scene under the kitchen clock on
+  a wide phone held sideways, and below Chef Bunny (or beside her, under her
+  speech bubble) held upright. A Perfect! or Great! makes them hop for joy.
+  An order ticket is theirs ("🧾 Benny Bear's order"), and "the customer
+  pays" is them paying ("Benny pays 45¢. Tap the coins to pay!").
+- **Serving.** After decorating, the dish slides over to them and they're
+  delighted, more with more stars, and never disappointed: 1 star is "Yummy,
+  thank you!", 2 "Super yummy! Thank you!", 3 "Wow! The best Pizza ever!".
+  Then they pay: the coins fly one by one into the coin jar, each with a
+  clink, and a number above the jar counts them up. A customer waves and
+  walks off, and the end card shows the coins earned and how many are in the
+  jar ("🪙 +25 · Jar: 140"), and Chef Bunny says "You earned 25 coins!". A
+  tap while serving skips to the end card.
+- **The coins** (`roundCoins`): 10 for each star, 5 more for a perfect
+  streak (3 Perfect! in a row at some point, Chef Bunny's party) and 5 for a
+  Smart Chef round, so 10 to 40, all in tens and fives. When the customer
+  paid, the coins she counted into the tray are the payment instead of the
+  stars' tens (45¢ is 45 coins, quarters and dimes flying into the jar), plus
+  the tip and the Smart Chef 5. They're earned once per round, when the round
+  ends, with the carnival's shared wallet (`earnCoins` in `src/carnival`),
+  and the jar's total is also on the HUD while she cooks, small, along the
+  top near the buttons (under the score on a phone held upright).
+
+### Bosses
+
+About one visit in six (`BOSS_CHANCE`), a boss comes instead: never in the
+first two visits of a session, never twice in a row, and never for a dish
+from the recipe book. The bosses are the Carnival King (a lion with a big
+mane, round ears, a muzzle, a crown and a cape), Sparky the Dragon and Lulu's Grandma (with glasses and a lace
+cap).
+
+- **The entrance** replaces the dish spinner: the kitchen goes dark, a
+  spotlight sweeps about to a drumroll, then the boss pops up in it with a
+  fanfare and confetti, and says their order out loud: three different
+  dishes, shown numbered on an order card. They're picked from the dishes a
+  round can pick (`playableDishes`), so the Birthday Cake only once it's
+  unlocked. Every guest is drawn wholly on
+  the screen in every layout, wings and claws too (`guestReach`,
+  `onStageX`).
+- **Three dishes in a row,** each a whole round with its stars, sticker,
+  learning moment and coins, served to the boss (who stays). Between them a
+  card says "Dish 2 of 3", ticks off the dishes served and lights up the
+  next; the end card's button says "Next dish!", and after the last one
+  "Trophy time!".
+- **The trophy ceremony.** Whatever the stars (a boss can't be failed), a
+  drumroll, then a golden trophy with the boss's badge rises in the
+  spotlight with a fanfare, and a bonus of 50 coins (`TROPHY_COINS`) drops
+  into the jar as five tens. The trophy is the sticker `trophy:<boss id>`
+  (`trophy:king`, `trophy:dragon`, `trophy:grandma`), its level how many
+  times it was won; it and the bonus are given once per boss visit
+  (`claimTrophy`). A trophy is worth 3 chef points, so it can bring a new
+  rank: its ceremony comes after the trophy, before the next visit, and
+  never in the middle of a boss's three dishes. A tap then starts the next
+  visit.
+- **The trophy shelf** in the recipe book shows each boss's golden trophy
+  ("×2" when won more than once), or a grey "?" for one not won yet: at the
+  top left of the page beside the title, or along the bottom on a phone held
+  upright, clear of the dishes and the wrapped surprise. Tapping a trophy
+  has Chef Bunny say whose it is.
 
 ## The shop
 
@@ -1268,8 +1348,14 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
 - `decorate.ts`: decorating the finished dish: the treats, where the dish,
   tray and **Done!** go for each layout, and plain functions for pressing,
   dragging and letting go. `decorate.test.ts` tests it.
-- `book.ts`: the recipe book's count, grid and hit testing, and the title
-  screen's book button. `book.test.ts` tests it.
+- `book.ts`: the recipe book's count, grid, trophy shelf and hit testing, and
+  the title screen's book button. `book.test.ts` tests it.
+- `customers.ts`: the food stand's guests and bosses, when a boss comes, a
+  visit's dishes and trophy, what they say, and the coins a round brings in.
+  `customers.test.ts` tests it.
+- `stand.ts`: drawing the guests, the coin jar, coins and the trophy, and
+  where the stand goes in each layout (`guestSpot`, `walletSpot`,
+  `stageSpot`) and its timings. `stand.test.ts` tests it.
 - `grownups.ts`: the grown-ups' settings: the gear, the page's layout and
   hit testing, and loading and saving them. `grownups.test.ts` tests it.
 - `activities/`: one file per learning activity, and `index.ts`, which finds
