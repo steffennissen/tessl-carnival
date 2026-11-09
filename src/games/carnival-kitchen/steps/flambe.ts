@@ -243,6 +243,7 @@ interface FlambeFx {
 
 const flambe: Step<FlambeOptions, FlambeState, FlambeFx> = {
   kind: 'flambe',
+  finisher: true,
   uses: (o) => [[o.item, 'flip']],
   start: (o, random) => startFlambe(o.goes ?? FLAMBE_GOES, random),
 

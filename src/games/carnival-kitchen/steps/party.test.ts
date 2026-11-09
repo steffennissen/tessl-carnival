@@ -16,6 +16,7 @@ import {
 } from '../test-kit';
 import {
   BLOW_TIME,
+  BUNTING,
   CROWD_SIZE,
   crowdFor,
   friendBox,
@@ -131,6 +132,14 @@ describe('party', () => {
       }
     });
   }
+
+  it('hangs the bunting clear of the recipe, the streak and Chef Bunny in every layout', () => {
+    for (const shape of ['page', 'wide', 'tall'] as const) {
+      for (const clear of keepClear(shape, 7)) {
+        expect(overlaps(BUNTING, clear), shape).toBe(false);
+      }
+    }
+  });
 
   it("leaves the round's own customer out of the crowd: they're already watching", () => {
     const state = ready('cupcakes', 'party');

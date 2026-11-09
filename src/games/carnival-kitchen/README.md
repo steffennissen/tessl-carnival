@@ -421,6 +421,8 @@ Nothing is ever lost:
   fills (the stirring clock stops, a floating egg holds still). The step's
   own state, the score and the streak aren't touched.
 - The flashlight doesn't stop anything: she cooks on in its light.
+- A surprise never happens during a learning moment or an epic finisher
+  (the dough toss, flambé, tower or party): those are a show of their own.
 - Finishing a surprise adds 5 points (`CHAOS_BONUS`), once, with a "+5"
   and sparkles. A flashlight that ends with the last step shows its "+5"
   on the decorate screen.
@@ -1225,6 +1227,7 @@ The `Step` interface (`kit/types.ts`; `O` options, `S` state, `F` effect memory)
 | `observe?(view)`                 | Each frame, from the step's start to the end of the round: play sounds and throw sparkles on changes.     |
 | `draw(view)`                     | Draws the step on the scene.                                                                              |
 | `learning?`                      | A learning step (a ticket, a question): see "Learning".                                                   |
+| `finisher?`                      | An epic finisher (a dough toss, a party): kitchen surprises never happen on it.                           |
 | `bubble?(turn)`                  | Chef Bunny's two lines right now, instead of the hint (after a wrong answer, say).                        |
 | `solve?(turn)`                   | For tests: does what someone who knows would do. Learning steps have one, for `playThrough`.              |
 

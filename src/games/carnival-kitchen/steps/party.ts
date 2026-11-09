@@ -140,6 +140,12 @@ export const PARTY_ROOM = { left: 212, right: 690, bottom: 462 } as const;
 /** How far down each layout shows the scene: a phone held upright shows more. */
 const SHOWN_DOWN: Record<Shape, number> = { page: 500, wide: 500, tall: 546 };
 
+/**
+ * Where the party's bunting hangs, flags and their flutter included: under
+ * the recipe along the top and the streak, clear of them in every layout.
+ */
+export const BUNTING = { x: 230, y: 126, w: 340, h: 58 } as const;
+
 /** How many friends come to sing, and how big they are. */
 export const CROWD_SIZE = 5;
 export const CROWD_SCALE = 0.5;
@@ -456,6 +462,7 @@ interface PartyFx {
 
 const party: Step<PartyOptions, PartyState, PartyFx> = {
   kind: 'party',
+  finisher: true,
   uses: (o) => [[o.cake, 'partyCake']],
   start: (o, random) => startParty(o, random),
 
@@ -571,17 +578,18 @@ const party: Step<PartyOptions, PartyState, PartyFx> = {
     const art = artOf(options.cake, 'partyCake');
     const partying = s.phase === 'party';
 
-    // Bunting across the wall.
+    // Bunting across the wall, under the recipe along the top.
+    const { x: bx, y: by, w: bw } = BUNTING;
     g.lineWidth = 3;
     g.strokeStyle = C.ink;
     g.beginPath();
-    g.moveTo(230, 118);
-    g.quadraticCurveTo(400, 158, 570, 118);
+    g.moveTo(bx, by);
+    g.quadraticCurveTo(bx + bw / 2, by + 40, bx + bw, by);
     g.stroke();
     for (let k = 0; k < 7; k++) {
       const p = (k + 0.5) / 7;
-      const x = 230 + p * 340;
-      const y = 118 + Math.sin(p * Math.PI) * 20 + Math.sin(t * 2 + k) * (partying ? 3 : 1);
+      const x = bx + p * bw;
+      const y = by + Math.sin(p * Math.PI) * 20 + Math.sin(t * 2 + k) * (partying ? 3 : 1);
       g.beginPath();
       g.moveTo(x - 16, y);
       g.lineTo(x + 16, y);

@@ -328,6 +328,7 @@ function drawPaw(g: G, x: number, y: number, side: number, reach: number) {
 
 const tower: Step<TowerOptions, TowerState, TowerFx> = {
   kind: 'tower',
+  finisher: true,
   uses: (o) => [[o.base, 'towerBase'], ...o.scoops.map((id): [string, 'stack'] => [id, 'stack'])],
   start: (o) => startTower(o),
 

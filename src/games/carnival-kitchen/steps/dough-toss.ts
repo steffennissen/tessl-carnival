@@ -261,6 +261,7 @@ interface DoughFx {
 
 const doughToss: Step<DoughTossOptions, DoughTossState, DoughFx> = {
   kind: 'dough-toss',
+  finisher: true,
   uses: () => [],
   start: (o) => startDoughToss(o.tosses ?? DOUGH_TOSSES),
 
