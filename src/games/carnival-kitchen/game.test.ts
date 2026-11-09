@@ -167,7 +167,13 @@ describe('carnival kitchen', () => {
         seen.add(next.id);
         previous = next;
       }
-      expect([...seen].sort()).toEqual(DISHES.map((d) => d.id).sort());
+      // Every dish but the surprise, which waits for a full recipe book.
+      const open = DISHES.filter((d) => !d.locked);
+      expect(open.length).toBeLessThan(DISHES.length);
+      expect([...seen].sort()).toEqual(open.map((d) => d.id).sort());
+      const all = new Set<string>();
+      for (let i = 0; i < 400; i++) all.add(pickDish(random, undefined, DISHES).id);
+      expect([...all].sort()).toEqual(DISHES.map((d) => d.id).sort());
     });
 
     it('starts on the first step with no score, waiting for the card', () => {

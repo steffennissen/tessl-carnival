@@ -1,4 +1,11 @@
-import { earnSticker, recordScore, stickersFor, theme, type CarnivalGame } from '../../carnival';
+import {
+  coinsFor,
+  earnSticker,
+  recordScore,
+  stickersFor,
+  theme,
+  type CarnivalGame,
+} from '../../carnival';
 import { planRound } from './activities';
 import { bookButtonFor, bookPlaces, cellAt, inBox } from './book';
 import {
@@ -10,7 +17,7 @@ import {
   decorTick,
   type DecorState,
 } from './decorate';
-import { DISHES } from './dishes';
+import type { DISHES } from './dishes';
 import {
   GEAR_HOLD,
   grownupPlaces,
@@ -39,9 +46,23 @@ import {
   type RoundPlan,
 } from './kit';
 import { fillsScreen, isTouchDevice, layoutFor, sameLayout, toScene, type Shape } from './layout';
+import {
+  bookDishes,
+  ceremonyDue,
+  chefPoints,
+  loadCelebrated,
+  openDishes,
+  playableDishes,
+  rankFor,
+  rewardsFor,
+  saveCelebrated,
+  surpriseHint,
+} from './ranks';
 import { createRenderer } from './render';
+import { createShop, pressShop, shopPlaces, titlePlaces } from './shop';
 import { createSound } from './sound';
 import { stepOf } from './steps';
+import { loadOutfit, ownSticker, saveOutfit, type Outfit } from './wardrobe';
 
 const { width: WIDTH, height: HEIGHT } = theme.canvas;
 
@@ -56,11 +77,16 @@ export const MOST_PIXELS = 2;
  */
 
 /**
- * Picks the next dish at random. Never the same dish twice in a row, so
- * every round feels new.
+ * Picks the next dish at random from `dishes` (the dishes open from the
+ * start, unless the surprise is unlocked: `playableDishes` in ranks.ts).
+ * Never the same dish twice in a row, so every round feels new.
  */
-export function pickDish(random: () => number = Math.random, previous?: Dish): Dish {
-  const choices = DISHES.filter((dish) => dish.id !== previous?.id);
+export function pickDish(
+  random: () => number = Math.random,
+  previous?: Dish,
+  dishes: typeof DISHES = openDishes(),
+): Dish {
+  const choices = dishes.filter((dish) => dish.id !== previous?.id);
   return choices[Math.floor(random() * choices.length) % choices.length];
 }
 
@@ -378,7 +404,7 @@ export const carnivalKitchen: CarnivalGame = {
     let state = createState(pickDish());
     // The title screen waits for a tap to start cooking; the recipe book
     // opens from it; the kitchen is where the cooking (and decorating) is.
-    let screen: 'title' | 'book' | 'grownups' | 'kitchen' = 'title';
+    let screen: 'title' | 'book' | 'grownups' | 'kitchen' | 'shop' | 'ceremony' = 'title';
     // The grown-ups' settings, remembered between visits.
     let settings: LearnSettings = loadSettings();
     // The last round's learning activity, so the next one is different.
@@ -400,6 +426,52 @@ export const carnivalKitchen: CarnivalGame = {
     const pointer: Pointer = { x: WIDTH / 2, y: HEIGHT / 2, down: false };
     const sound = createSound();
     const renderer = createRenderer(ctx, sound);
+
+    // What she has: stickers, coins, chef points and rank, read again
+    // whenever they may have changed (`refresh`); what she wears and has put
+    // up in the kitchen; and the last rank celebrated.
+    let stickers: Record<string, number> = {};
+    let coins = 0;
+    let points = 0;
+    let rank = 0;
+    const refresh = () => {
+      stickers = stickersFor(carnivalKitchen.id);
+      coins = coinsFor(carnivalKitchen.id);
+      points = chefPoints(stickers);
+      rank = rankFor(points);
+    };
+    refresh();
+    let outfit: Outfit = loadOutfit(stickers, rank);
+    renderer.setOutfit(outfit);
+    let celebrated = loadCelebrated();
+    // The shop and wardrobe page.
+    let shop = createShop();
+    // What happens once the rank ceremony is done: cooking.
+    let afterCeremony: (() => void) | null = null;
+
+    /**
+     * A new rank to celebrate? Then the ceremony first: the rank's hat goes
+     * on and its kitchen goes up, and `then` waits until it's over.
+     */
+    const celebrateOr = (then: () => void) => {
+      refresh();
+      const due = ceremonyDue(rank, celebrated);
+      if (due === null) {
+        then();
+        return;
+      }
+      celebrated = due;
+      saveCelebrated(due);
+      const { hat, kitchen } = rewardsFor(due);
+      if (hat) earnSticker(carnivalKitchen.id, ownSticker(hat.id), 1);
+      renderer.startCeremony(due);
+      const before = outfit;
+      outfit = { ...outfit, hat: hat?.id ?? outfit.hat, kitchen: kitchen?.id ?? outfit.kitchen };
+      saveOutfit(outfit, before);
+      renderer.setOutfit(outfit);
+      afterCeremony = then;
+      screen = 'ceremony';
+    };
 
     // The finger (or mouse) that's holding the spoon or the shaker. Other
     // fingers pressing, moving or lifting don't touch its gesture.
@@ -430,7 +502,8 @@ export const carnivalKitchen: CarnivalGame = {
      * it; a chosen dish starts straight away unless `spin` says otherwise.
      */
     const newRound = (dish?: Dish, { spin = dish === undefined }: { spin?: boolean } = {}) => {
-      lastDish = dish ?? pickDish(Math.random, lastDish);
+      const reel = playableDishes(stickersFor(carnivalKitchen.id));
+      lastDish = dish ?? pickDish(Math.random, lastDish, reel);
       const plan = planRound(lastDish, settings, Math.random, lastActivity);
       lastActivity = plan.activity ?? lastActivity;
       state = createState(lastDish, Math.random, plan);
@@ -441,7 +514,7 @@ export const carnivalKitchen: CarnivalGame = {
       screen = 'kitchen';
       renderer.reset();
       spinning = spin;
-      if (spin) renderer.startSpin(lastDish);
+      if (spin) renderer.startSpin(lastDish, reel);
     };
 
     /** Where the event is, in canvas units. The pointer keeps scene units. */
@@ -457,11 +530,20 @@ export const carnivalKitchen: CarnivalGame = {
       Object.assign(pointer, toScene(layout, at.x, at.y));
       return at;
     };
-    /** A tap on the recipe book: an earned dish cooks it, anywhere else closes it. */
+    /**
+     * A tap on the recipe book: an earned dish cooks it, and so does the
+     * surprise once it's unlocked; the wrapped surprise says how many dishes
+     * are left; anywhere else closes it.
+     */
     const tapBook = (x: number, y: number) => {
-      const i = cellAt(bookPlaces(layout, DISHES.length).cells, x, y);
-      const dish = DISHES[i] as Dish | undefined;
-      if (dish && (bookStickers[dish.id] ?? 0) >= 1) {
+      const dishes = bookDishes();
+      const i = cellAt(bookPlaces(layout, dishes.length).cells, x, y);
+      const dish = dishes[i] as Dish | undefined;
+      const hint = surpriseHint(bookStickers);
+      if (dish?.locked && hint) {
+        sound.boop();
+        sound.say(hint);
+      } else if (dish && ((bookStickers[dish.id] ?? 0) >= 1 || dish.locked)) {
         sound.pop();
         newRound(dish);
       } else {
@@ -483,6 +565,32 @@ export const carnivalKitchen: CarnivalGame = {
       }
       if (screen === 'book') {
         tapBook(at.x, at.y);
+        return;
+      }
+      if (screen === 'ceremony') {
+        // Once it's all been shown, a tap goes on to cooking.
+        if (renderer.ceremonyReady()) {
+          const then = afterCeremony;
+          afterCeremony = null;
+          screen = 'title';
+          then?.();
+        }
+        return;
+      }
+      if (screen === 'shop') {
+        const tapped = pressShop(shop, shopPlaces(layout), at.x, at.y, {
+          stickers,
+          rank,
+          outfit,
+        });
+        renderer.shopEvent(tapped.event, shop);
+        if (tapped.outfit !== outfit) {
+          saveOutfit(tapped.outfit, outfit);
+          outfit = tapped.outfit;
+          renderer.setOutfit(outfit);
+        }
+        if (tapped.event?.kind === 'bought') refresh();
+        if (tapped.event?.kind === 'close') screen = 'title';
         return;
       }
       if (screen === 'grownups') {
@@ -540,12 +648,25 @@ export const carnivalKitchen: CarnivalGame = {
         screen = 'book';
         return;
       }
+      if (screen === 'title' && inBox(titlePlaces(layout).shop, at.x, at.y, 8)) {
+        sound.pop();
+        refresh();
+        shop = createShop(shop.tab);
+        screen = 'shop';
+        return;
+      }
+      if (screen === 'title' && inBox(titlePlaces(layout).rank, at.x, at.y)) {
+        refresh();
+        renderer.sayRank(points);
+        return;
+      }
       pointer.down = true;
       activePointer = event.pointerId;
       if (screen === 'title') {
-        // A tap starts cooking a dish picked at random. It also unlocks sound
-        // and speech, which browsers only allow after a tap.
-        newRound();
+        // A tap starts cooking a dish picked at random (after the ceremony,
+        // if she has a new rank). It also unlocks sound and speech, which
+        // browsers only allow after a tap.
+        celebrateOr(() => newRound());
       } else if (decorating()) {
         const places = decorPlaces(layout.shape);
         const did = decorPress(decor, places, pointer.x, pointer.y);
@@ -555,7 +676,7 @@ export const carnivalKitchen: CarnivalGame = {
         // A short pause first, so a last excited tap doesn't skip the stars.
         if (!renderer.endShown()) return;
         saveScore();
-        newRound();
+        celebrateOr(() => newRound());
       } else {
         if (!press(state, pointer.x, pointer.y, layout.shape))
           renderer.notYet(pointer.x, pointer.y);
@@ -598,6 +719,7 @@ export const carnivalKitchen: CarnivalGame = {
 
     let frame = 0;
     let last = performance.now();
+    let sinceRefresh = 0;
     // Whether the step card was being read out by its speaker last frame.
     let wasReading = false;
     const loop = (time: number) => {
@@ -607,6 +729,12 @@ export const carnivalKitchen: CarnivalGame = {
       // While "Leave the kitchen?" is asked, the round waits.
       const paused = renderer.leaveAsked();
       if (screen === 'title') {
+        // Coins and stickers can change elsewhere (the food stand): read them now and then.
+        sinceRefresh += dt;
+        if (sinceRefresh >= 1) {
+          sinceRefresh = 0;
+          refresh();
+        }
         if (gearHeld !== null && !paused) {
           gearHeld += dt;
           if (gearHeld >= GEAR_HOLD) {
@@ -615,11 +743,15 @@ export const carnivalKitchen: CarnivalGame = {
             screen = 'grownups';
           }
         }
-        renderer.drawTitle(dt, (gearHeld ?? 0) / GEAR_HOLD);
+        renderer.drawTitle(dt, (gearHeld ?? 0) / GEAR_HOLD, { coins, points });
       } else if (screen === 'book') {
         renderer.drawBook(dt, bookStickers);
       } else if (screen === 'grownups') {
         renderer.drawGrownups(dt, settings);
+      } else if (screen === 'shop') {
+        renderer.drawShop(dt, shop, { coins, stickers, rank, outfit });
+      } else if (screen === 'ceremony') {
+        renderer.drawCeremony(dt);
       } else if (spinning) {
         // The round doesn't tick while the spinner runs.
         renderer.drawSpin(dt);
