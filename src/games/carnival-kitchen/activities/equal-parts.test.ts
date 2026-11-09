@@ -115,10 +115,15 @@ describe('equal parts', () => {
   });
 
   it('then names the pieces at Level 1, or counts how many make the whole at Level 2', () => {
-    const one = pieceQuestion('pizza', 4, 1).question;
-    expect(one.choices).toEqual(['one half', 'one third', 'one fourth']);
+    const one = pieceQuestion('pizza', 4, 1, seeded()).question;
+    expect([...one.choices].sort()).toEqual(['one fourth', 'one half', 'one third']);
     expect(one.choices[one.answer]).toBe('one fourth');
-    const two = pieceQuestion('pancake', 3, 2).question;
+    // The names come in any order, so where the answer sits gives nothing away.
+    const places = new Set<number>();
+    for (let seed = 1; seed <= 30; seed++)
+      places.add(pieceQuestion('pizza', 2, 1, seeded(seed)).question.answer);
+    expect(places.size).toBe(3);
+    const two = pieceQuestion('pancake', 3, 2, seeded()).question;
     expect(two.text).toBe('How many thirds make the whole pancake?');
     expect(two.choices[two.answer]).toBe('3');
   });

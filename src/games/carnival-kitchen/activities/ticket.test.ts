@@ -6,7 +6,7 @@ import type { AskOptions } from '../steps/ask';
 import type { StackOptions } from '../steps/stack';
 import type { TopOptions, TopState } from '../steps/top';
 import { current, nextStep, seeded } from '../test-kit';
-import ticket, { countQuestion, makeOrder, ticketTarget } from './ticket';
+import ticket, { countQuestion, makeOrder, ticketTarget, ticketWords } from './ticket';
 
 describe('order tickets', () => {
   it('fits dishes with countable toppings, and the burger', () => {
@@ -25,7 +25,9 @@ describe('order tickets', () => {
       if (!one) continue;
       expect(orderTotal(one)).toBeLessThanOrEqual(5);
       expect(one.lines.length).toBeLessThanOrEqual(2);
-      expect(one.text).toMatch(/^One pizza with \d/);
+      expect(one.text).toMatch(/^A pizza with \d/);
+      // Toppings by their ticket words: slices of pepperoni, not whole pepperonis.
+      expect(one.text).not.toMatch(/pepperonis|\d pepperoni(?! slice)/);
       // The pepperoni chopped earlier always goes on.
       expect(one.lines.map((l) => l.id)).toContain('pepperoni');
       expect(one.without).toBeUndefined();
@@ -35,14 +37,38 @@ describe('order tickets', () => {
       expect(orderTotal(two)).toBeLessThanOrEqual(7);
       expect(two.text).not.toMatch(/\d/);
       expect(two.without).toBeDefined();
-      expect(two.text).toMatch(/ No \w+!$/);
+      expect(two.text).toMatch(/ No [\w ]+!$/);
       expect(two.lines.map((l) => l.id)).not.toContain(two.without?.id);
     }
-    expect(makeOrder(dishById('pizza'), 1, seeded(3))?.text).toBe(
-      'One pizza with 1 pepperoni and 1 mushroom, please!',
-    );
     const level2 = makeOrder(dishById('cheeseburger'), 2, seeded(3))?.text;
-    expect(level2).toMatch(/^One burger with (one|two) patt(y|ies)/);
+    expect(level2).toMatch(/^A burger with (one|two) patt(y|ies)/);
+  });
+
+  it('writes tickets in words that fit the food', () => {
+    expect(ticketWords('pepperoni')).toEqual({ one: 'pepperoni slice', many: 'pepperoni slices' });
+    expect(ticketWords('avocado').many).toBe('avocado slices');
+    expect(ticketWords('carrot-stick').many).toBe('carrot sticks');
+    expect(ticketWords('egg-strip').many).toBe('egg strips');
+    expect(ticketWords('olive').many).toBe('olives');
+    for (let seed = 1; seed <= 20; seed++) {
+      expect(makeOrder(dishById('tacos'), 1, seeded(seed))?.text).toMatch(/^A taco with /);
+      expect(makeOrder(dishById('fruit-salad'), 1, seeded(seed))?.text).toMatch(
+        /^A fruit salad with /,
+      );
+      const sushi = makeOrder(dishById('sushi-rolls'), 2, seeded(seed))?.text ?? '';
+      expect(sushi).toMatch(/^A sushi roll with /);
+      expect(sushi).not.toMatch(/\b(carrots|eggs|cucumbers)\b/);
+    }
+  });
+
+  it("counts a burger's layers between the buns, as the ticket's note does", () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const order = makeOrder(dishById('cheeseburger'), 1, seeded(seed));
+      if (!order) continue;
+      const { question, tag } = countQuestion(order, 'stack', 1, seeded(seed));
+      expect(question.text).toContain('between the buns');
+      if (!tag) expect(Number(question.choices[question.answer])).toBe(orderTotal(order));
+    }
   });
 
   it('usually asks for two kinds of things at Level 1', () => {

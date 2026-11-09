@@ -199,3 +199,13 @@ export function speakable(text: string): string {
 export function inCircle(cx: number, cy: number, r: number, x: number, y: number, slop = 8) {
   return Math.hypot(x - cx, y - cy) <= r + slop;
 }
+
+/** Whether (x, y) is in the box, or within `slop` of its edges. */
+export function inBox(
+  b: { x: number; y: number; w: number; h: number },
+  x: number,
+  y: number,
+  slop = 8,
+): boolean {
+  return x >= b.x - slop && x <= b.x + b.w + slop && y >= b.y - slop && y <= b.y + b.h + slop;
+}

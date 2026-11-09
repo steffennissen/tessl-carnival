@@ -72,14 +72,13 @@ export const MEASURE_FULLEST = 0.8;
 
 /**
  * The measuring cup for `value`: the smallest one it fills to no more than
- * MEASURE_FULLEST, so the star sits between 0.4 and 0.8 of the way up, like
- * the stars of other meters. `least` is the smallest cup to use (questions
- * use a 1 cup measure even for ¼ cup).
+ * `fullest` (MEASURE_FULLEST), so the star sits between 0.4 and 0.8 of the
+ * way up, like the stars of other meters. `least` is the smallest cup to use
+ * (questions use a 1 cup measure even for ¼ cup).
  */
-export function measureScale(value: number, least = 0): Scale {
+export function measureScale(value: number, least = 0, fullest = MEASURE_FULLEST): Scale {
   const capacity =
-    CUPS.find((c) => c >= least && value / c <= MEASURE_FULLEST + 1e-9) ??
-    Math.ceil(value / MEASURE_FULLEST);
+    CUPS.find((c) => c >= least && value / c <= fullest + 1e-9) ?? Math.ceil(value / fullest);
   const step = capacity <= 1 ? 0.25 : capacity <= 3 ? 0.5 : 1;
   const marks: number[] = [];
   for (let v = step; v <= capacity + 1e-9; v += step) marks.push(Math.round(v * 100) / 100);

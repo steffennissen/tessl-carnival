@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { dishById } from '../dishes';
 import { createState, press, tick } from '../game';
-import { QUIZ_OUTRO, SMART_BONUS, plainPlan, type KitchenState } from '../kit';
+import {
+  QUIZ_OUTRO,
+  SMART_BONUS,
+  currentTurn,
+  middleOf,
+  plainPlan,
+  type KitchenState,
+} from '../kit';
 import { current, drawRound, nextStep, playThrough, seeded } from '../test-kit';
 import pay, {
   PAY_CHECK,
@@ -10,7 +17,9 @@ import pay, {
   coinTotal,
   countOn,
   fewestCoins,
-  traySpot,
+  paidText,
+  trayCells,
+  valuesShown,
   type CoinId,
   type PayOptions,
   type PayState,
@@ -87,7 +96,7 @@ describe('the customer pays', () => {
     const ctx = { round: state, options: options(state), state: s };
     expect(pay.bubble?.(ctx)).toEqual(['Oops, too much!', 'Tap a coin to give it back.']);
     expect(s.wrong).toBe(0);
-    const dime = traySpot(1);
+    const dime = middleOf(trayCells(BANK)[1]);
     press(state, dime.x, dime.y);
     expect(s.tray).toEqual(['quarter']);
     tapCoin(state, 'nickel');
@@ -120,8 +129,51 @@ describe('the customer pays', () => {
   it(`holds at most ${TRAY_MOST} coins`, () => {
     const state = onPay(99);
     for (let i = 0; i < TRAY_MOST; i++) tapCoin(state, 'penny');
-    expect(tapCoin(state, 'penny')).toBe(false);
+    // Not "Not yet!": Chef Bunny says the tray is full.
+    expect(tapCoin(state, 'penny')).toBe(true);
     expect(current<PayState>(state).tray).toHaveLength(TRAY_MOST);
+    expect(current<PayState>(state).full).toBe(1);
+    expect(pay.bubble?.(currentTurn(state) as never)).toEqual([
+      'The tray is full!',
+      'Try bigger coins.',
+    ]);
+  });
+
+  it('finishes when giving a coin back makes it exactly right', () => {
+    const state = onPay(30);
+    tapCoin(state, 'quarter');
+    tapCoin(state, 'dime'); // 35¢: too much
+    const s = current<PayState>(state);
+    expect(s.done).toBe(false);
+    tapCoin(state, 'nickel'); // 40¢
+    const dime = middleOf(trayCells(BANK)[1]);
+    press(state, dime.x, dime.y); // the dime back: 30¢, exactly right
+    expect(coinTotal(s.tray)).toBe(30);
+    expect(s.done).toBe(true);
+    expect(s.outcome).toBe('right');
+  });
+
+  it('shows coin values from the start at Level 1, at Level 2 only after a wrong check', () => {
+    const state = onPay(45);
+    const s = current<PayState>(state);
+    expect(valuesShown(options(state), s)).toBe(true);
+    const level2 = { ...options(state), values: false };
+    expect(valuesShown(level2, s)).toBe(false);
+    s.wrong = 1;
+    expect(valuesShown(level2, s)).toBe(true);
+  });
+
+  it('keeps the cents paid a secret at Level 2 until a wrong check, counting coins instead', () => {
+    const state = onPay(45);
+    const s = current<PayState>(state);
+    const level2 = { ...options(state), values: false };
+    tapCoin(state, 'quarter');
+    expect(paidText(options(state), s)).toEqual(['Paid', '25¢']);
+    expect(paidText(level2, s)).toEqual(['Coins', '1']);
+    tapCoin(state, 'dime');
+    expect(paidText(level2, s)).toEqual(['Coins', '2']);
+    s.wrong = 1;
+    expect(paidText(level2, s)).toEqual(['Paid', '35¢']);
   });
 
   it('plays through and draws in every layout', () => {

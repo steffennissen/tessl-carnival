@@ -13,31 +13,40 @@ import {
 } from '../art';
 import type { Shape } from '../layout';
 import {
+  NICE,
   answer,
-  autoReadDelay,
+  answerFx,
+  cheerLines,
   drawQuestion,
   finishStep,
   fitWords,
+  inBox,
   inCircle,
   middleOf,
+  observeAnswer,
   startAnswer,
+  type AnswerFx,
   type AnswerState,
   type Box,
   type Disc,
-  type Feedback,
+  type KitchenState,
   type Step,
   type StepBasics,
   type Turn,
 } from '../kit';
-import type { Reading } from '../sound';
 
 /**
  * Sequence: put the recipe in order. The dish's step cards lie shuffled in
  * a tray; she drags each one up into its slot (First, Next, Then, Last), or
  * just taps the cards in order and each flies to the next empty slot. A
- * card in the wrong slot slides gently back with a hint; after two wrong
- * tries, the card that comes next glows. Then the cooking follows that
- * order. A learning step, woven in by activities/recipe-order.ts.
+ * card in the wrong slot slides gently back with a hint. Steps that could
+ * go either way (`groups`) fit each other's slots. Then the cooking follows
+ * the recipe. A learning step, woven in by activities/recipe-order.ts.
+ *
+ * The Smart Chef rule: the whole order is one question, answered by the
+ * shared rules. One slip is fine, as one wrong answer to a question is; the
+ * second slip means Chef Bunny helps (the card that comes next glows, and
+ * each one after it), and the round's Smart Chef star is gone.
  */
 
 export interface SequenceCard {
@@ -53,6 +62,12 @@ export interface SequenceOptions extends StepBasics {
   cards: SequenceCard[];
   /** How they lie in the tray, left to right (or top to bottom): indices into `cards`. */
   tray: number[];
+  /**
+   * Each card's group, if any could go either way: cards with the same
+   * number fit each other's slots (chop the strawberry or the banana
+   * first). Each card is its own group if left out.
+   */
+  groups?: number[];
 }
 
 declare module '../kit/types' {
@@ -169,9 +184,6 @@ export function startSequence(o: SequenceOptions): SequenceState {
   };
 }
 
-const inBox = (b: Box, x: number, y: number, slop = 0) =>
-  x >= b.x - slop && x <= b.x + b.w + slop && y >= b.y - slop && y <= b.y + b.h + slop;
-
 /** Where a card sits now: its slot once it's in, otherwise its place in the tray. */
 export function homeOf(o: SequenceOptions, s: SequenceState, card: number, shape?: Shape): Box {
   const places = sequencePlaces(o.cards.length, shape);
@@ -179,9 +191,21 @@ export function homeOf(o: SequenceOptions, s: SequenceState, card: number, shape
   return slot >= 0 ? places.slots[slot] : places.tray[o.tray.indexOf(card)];
 }
 
-/** The card that belongs in the first empty slot: the one Chef Bunny shows. */
+/** The first empty slot, or -1 once they're all filled. */
 export function nextCard(s: SequenceState): number {
   return s.slots.findIndex((c) => c === null);
+}
+
+/** Whether `card` may go in `slot`: its own, or one of its group's. */
+export function fitsSlot(o: SequenceOptions, slot: number, card: number): boolean {
+  return (o.groups?.[card] ?? card) === (o.groups?.[slot] ?? slot);
+}
+
+/** A card that fits the first empty slot, not placed yet: the one Chef Bunny shows. -1 if none. */
+export function cardForNext(o: SequenceOptions, s: SequenceState): number {
+  const slot = nextCard(s);
+  if (slot < 0) return -1;
+  return o.cards.findIndex((_, card) => !s.slots.includes(card) && fitsSlot(o, slot, card));
 }
 
 export function pressSequence(
@@ -240,7 +264,7 @@ export function releaseSequence(turn: Turn<SequenceOptions, SequenceState>): nul
     if (!tapped) s.gliding.push({ card: h.card, ...from, age: 0 });
     return null;
   }
-  if (slot === h.card) {
+  if (fitsSlot(o, slot, h.card)) {
     s.slots[slot] = h.card;
     s.placedAt = slot;
     s.gliding.push({ card: h.card, ...from, age: 0 });
@@ -275,11 +299,16 @@ export function updateSequence(turn: Turn<SequenceOptions, SequenceState>, dt: n
 }
 
 /** Chef Bunny's bubble: a hint after a wrong try, where to look when shown, a cheer when done. */
-export function sequenceBubble(o: SequenceOptions, s: SequenceState): [string, string] | null {
-  if (s.done)
-    return s.outcome === 'right'
-      ? ['Yes! You are', 'a Smart Chef!']
-      : ['Yes! Now', "let's cook it!"];
+export function sequenceBubble(
+  o: SequenceOptions,
+  s: SequenceState,
+  round?: KitchenState,
+): [string, string] | null {
+  if (s.done) {
+    const helped: [string, string] = ['Yes! Now', "let's cook it!"];
+    if (!round) return s.outcome === 'right' ? ['Yes! You are', 'a Smart Chef!'] : helped;
+    return cheerLines(round, s, helped);
+  }
   if (s.shown) return ['Look for the', 'glowing card!'];
   if (s.missed !== null) {
     const name = slotNames(o.cards.length)[nextCard(s)] ?? 'next';
@@ -288,20 +317,10 @@ export function sequenceBubble(o: SequenceOptions, s: SequenceState): [string, s
   return null;
 }
 
-interface SequenceFx {
-  reading: Reading | null;
-  reads: number;
-  autoRead: boolean;
+interface SequenceFx extends AnswerFx {
   lifts: number;
-  wrong: number;
   placed: number;
-  shown: boolean;
-  done: boolean;
 }
-
-const CHEER: Feedback = { grade: 'Perfect!', points: 0, combo: 0, age: 0 };
-const NICE: Feedback = { grade: 'Great!', points: 0, combo: 0, age: 0 };
-const ENCOURAGE: Feedback = { grade: 'Nice try!', points: 0, combo: 0, age: 0 };
 
 /** One step card: its emoji (Level 1) and its words, fitted to the box. */
 function drawCard(
@@ -407,11 +426,12 @@ const sequence: Step<SequenceOptions, SequenceState, SequenceFx> = {
   move: (turn, x, y) => moveSequence(turn, x, y),
   release: (turn) => releaseSequence(turn),
   update: (turn, dt) => updateSequence(turn, dt),
-  bubble: ({ options, state }) => sequenceBubble(options, state),
+  bubble: ({ options, state, round }) => sequenceBubble(options, state, round),
   solve(turn) {
     const { options: o, state: s } = turn;
     const places = sequencePlaces(o.cards.length, turn.shape);
     for (let card = 0; card < o.cards.length && !s.done; card++) {
+      // Each in the recipe's order: a tap sends it to the next empty slot.
       const at = middleOf(places.tray[o.tray.indexOf(card)]);
       pressSequence(turn, at.x, at.y);
       releaseSequence(turn);
@@ -419,31 +439,13 @@ const sequence: Step<SequenceOptions, SequenceState, SequenceFx> = {
     updateSequence(turn, OUTRO);
   },
 
-  fx: () => ({
-    reading: null,
-    reads: 0,
-    autoRead: false,
-    lifts: 0,
-    wrong: 0,
-    placed: 0,
-    shown: false,
-    done: false,
-  }),
+  fx: () => ({ ...answerFx(), lifts: 0, placed: 0 }),
 
-  observe({ state: s, options: o, fx, effects, round, taking, shape }) {
+  observe(view) {
+    const { state: s, options: o, fx, effects, round, shape } = view;
     const { sound } = effects;
     const settings = round.learn.settings;
     const places = sequencePlaces(o.cards.length, shape);
-    const delay = autoReadDelay(settings);
-    if (taking && !fx.autoRead && delay !== null && s.age >= delay && !s.done) {
-      fx.autoRead = true;
-      fx.reading = sound.read(SEQUENCE_TEXT);
-    }
-    if (s.reads > fx.reads) {
-      fx.reads = s.reads;
-      fx.autoRead = true;
-      fx.reading = sound.read(SEQUENCE_TEXT);
-    }
     if (s.lifts > fx.lifts) {
       fx.lifts = s.lifts;
       sound.pop();
@@ -459,32 +461,19 @@ const sequence: Step<SequenceOptions, SequenceState, SequenceFx> = {
       effects.burst(at.x, at.y, 8, ['star', 'heart'], CONFETTI, 180);
       if (placed < o.cards.length) effects.celebrate(at.x, at.y, NICE);
     }
-    if (s.wrong > fx.wrong) {
-      fx.wrong = s.wrong;
-      const at = middleOf(places.slots[s.missed ?? 0]);
-      sound.boop();
-      effects.celebrate(at.x, at.y, ENCOURAGE);
-      if (!s.shown && !settings.readMyself) {
-        const name = slotNames(o.cards.length)[nextCard(s)] ?? 'next';
-        sound.say(`Hmm! What do we do ${name.toLowerCase()}?`);
-      }
-    }
-    if (s.shown && !fx.shown) {
-      fx.shown = true;
-      sound.chime([1046.5, 1318.5], 0.12, 0.12);
-      const next = nextCard(s);
-      if (!settings.readMyself && next >= 0) {
-        sound.say(`${slotNames(o.cards.length)[next]}: ${o.cards[next].text}`);
-      }
-    }
-    if (s.done && !fx.done) {
-      fx.done = true;
-      const at = middleOf(places.slots[Math.floor(o.cards.length / 2)]);
-      sound.chime([1046.5, 1318.5, 1568, 2093], 0.07, 0.16);
-      effects.burst(at.x, at.y, 20, ['star', 'heart', 'star', 'dot'], CONFETTI, 260);
-      effects.celebrate(at.x, at.y, CHEER);
-      sound.say("Yes! That's the recipe! Let's cook!");
-    }
+    const slotName = () => slotNames(o.cards.length)[nextCard(s)] ?? 'next';
+    observeAnswer(view, s, fx, {
+      read: SEQUENCE_TEXT,
+      done: s.done,
+      wrongAt: () => middleOf(places.slots[s.missed ?? 0]),
+      wrongSay: () => `Hmm! What do we do ${slotName().toLowerCase()}?`,
+      helpSay: () => {
+        const card = cardForNext(o, s);
+        return card >= 0 ? `${slotName()}: ${o.cards[card].text}` : '';
+      },
+      doneAt: () => middleOf(places.slots[Math.floor(o.cards.length / 2)]),
+      doneSay: () => "Yes! That's the recipe! Let's cook!",
+    });
   },
 
   draw({ g, t, state: s, options: o, fx, taking, shape }) {
@@ -517,7 +506,7 @@ const sequence: Step<SequenceOptions, SequenceState, SequenceFx> = {
       g.fill();
     });
 
-    const show = s.shown && !s.done ? nextCard(s) : -1;
+    const show = s.shown && !s.done ? cardForNext(o, s) : -1;
     const glide = (card: number, home: Box): Box => {
       const gl = s.gliding.find((x) => x.card === card);
       if (!gl) return home;

@@ -15,7 +15,14 @@ import {
   quietEffects,
   seeded,
 } from '../test-kit';
-import findWord, { PATTERNS, WORD_BANK, findTargets, jarWords, makeFind } from './find-word';
+import findWord, {
+  PATTERNS,
+  WORD_BANK,
+  findTargets,
+  firstSound,
+  jarWords,
+  makeFind,
+} from './find-word';
 
 describe('the word bank', () => {
   it('has words that practise 2nd-grade patterns, spelled the way they say', () => {
@@ -85,6 +92,8 @@ describe('find the ingredient', () => {
         const one = jarWords(target, '🧀', 1, seeded(seed));
         expect(one.words).toHaveLength(3);
         expect(new Set(one.words.map((w) => w[0])).size).toBe(3);
+        // Different first sounds too: never cream and ketchup together.
+        expect(new Set(one.words.map(firstSound)).size).toBe(3);
         expect(one.words[one.answer]).toBe(target.word);
         for (const w of one.words) {
           if (w !== target.word) expect(w).not.toContain(' ');
@@ -97,6 +106,24 @@ describe('find the ingredient', () => {
         expect(jarWords(target, '🧀', 2, seeded(seed))).toEqual(two);
       }
     }
+  });
+
+  it('reads first sounds, not just first letters', () => {
+    expect(firstSound('cream')).toBe(firstSound('ketchup'));
+    expect(firstSound('cheese')).not.toBe(firstSound('cupcakes'));
+    expect(firstSound('shells')).not.toBe(firstSound('sushi'));
+    expect(firstSound('whipped cream')).toBe('w');
+  });
+
+  it('has real words for every look-alike, and tags only patterns the word has', () => {
+    for (const entry of WORD_BANK) {
+      for (const alike of entry.alike) expect(alike.word).not.toMatch(/whipped dream|ripped cream/);
+      for (const sound of entry.sounds) {
+        if (sound === 'silent e') expect(entry.word, entry.word).toMatch(/[aeiou][^aeiou]e(s?)\b/);
+        else expect(entry.word).toContain(sound);
+      }
+    }
+    expect(WORD_BANK.find((w) => w.word === 'cheese')?.sounds).not.toContain('silent e');
   });
 
   it('hints at the letters, and never says the word until shown', () => {

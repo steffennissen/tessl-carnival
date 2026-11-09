@@ -29,6 +29,8 @@ const fruitSalad: Dish = {
       count: 5,
     },
   ],
+  // Chop the strawberry or the banana first: either way.
+  either: [[0, 1]],
 
   draw(g, t, state) {
     // The glass bowl of rainbow fruit with your toppings, and a smiling strawberry on top.

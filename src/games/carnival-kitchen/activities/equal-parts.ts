@@ -1,4 +1,12 @@
-import { numberWord, type Activity, type Dish, type Level, type RecipeStep } from '../kit';
+import {
+  numberWord,
+  pick,
+  shuffle,
+  type Activity,
+  type Dish,
+  type Level,
+  type RecipeStep,
+} from '../kit';
 import type { AskOptions } from '../steps/ask';
 import type { CutFood, CutOptions, CutPicture } from '../steps/cut';
 
@@ -10,7 +18,8 @@ import type { CutFood, CutOptions, CutPicture } from '../steps/cut';
  * way beside it.
  *
  * Level 1: halves or fourths. Which one is cut into 2 (or 4) equal pieces,
- * then "What is each piece?": one half, one third or one fourth. Level 2:
+ * then "What is each piece?": one half, one third or one fourth (in any
+ * order; one third is never the answer at Level 1). Level 2:
  * thirds too, asked by name ("Which pizza is cut into thirds?"), then "How
  * many thirds make the whole pizza?".
  */
@@ -35,16 +44,6 @@ export const PART_NAMES: Record<number, { one: string; many: string }> = {
   4: { one: 'fourth', many: 'fourths' },
 };
 
-const pick = <T>(items: readonly T[], random: () => number): T =>
-  items[Math.floor(random() * items.length) % items.length];
-
-function shuffled<T>(items: readonly T[], random: () => number): T[] {
-  const left = [...items];
-  const out: T[] = [];
-  while (left.length) out.push(left.splice(Math.floor(random() * left.length) % left.length, 1)[0]);
-  return out;
-}
-
 /** How many equal pieces at `level`: 2 or 4 at Level 1, 2, 3 or 4 at Level 2. */
 export function partsFor(level: Level, random: () => number): number {
   return pick(level === 1 ? [2, 4] : [2, 3, 4], random);
@@ -66,7 +65,7 @@ export function cutQuestion(
     random,
   );
   const right: CutPicture = { parts, equal: true };
-  const pictures = shuffled<CutPicture>(
+  const pictures = shuffle<CutPicture>(
     [right, { parts, equal: false }, { parts: other, equal: true }],
     random,
   );
@@ -91,11 +90,21 @@ export function cutQuestion(
   };
 }
 
-/** The question after: what each piece is called (Level 1), or how many make the whole (Level 2). */
-export function pieceQuestion(noun: string, parts: number, level: Level): AskOptions {
+/**
+ * The question after: what each piece is called (Level 1), or how many make
+ * the whole (Level 2). Level 1's names are shuffled, "one third" among them
+ * as a wrong one to think past (Level 1 cuts only halves and fourths).
+ */
+export function pieceQuestion(
+  noun: string,
+  parts: number,
+  level: Level,
+  random: () => number,
+): AskOptions {
   const { one, many } = PART_NAMES[parts];
   if (level === 1) {
-    const names = [2, 3, 4].map((n) => `one ${PART_NAMES[n].one}`);
+    const order = shuffle([2, 3, 4], random);
+    const names = order.map((n) => `one ${PART_NAMES[n].one}`);
     return {
       kind: 'ask',
       title: 'Name the pieces!',
@@ -103,7 +112,7 @@ export function pieceQuestion(noun: string, parts: number, level: Level): AskOpt
       question: {
         text: `The ${noun} has ${parts} equal pieces. What is each piece?`,
         choices: names,
-        answer: [2, 3, 4].indexOf(parts),
+        answer: order.indexOf(parts),
         hint: ['2 pieces are halves,', '4 pieces are fourths!'],
         help: `${numberWord(parts)} equal pieces, so each piece is one ${one}!`,
       },
@@ -134,7 +143,7 @@ const equalParts: Activity = {
     if (!found) return dish.steps;
     const parts = partsFor(level, random);
     const cut = cutQuestion(found.food, found.noun, parts, level, random);
-    const ask = pieceQuestion(found.noun, parts, level);
+    const ask = pieceQuestion(found.noun, parts, level, random);
     const icon = found.food === 'pancake' ? '🥞' : found.food === 'pizza' ? '🍕' : '🧀';
     const i = dish.steps.indexOf(found.after);
     return [...dish.steps.slice(0, i + 1), cut, { ...ask, icon }, ...dish.steps.slice(i + 1)];

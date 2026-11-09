@@ -33,9 +33,14 @@ declare module '../kit/types' {
   }
 }
 
-/** The cup for these options: a 1 cup measure at least, so ¼ cup is a quarter of it. */
+/**
+ * The cup for these options: a 1 cup measure, with a line every ¼ cup, for
+ * up to 1 cup (filled right to its top line for 1 cup), else a jug with a
+ * line every ½ cup. Either way what's in it and the star are on lines.
+ */
 export function cupScale(options: CupOptions) {
-  return measureScale(Math.max(options.have, options.need ?? 0), 1);
+  const most = Math.max(options.have, options.need ?? 0);
+  return most <= 1 ? measureScale(most, 1, 1) : measureScale(most, 1);
 }
 
 const cup = pictureQuiz<CupOptions>(

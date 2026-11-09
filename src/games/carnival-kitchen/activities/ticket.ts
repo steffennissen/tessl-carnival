@@ -4,6 +4,8 @@ import {
   nearChoices,
   numberWord,
   orderTotal,
+  pick,
+  wholeBetween,
   type Activity,
   type Dish,
   type Level,
@@ -19,7 +21,7 @@ import type { TopOptions } from '../steps/top';
 
 /**
  * Order tickets (reading and counting). A customer's ticket comes first:
- * "One pizza with 2 olives and 3 mushrooms, please!". She reads it, then
+ * "A pizza with 2 olives and 3 pepperoni slices, please!". She reads it, then
  * cooks it: the toppings (or the burger's layers) are exactly what it says,
  * with the ticket's note pinned up and ticked off as they go on. Right after,
  * a counting question about what she put on, with a picture of it: how many
@@ -31,20 +33,39 @@ import type { TopOptions } from '../steps/top';
  * add 3 to 9 more (within 20).
  */
 
-/** Names for bases whose own label doesn't read well on a ticket. */
+/** Names for bases whose own label doesn't read well on a ticket ("a bowl"). */
 const BASE_NOUNS: Record<string, string> = {
   'spaghetti-plate': 'plate of spaghetti',
   nori: 'sushi roll',
+  'fruit-bowl': 'fruit salad',
+  'taco-shell': 'taco',
 };
 
-/** Burger layers a ticket can ask for, in the order they stack, with their words. */
-const BURGER_LAYERS: { id: string; one: string; many: string }[] = [
-  { id: 'patty', one: 'patty', many: 'patties' },
-  { id: 'cheese-slice', one: 'cheese slice', many: 'cheese slices' },
-  { id: 'pickle', one: 'pickle', many: 'pickles' },
-  { id: 'lettuce-leaf', one: 'lettuce leaf', many: 'lettuce leaves' },
-  { id: 'tomato-slice', one: 'tomato slice', many: 'tomato slices' },
-];
+/** Burger layers a ticket can ask for, in the order they stack. */
+const BURGER_LAYERS = ['patty', 'cheese-slice', 'pickle', 'lettuce-leaf', 'tomato-slice'];
+
+/**
+ * What a ticket calls one and more of an ingredient, where its label alone
+ * would read as the whole food: "2 pepperoni slices", not "2 pepperonis"; "3
+ * avocado slices" on a taco, not "3 avocados". Anything else uses its label.
+ */
+export const TICKET_WORDS: Record<string, { one: string; many: string }> = {
+  patty: { one: 'patty', many: 'patties' },
+  'cheese-slice': { one: 'cheese slice', many: 'cheese slices' },
+  pickle: { one: 'pickle', many: 'pickles' },
+  'lettuce-leaf': { one: 'lettuce leaf', many: 'lettuce leaves' },
+  'tomato-slice': { one: 'tomato slice', many: 'tomato slices' },
+  pepperoni: { one: 'pepperoni slice', many: 'pepperoni slices' },
+  mushroom: { one: 'mushroom slice', many: 'mushroom slices' },
+  pineapple: { one: 'pineapple piece', many: 'pineapple pieces' },
+  pepper: { one: 'pepper slice', many: 'pepper slices' },
+  tomato: { one: 'tomato slice', many: 'tomato slices' },
+  avocado: { one: 'avocado slice', many: 'avocado slices' },
+  'carrot-stick': { one: 'carrot stick', many: 'carrot sticks' },
+  'egg-strip': { one: 'egg strip', many: 'egg strips' },
+  cucumber: { one: 'cucumber stick', many: 'cucumber sticks' },
+  kiwi: { one: 'kiwi slice', many: 'kiwi slices' },
+};
 
 /** Something you can count ("2 olives"), rather than "some cheese". */
 function countable(id: string): boolean {
@@ -52,16 +73,16 @@ function countable(id: string): boolean {
   return (ing.plural ?? `${ing.label}s`) !== ing.label;
 }
 
-function words(id: string): { one: string; many: string } {
-  const layer = BURGER_LAYERS.find((l) => l.id === id);
-  if (layer) return layer;
+/** What a ticket calls one and more of `id`: see TICKET_WORDS. */
+export function ticketWords(id: string): { one: string; many: string } {
+  if (TICKET_WORDS[id]) return TICKET_WORDS[id];
   const ing = ingredient(id);
   return { one: ing.label, many: ing.plural ?? `${ing.label}s` };
 }
 
 /** "2 olives", "one mushroom", "three olives". */
 function amountOf(line: OrderLine, level: Level): string {
-  const { one, many } = words(line.id);
+  const { one, many } = ticketWords(line.id);
   const n = level === 1 ? String(line.count) : numberWord(line.count);
   return `${n} ${line.count === 1 ? one : many}`;
 }
@@ -92,15 +113,10 @@ export function ticketTarget(
   }
   const stack = stackOf(dish);
   if (stack?.base === 'burger-plate') {
-    return { kind: 'stack', step: stack, kinds: BURGER_LAYERS.map((l) => l.id), noun: 'burger' };
+    return { kind: 'stack', step: stack, kinds: BURGER_LAYERS, noun: 'burger' };
   }
   return null;
 }
-
-const pick = <T>(items: readonly T[], random: () => number): T =>
-  items[Math.floor(random() * items.length) % items.length];
-const between = (random: () => number, low: number, high: number) =>
-  low + (Math.floor(random() * (high - low + 1)) % (high - low + 1));
 
 /** Splits `total` into `parts` counts of at least 1 each. */
 function split(total: number, parts: number, random: () => number): number[] {
@@ -124,7 +140,7 @@ export function makeOrder(dish: Dish, level: Level, random: () => number): Order
   // A burger has a patty and at least one more kind of layer.
   const fewest = target.kind === 'stack' ? 2 : must.length;
   // Level 1 usually asks for two kinds (four times in five), now and then one.
-  const kinds = level === 1 ? (random() < 0.8 ? 2 : 1) : between(random, level, most);
+  const kinds = level === 1 ? (random() < 0.8 ? 2 : 1) : wholeBetween(random, level, most);
   const want = Math.min(target.kinds.length, Math.max(fewest, kinds));
   const chosen = [...must];
   const pool = [...others];
@@ -135,7 +151,7 @@ export function makeOrder(dish: Dish, level: Level, random: () => number): Order
   chosen.sort((a, b) => target.kinds.indexOf(a) - target.kinds.indexOf(b));
   const usual = target.kind === 'top' ? target.step.count : 4;
   const [low, high] = level === 1 ? [2, Math.min(5, usual + 1)] : [3, Math.min(7, usual + 2)];
-  const total = Math.max(chosen.length, between(random, low, Math.max(low, high)));
+  const total = Math.max(chosen.length, wholeBetween(random, low, Math.max(low, high)));
   const counts = split(total, chosen.length, random);
   // No more than 2 patties: the rest go to the other layers.
   const patty = chosen.indexOf('patty');
@@ -153,8 +169,9 @@ export function makeOrder(dish: Dish, level: Level, random: () => number): Order
     level === 2 && left.length ? { id: pick(left, random), count: 0, icon: '' } : undefined;
   if (without) without.icon = ingredient(without.id).icon;
   const list = listOf(lines.map((line) => amountOf(line, level)));
-  const no = without ? ` No ${words(without.id).many}!` : '';
-  return { text: `One ${target.noun} with ${list}, please!${no}`, lines, without };
+  const no = without ? ` No ${ticketWords(without.id).many}!` : '';
+  const a = /^[aeiou]/.test(target.noun) ? 'An' : 'A';
+  return { text: `${a} ${target.noun} with ${list}, please!${no}`, lines, without };
 }
 
 /**
@@ -168,10 +185,12 @@ export function countQuestion(
   level: Level,
   random: () => number,
 ): { question: Question; tag?: string } {
-  // A burger's layers include its two buns.
-  const total = orderTotal(order) + (kind === 'stack' ? 2 : 0);
+  // A burger's layers are what the ticket asked for, between the buns (the
+  // buns aren't on the ticket's note, so they aren't counted).
+  const total = orderTotal(order);
   const single = order.lines.length === 1 && kind === 'top';
-  const things = kind === 'stack' ? 'layers' : single ? words(order.lines[0].id).many : 'toppings';
+  const things =
+    kind === 'stack' ? 'layers' : single ? ticketWords(order.lines[0].id).many : 'toppings';
   const add = level === 2 || (total < 9 && random() < 0.5);
   if (!add) {
     const { choices, index } = nearChoices(total, random, 1);
@@ -180,7 +199,7 @@ export function countQuestion(
       question: {
         text:
           kind === 'stack'
-            ? 'How many layers does your burger have?'
+            ? 'How many layers did you put between the buns?'
             : `How many ${things} did you put on?`,
         choices: choices.map(String),
         answer: index,
@@ -191,14 +210,17 @@ export function countQuestion(
   }
   const more =
     level === 1
-      ? between(random, 1, Math.min(3, 10 - total))
-      : between(random, 3, Math.min(9, 20 - total));
+      ? wholeBetween(random, 1, Math.min(3, 10 - total))
+      : wholeBetween(random, 3, Math.min(9, 20 - total));
   const sum = total + more;
   const { choices, index } = nearChoices(sum, random, 1);
   const icon = kind === 'stack' ? '🍔' : order.lines[0].icon;
   return {
     question: {
-      text: `You put on ${total} ${things}. Add ${more} more. How many is that?`,
+      text:
+        kind === 'stack'
+          ? `You put ${total} layers between the buns. Add ${more} more. How many is that?`
+          : `You put on ${total} ${things}. Add ${more} more. How many is that?`,
       choices: choices.map(String),
       answer: index,
       hint: [`Start at ${total},`, `then count on ${more}!`],

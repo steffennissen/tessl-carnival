@@ -2,8 +2,8 @@ import { C, type G, emoji, fillStroke, plainText, rounded } from '../art';
 import type { Shape } from '../layout';
 
 /**
- * An order ticket: what a customer asked for, such as "One pizza with 2
- * olives and 3 mushrooms, please!". The ticket activity writes one at the
+ * An order ticket: what a customer asked for, such as "A pizza with 2
+ * olives and 3 pepperoni slices, please!". The ticket activity writes one at the
  * start of a round, the ticket step shows it, and the step that adds those
  * things (toppings, burger layers) puts on exactly that and shows a little
  * note, pinned up, ticking each line off as it goes on.

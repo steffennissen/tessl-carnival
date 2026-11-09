@@ -119,4 +119,30 @@ describe('planning a round', () => {
     expect(counts.b / counts.a).toBeGreaterThan(2);
     expect(counts.b / counts.a).toBeLessThan(4.5);
   });
+
+  it("doesn't give the answer away by where it sits", () => {
+    // Every question every activity asks, in every dish, at both levels: the
+    // right answer is first, middle or last about as often as each other.
+    for (const activity of ACTIVITIES) {
+      const at = [0, 0, 0];
+      for (const dish of DISHES.filter((d) => activity.fits(d))) {
+        for (const level of [1, 2] as Level[]) {
+          for (let seed = 1; seed <= 60; seed++) {
+            const random = seeded(seed * 7919 + level);
+            const steps = activity.weave({ dish, level, random, start: 900 });
+            for (const step of steps) {
+              const q = (step as { question?: { choices: string[]; answer: number } }).question;
+              if (q?.choices.length === 3) at[q.answer] += 1;
+            }
+          }
+        }
+      }
+      const total = at[0] + at[1] + at[2];
+      if (!total) continue;
+      for (const n of at) {
+        expect(n / total, `${activity.id}: ${at.join(', ')}`).toBeLessThan(0.6);
+        expect(n / total, `${activity.id}: ${at.join(', ')}`).toBeGreaterThan(0.15);
+      }
+    }
+  });
 });

@@ -4,6 +4,7 @@ import { createState, move, press, release, tick } from '../game';
 import { DEFAULT_SETTINGS, SMART_BONUS, middleOf, type Level } from '../kit';
 import {
   TAP_SLOP,
+  cardForNext,
   homeOf,
   sequenceBubble,
   sequencePlaces,
@@ -12,7 +13,7 @@ import {
   type SequenceState,
 } from '../steps/sequence';
 import { cssScale, current, drawRound, keepClear, nextStep, overlaps, seeded } from '../test-kit';
-import recipeOrder, { recipeCards, shuffledTray } from './recipe-order';
+import recipeOrder, { recipeCards, recipeGroups, shuffledTray } from './recipe-order';
 
 describe('put the recipe in order', () => {
   it('fits dishes with three or four steps that read differently', () => {
@@ -45,6 +46,23 @@ describe('put the recipe in order', () => {
     }
   });
 
+  it('never starts the tray with a card that could go first, swaps included', () => {
+    for (let seed = 1; seed < 80; seed++) {
+      const tray = shuffledTray(4, seeded(seed), [0, 0, 2, 3]);
+      expect([...tray].sort()).toEqual([0, 1, 2, 3]);
+      expect([0, 1]).not.toContain(tray[0]);
+      // Even a roll that always comes out the same way.
+      expect([0, 1]).not.toContain(shuffledTray(4, () => 0, [0, 0, 2, 3])[0]);
+      const steps = recipeOrder.weave({
+        dish: dishById('fruit-salad'),
+        level: 1,
+        random: seeded(seed),
+        start: 900,
+      });
+      expect([0, 1]).not.toContain((steps[0] as SequenceOptions).tray[0]);
+    }
+  });
+
   it('starts the round with the cards, then cooks the real recipe', () => {
     const dish = dishById('soup');
     const steps = recipeOrder.weave({ dish, level: 1, random: seeded(), start: 900 });
@@ -55,8 +73,8 @@ describe('put the recipe in order', () => {
 });
 
 /** A round of pizza on its cards. */
-function onCards(level: Level = 1, seed = 1) {
-  const dish = dishById('pizza');
+function onCards(level: Level = 1, seed = 1, id = 'pizza') {
+  const dish = dishById(id);
   const steps = recipeOrder.weave({ dish, level, random: seeded(seed), start: 900 });
   const state = createState(dish, seeded(), {
     steps,
@@ -139,6 +157,51 @@ describe('the sequence step', () => {
     expect(s.done).toBe(true);
     expect(s.outcome).toBe('helped');
     expect(state.bonus).toBe(0);
+  });
+
+  it('takes steps that could go either way in either order', () => {
+    // Fruit salad and smoothie chop either fruit first; pancakes take the
+    // eggs or the flour and milk first; the sundae's chocolate goes on before or
+    // after the toppings.
+    expect(recipeGroups(dishById('fruit-salad'))).toEqual([0, 0, 2, 3]);
+    expect(recipeGroups(dishById('strawberry-smoothie'))).toEqual([0, 0, 2, 3]);
+    expect(recipeGroups(dishById('pancakes'))).toEqual([0, 0, 2, 3]);
+    expect(recipeGroups(dishById('ice-cream-sundae'))).toEqual([0, 1, 2, 2]);
+    expect(recipeGroups(dishById('pizza'))).toBeUndefined();
+    for (const shape of ['page', 'tall'] as const) {
+      const state = onCards(1, 1, 'fruit-salad');
+      const s = current<SequenceState>(state);
+      // The banana first, then the strawberry: both right.
+      dragCard(state, 1, 0, shape);
+      tapCard(state, 0, shape);
+      expect(s.slots).toEqual([1, 0, null, null]);
+      expect(s.wrong).toBe(0);
+      tapCard(state, 2, shape);
+      tapCard(state, 3, shape);
+      expect(s.done).toBe(true);
+      expect(s.outcome).toBe('right');
+      // The cooking keeps the recipe's order.
+      tick(state, 2);
+      expect(state.steps.slice(1).map((r) => r.options)).toEqual(dishById('fruit-salad').steps);
+    }
+    // Still not the mix before the chopping.
+    const state = onCards(1, 1, 'fruit-salad');
+    dragCard(state, 2, 1);
+    expect(current<SequenceState>(state).wrong).toBe(1);
+  });
+
+  it('keeps the Smart Chef star with one slip, not two', () => {
+    const one = onCards();
+    tapCard(one, 2);
+    for (let card = 0; card < 4; card++) tapCard(one, card);
+    expect(current<SequenceState>(one).outcome).toBe('right');
+    const two = onCards();
+    tapCard(two, 2);
+    tapCard(two, 0);
+    tapCard(two, 3);
+    expect(current<SequenceState>(two).shown).toBe(true);
+    // Helped now: the card that comes next glows.
+    expect(cardForNext(opts(two), current<SequenceState>(two))).toBe(1);
   });
 
   it('lets a card dropped away from the slots slide back, with no try used', () => {

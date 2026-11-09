@@ -127,6 +127,17 @@ export function between(random: () => number, low: number, high: number): number
   return low + random() * (high - low);
 }
 
+/** A whole number from `low` to `high`, both included. */
+export function wholeBetween(random: () => number, low: number, high: number): number {
+  const count = high - low + 1;
+  return low + (Math.floor(random() * count) % count);
+}
+
+/** One of `items`, at random. */
+export function pick<T>(items: readonly T[], random: () => number): T {
+  return items[Math.floor(random() * items.length) % items.length];
+}
+
 /** A shuffled copy. */
 export function shuffle<T>(items: readonly T[], random: () => number): T[] {
   const out = [...items];

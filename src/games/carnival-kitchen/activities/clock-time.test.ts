@@ -22,6 +22,8 @@ import clockTime, {
   handsHelp,
   planClock,
   readStep,
+  setFrom,
+  setStep,
   swappedHands,
   timeChoices,
 } from './clock-time';
@@ -64,14 +66,37 @@ describe('clock time', () => {
     );
     expect(handsHelp(at(15, 0))).toMatch(/points at the 3, and the long hand points straight up/);
     expect(handsHelp(at(15, 50))).toMatch(/^The short hand is almost at the 4/);
+    // Not "just past" or "almost" in the middle of the hour.
+    expect(handsHelp(at(16, 10))).toMatch(/^The short hand is just past the 4/);
+    expect(handsHelp(at(16, 25))).toMatch(/^The short hand is between the 4 and the 5/);
+    expect(handsHelp(at(16, 35))).toMatch(/^The short hand is between the 4 and the 5/);
+    expect(handsHelp(at(16, 45))).toMatch(/^The short hand is almost at the 5/);
+  });
+
+  it('starts the hands on the hour before at Level 1, at 12:00 at Level 2', () => {
+    expect(setFrom(at(16, 30), 1)).toBe(at(16, 0));
+    expect(setFrom(at(16, 0), 1)).toBe(at(15, 0));
+    expect(setFrom(at(16, 30), 2)).toBeUndefined();
+    const one = setStep(
+      [{ kind: 'bake', item: 'cookies', minutes: 15 }],
+      0,
+      at(16, 15),
+      1,
+      seeded(),
+    );
+    expect(one.from).toBe(setFrom(one.target, 1));
+    expect(one.from).not.toBe(one.target);
   });
 
   it('asks "When will it be done?" with the minutes counted on by fives', () => {
     const steps: RecipeStep[] = [{ kind: 'bake', item: 'cookies', minutes: 15 }];
     const step = elapsedStep(steps, 0, at(15, 10), seeded());
+    // It names the very step next, not just the kind of step.
     expect(step.question.text).toBe(
-      "Baking takes 15 minutes. It's 3:10 now. When will it be done?",
+      "Next: Bake the cookies! That takes 15 minutes. It's 3:10 now. When will it be done?",
     );
+    // Shown, Chef Bunny says when it will be done, not "It is 3:25" (the clock says 3:10).
+    expect(step.question.shownLines).toEqual(['It will be done', 'at 3:25!']);
     expect(step.question.choices[step.question.answer]).toBe('3:25');
     expect(step.question.choices).toHaveLength(3);
     expect(step.question.help).toBe(

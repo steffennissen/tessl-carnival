@@ -57,8 +57,14 @@ describe('tray arrays', () => {
         for (const c of q.choices) expect(Number(c)).toBeGreaterThan(0);
       }
     }
-    // Level 1's wrong answers are a row more and a row less.
-    expect(trayChoices(3, 5, 1, seeded())).toEqual({ choices: [10, 15, 20], index: 1 });
+    // Level 1's wrong answers are a row more or less first (the skip-counting slips).
+    for (let seed = 1; seed <= 30; seed++) {
+      const { choices, index } = trayChoices(3, 5, 1, seeded(seed));
+      expect(choices[index]).toBe(15);
+      if (index === 1) expect(choices).toEqual([10, 15, 20]);
+      if (index === 0) expect(choices).toEqual([15, 16, 20]);
+      if (index === 2) expect(choices).toEqual([10, 14, 15]);
+    }
   });
 
   it('says how to get it: skip counting, or adding the rows', () => {

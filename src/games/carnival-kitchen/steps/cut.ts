@@ -61,8 +61,12 @@ export function isRound(food: CutFood): boolean {
   return food !== 'casserole';
 }
 
-/** Where a rectangle's long lines go, as shares across it, for unequal pieces. */
-const UNEQUAL_STRIPS: Record<number, number[]> = { 2: [0.3], 3: [0.2, 0.45], 4: [0.15, 0.35, 0.6] };
+/**
+ * Where a rectangle's long lines go, as shares across it, for unequal
+ * pieces: clearly different sizes, even small on a phone (a tenth next to a
+ * half).
+ */
+const UNEQUAL_STRIPS: Record<number, number[]> = { 2: [0.28], 3: [0.12, 0.4], 4: [0.1, 0.25, 0.5] };
 
 /**
  * The cuts for a picture, in units of the food's size (a round food's radius,
@@ -88,7 +92,7 @@ export function cutLines(food: CutFood, picture: CutPicture): Line[] {
             [-far, 0, far, 0],
           ];
     }
-    if (parts === 2) return [[0.45, -far, 0.45, far]];
+    if (parts === 2) return [[0.55, -far, 0.55, far]];
     if (parts === 3) {
       // A half and two quarters: three pieces, but not equal ones.
       return [
@@ -98,8 +102,8 @@ export function cutLines(food: CutFood, picture: CutPicture): Line[] {
       ];
     }
     return [
-      [0.4, -far, 0.4, far],
-      [-far, 0.3, far, 0.3],
+      [0.5, -far, 0.5, far],
+      [-far, 0.45, far, 0.45],
     ];
   }
   if (equal && parts === 4) {
@@ -181,18 +185,26 @@ export function drawCutFood(
       fillStroke(g, C.cheeseBrown, 0);
     }
   }
-  // The cuts: gaps of plate showing through, clipped to the food.
+  // The cuts: wide gaps of plate showing through, edged in ink so they read
+  // on pale cheese even small on a phone, clipped to the food.
   g.save();
   foodPath(g, food, x, y, size + line);
   g.clip();
   g.lineCap = 'round';
-  g.strokeStyle = C.white;
-  g.lineWidth = Math.max(3, size * 0.08);
-  for (const [x1, y1, x2, y2] of cutLines(food, picture)) {
-    g.beginPath();
-    g.moveTo(x + x1 * size, y + y1 * size);
-    g.lineTo(x + x2 * size, y + y2 * size);
-    g.stroke();
+  const gap = Math.max(5, size * 0.11);
+  const edge = Math.max(2, size * 0.035);
+  for (const [width, color] of [
+    [gap + edge * 2, C.ink],
+    [gap, C.white],
+  ] as const) {
+    g.strokeStyle = color;
+    g.lineWidth = width;
+    for (const [x1, y1, x2, y2] of cutLines(food, picture)) {
+      g.beginPath();
+      g.moveTo(x + x1 * size, y + y1 * size);
+      g.lineTo(x + x2 * size, y + y2 * size);
+      g.stroke();
+    }
   }
   g.restore();
   foodPath(g, food, x, y, size);
@@ -222,10 +234,10 @@ const cut: Step<CutOptions, QuizState, QuizFx> = {
   progress: ({ state }) => [1, state.picked === null ? 0 : 1],
   press: (turn, x, y) => pressQuiz(turn, x, y),
   update: (turn, dt) => updateQuiz(turn, dt),
-  bubble: ({ options, state }) =>
+  bubble: ({ options, state, round }) =>
     state.shown && state.picked === null
       ? ['This one has', `${rightPicture(options).parts} equal pieces!`]
-      : quizBubble(state),
+      : quizBubble(state, round),
   solve: (turn) => solveQuiz(turn),
   fx: quizFx,
   observe: (view) => observeQuiz(view),

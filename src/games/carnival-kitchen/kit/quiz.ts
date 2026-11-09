@@ -12,10 +12,17 @@ import {
 } from '../art';
 import type { Shape } from '../layout';
 import type { Reading } from '../sound';
-import { type AnswerState, SMART_BONUS, answer, autoReadDelay, startAnswer } from './learn';
+import {
+  type AnswerState,
+  SMART_BONUS,
+  answer,
+  autoReadDelay,
+  cheerLines,
+  startAnswer,
+} from './learn';
 import { finishStep } from './rules';
-import type { Feedback, StepBasics, StepView, Turn } from './types';
-import { drawSpeaker, drawWords, fitWords, inCircle } from './words';
+import type { Effects, Feedback, KitchenState, StepBasics, StepView, Turn } from './types';
+import { drawSpeaker, drawWords, fitWords, inBox, inCircle } from './words';
 
 /**
  * Quiz: a question with big answer buttons, the fifth ready-made mini-game,
@@ -47,6 +54,11 @@ export interface Question {
   hint: [string, string];
   /** What she says when she shows the answer: "Let's count: one, two, three. Three!" */
   help: string;
+  /**
+   * Chef Bunny's two lines while she shows the answer, if not the usual
+   * ["It is 4:45!", "Tap the 4:45!"]: ["It will be done", "at 4:45!"].
+   */
+  shownLines?: [string, string];
   /** Buttons down the right beside a picture ('side', the default), or in a row under the question. */
   layout?: 'side' | 'row';
 }
@@ -187,9 +199,6 @@ export function startQuiz(question: Question): QuizState {
   return { ...startAnswer(), question, tried: [], picked: null, reads: 0, age: 0, after: 0 };
 }
 
-const inBox = (b: Box, x: number, y: number) =>
-  x >= b.x - 6 && x <= b.x + b.w + 6 && y >= b.y - 6 && y <= b.y + b.h + 6;
-
 /**
  * A tap: the speaker reads the question again, an answer button answers.
  * Never "Not yet!": a tap anywhere else just does nothing.
@@ -203,7 +212,7 @@ export function pressQuiz(turn: Turn<StepBasics, QuizState>, x: number, y: numbe
     return true;
   }
   const q = s.question;
-  const i = choiceBoxes(q.choices.length, q.layout, turn.shape).findIndex((b) => inBox(b, x, y));
+  const i = choiceBoxes(q.choices.length, q.layout, turn.shape).findIndex((b) => inBox(b, x, y, 6));
   if (i < 0 || s.tried.includes(i) || (s.shown && i !== q.answer)) return true;
   const result = answer(turn.round, s, i === q.answer);
   if (result === 'right') s.picked = i;
@@ -220,12 +229,19 @@ export function updateQuiz(turn: Turn<StepBasics, QuizState>, dt: number): void 
   if (s.after >= QUIZ_OUTRO) finishStep(turn.round, 0);
 }
 
-/** Chef Bunny's bubble: the hint after a wrong try, the answer when shown, a cheer when right. */
-export function quizBubble(s: QuizState): [string, string] | null {
+/**
+ * Chef Bunny's bubble: the hint after a wrong try, the answer when shown, a
+ * cheer when right ("a Smart Chef!" only while the round is earning its
+ * star; see `cheerLines`).
+ */
+export function quizBubble(s: QuizState, round?: KitchenState): [string, string] | null {
   const right = s.question.choices[s.question.answer];
-  if (s.picked !== null)
-    return s.outcome === 'right' ? ['Yes! You are', 'a Smart Chef!'] : ['Yes, it is', `${right}!`];
-  if (s.shown) return [`It is ${right}!`, `Tap the ${right}!`];
+  if (s.picked !== null) {
+    const helped: [string, string] = ['Yes, it is', `${right}!`];
+    if (!round) return s.outcome === 'right' ? ['Yes! You are', 'a Smart Chef!'] : helped;
+    return cheerLines(round, s, helped);
+  }
+  if (s.shown) return s.question.shownLines ?? [`It is ${right}!`, `Tap the ${right}!`];
   if (s.wrong > 0) return s.question.hint;
   return null;
 }
@@ -241,72 +257,131 @@ export function solveQuiz(turn: Turn<StepBasics, QuizState>): void {
 // ---------------------------------------------------------------------------
 // Sounds, the voice and Chef Bunny
 
-/** The quiz's effect memory: what it has seen, and the question being read out. */
-export interface QuizFx {
+/** What the shared answer feedback has seen so far (see `observeAnswer`). */
+export interface AnswerFx {
   reading: Reading | null;
   reads: number;
   autoRead: boolean;
-  tried: number;
+  wrong: number;
   shown: boolean;
-  picked: boolean;
+  done: boolean;
 }
 
-export function quizFx(): QuizFx {
-  return { reading: null, reads: 0, autoRead: false, tried: 0, shown: false, picked: false };
+export function answerFx(): AnswerFx {
+  return { reading: null, reads: 0, autoRead: false, wrong: 0, shown: false, done: false };
 }
 
-const CHEER: Feedback = { grade: 'Perfect!', points: 0, combo: 0, age: 0 };
-const ENCOURAGE: Feedback = { grade: 'Nice try!', points: 0, combo: 0, age: 0 };
+/** The quiz's effect memory: the shared answer feedback's. */
+export type QuizFx = AnswerFx;
+export const quizFx = answerFx;
+
+/** The popups every learning step shows: a cheer, a gentle "Nice try!", and "Great!" for a step along the way. */
+export const CHEER: Feedback = { grade: 'Perfect!', points: 0, combo: 0, age: 0 };
+export const ENCOURAGE: Feedback = { grade: 'Nice try!', points: 0, combo: 0, age: 0 };
+export const NICE: Feedback = { grade: 'Great!', points: 0, combo: 0, age: 0 };
 const PRAISE = ['Yes!', 'You got it!', "That's right!", 'Smart chef!'];
 
 /** The middle of a box. */
 export const middleOf = (b: Box) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
 
+/** How a learning step sounds and pops as it's answered: see `observeAnswer`. */
+export interface AnswerFeedback {
+  /** What the voice reads: by itself once (if the settings say so), and on each speaker tap. */
+  read: string;
+  /** Said instead of `read` when it reads by itself (find: never the word she's to read). */
+  autoSay?: string;
+  /** Wait a little at Level 2 before reading by itself, so she can try first. */
+  pause?: boolean;
+  /** Answered right: the step is cheering. */
+  done: boolean;
+  /** Where the "Nice try!" pops after a wrong try. */
+  wrongAt: () => { x: number; y: number };
+  /** What Chef Bunny says after a wrong try (not once she's showing the answer), or null. */
+  wrongSay: () => string | null;
+  /** What she says as she shows the answer. */
+  helpSay: () => string;
+  /** Where the cheer pops, and the confetti bursts (`burstAt`, if somewhere else). */
+  doneAt: () => { x: number; y: number };
+  burstAt?: () => { x: number; y: number };
+  /** What she says for a right answer. */
+  doneSay: () => string;
+}
+
 /**
- * Reads the question out (when the settings say it reads itself; `pause`
- * waits a little at Level 2 so she can try first) and again for each tap on
- * the speaker, and reacts to answers: a soft boop and an encouraging Chef
- * Bunny for a wrong one, her help when she shows it, a cheer for a right one.
+ * The feedback every learning step shares, as the answer rules in learn.ts
+ * go: reads the question out (and again for each tap on the speaker); a soft
+ * boop and a "Nice try!" for each wrong try, with a hint said; a chime and
+ * her help when she shows the answer; a chime, confetti and a cheer when
+ * it's right. Call it from a step's `observe`.
+ */
+export function observeAnswer(
+  view: { effects: Effects; round: KitchenState; taking: boolean },
+  s: AnswerState & { reads: number; age: number },
+  fx: AnswerFx,
+  f: AnswerFeedback,
+): void {
+  const { effects, round, taking } = view;
+  const { sound } = effects;
+  const settings = round.learn.settings;
+  const delay = autoReadDelay(settings, f.pause);
+  if (taking && !fx.autoRead && delay !== null && s.age >= delay && !f.done) {
+    fx.autoRead = true;
+    if (f.autoSay) sound.say(f.autoSay);
+    else fx.reading = sound.read(f.read);
+  }
+  if (s.reads > fx.reads) {
+    fx.reads = s.reads;
+    fx.autoRead = true;
+    fx.reading = sound.read(f.read);
+  }
+  if (s.wrong > fx.wrong) {
+    fx.wrong = s.wrong;
+    const at = f.wrongAt();
+    sound.boop();
+    effects.celebrate(at.x, at.y, ENCOURAGE);
+    const say = s.shown ? null : f.wrongSay();
+    if (say && !settings.readMyself) sound.say(say);
+  }
+  if (s.shown && !fx.shown) {
+    fx.shown = true;
+    sound.chime([1046.5, 1318.5], 0.12, 0.12);
+    const help = f.helpSay();
+    if (help && !settings.readMyself) sound.say(help);
+  }
+  if (f.done && !fx.done) {
+    fx.done = true;
+    const at = f.doneAt();
+    const burst = f.burstAt?.() ?? at;
+    sound.chime([1046.5, 1318.5, 1568, 2093], 0.07, 0.16);
+    effects.burst(burst.x, burst.y, 20, ['star', 'heart', 'star', 'dot'], CONFETTI, 270);
+    effects.celebrate(at.x, at.y, CHEER);
+    sound.say(f.doneSay());
+  }
+}
+
+/**
+ * The quiz's feedback (see `observeAnswer`): the question read out (`pause`
+ * waits a little at Level 2 so she can try first), the hint said after a
+ * wrong answer, her help when she shows it, a cheer for a right one.
  */
 export function observeQuiz(
   view: StepView<StepBasics, QuizState, QuizFx>,
   { pause = false }: { pause?: boolean } = {},
 ): void {
-  const { state: s, fx, effects, round, taking } = view;
-  const { sound } = effects;
-  const settings = round.learn.settings;
+  const { state: s, fx } = view;
   const q = s.question;
   const boxes = choiceBoxes(q.choices.length, q.layout, view.shape);
-  const delay = autoReadDelay(settings, pause);
-  if (taking && !fx.autoRead && delay !== null && s.age >= delay && s.picked === null) {
-    fx.autoRead = true;
-    fx.reading = sound.read(q.text);
-  }
-  if (s.reads > fx.reads) {
-    fx.reads = s.reads;
-    fx.autoRead = true;
-    fx.reading = sound.read(q.text);
-  }
-  if (s.tried.length > fx.tried) {
-    fx.tried = s.tried.length;
-    const at = middleOf(boxes[s.tried[s.tried.length - 1]]);
-    sound.boop();
-    effects.celebrate(at.x, at.y, ENCOURAGE);
-    if (!s.shown && !settings.readMyself) sound.say(`Try again! ${q.hint.join(' ')}`);
-  }
-  if (s.shown && !fx.shown) {
-    fx.shown = true;
-    sound.chime([1046.5, 1318.5], 0.12, 0.12);
-    if (!settings.readMyself) sound.say(q.help);
-  }
-  if (s.picked !== null && !fx.picked) {
-    fx.picked = true;
-    const at = middleOf(boxes[s.picked]);
-    sound.chime([1046.5, 1318.5, 1568, 2093], 0.07, 0.16);
-    effects.burst(at.x, at.y, 18, ['star', 'heart', 'star', 'dot'], CONFETTI, 260);
-    effects.celebrate(at.x, at.y, CHEER);
-    sound.say(`${PRAISE[Math.floor(s.age * 7) % PRAISE.length]} ${q.choices[s.picked]}!`);
-  }
+  observeAnswer(view, s, fx, {
+    read: q.text,
+    pause,
+    done: s.picked !== null,
+    wrongAt: () => middleOf(boxes[s.tried[s.tried.length - 1] ?? 0]),
+    wrongSay: () => `Try again! ${q.hint.join(' ')}`,
+    helpSay: () => q.help,
+    doneAt: () => middleOf(boxes[s.picked ?? q.answer]),
+    doneSay: () =>
+      `${PRAISE[Math.floor(s.age * 7) % PRAISE.length]} ${q.choices[s.picked ?? q.answer]}!`,
+  });
 }
 
 /** The word of `reading` being said now, or -1. */

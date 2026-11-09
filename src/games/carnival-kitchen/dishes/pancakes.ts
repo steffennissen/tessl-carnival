@@ -10,6 +10,8 @@ const pancakes: Dish = {
     { kind: 'mix', vessel: 'mixing-bowl', contents: 'batter' },
     { kind: 'flip', item: 'pancake' },
   ],
+  // The eggs, or the flour and milk, can go in the bowl first.
+  either: [[0, 1]],
 
   draw(g) {
     // A stack on a plate, with cream and strawberry hearts on top.
