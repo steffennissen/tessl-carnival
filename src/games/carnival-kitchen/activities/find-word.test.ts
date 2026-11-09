@@ -76,7 +76,7 @@ describe('find the ingredient', () => {
         random: seeded(seed),
         start: 900,
       });
-      expect(steps.map((s) => s.kind)).toEqual(['crack', 'pour', 'mix', 'find', 'flip']);
+      expect(steps.map((s) => s.kind)).toEqual(['crack', 'pour', 'mix', 'find', 'flip', 'flambe']);
       const find = steps[3] as FindOptions;
       expect(find.word).toBe('pancake');
       expect(find.question.text).toBe('Tap the PANCAKE!');

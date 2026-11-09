@@ -18,21 +18,24 @@ import recipeOrder, { recipeCards, recipeGroups, shuffledTray } from './recipe-o
 describe('put the recipe in order', () => {
   it('fits dishes with three or four steps that read differently', () => {
     const fits = DISHES.filter((d) => recipeOrder.fits(d)).map((d) => d.id);
-    expect(fits).toEqual(expect.arrayContaining(['pizza', 'pancakes', 'soup', 'cheeseburger']));
-    // Five steps is too many.
+    expect(fits).toEqual(
+      expect.arrayContaining(['tacos', 'ice-cream-sundae', 'soup', 'cheeseburger']),
+    );
+    // Five steps is too many, the pizza's dough toss and the pancakes' flambé included.
     expect(fits).not.toContain('mac-and-cheese');
+    expect(fits).not.toContain('pizza');
   });
 
   it('makes cards from the recipe: emoji and words at Level 1, words only at Level 2', () => {
-    const one = recipeCards(dishById('pizza'), 1);
+    const one = recipeCards(dishById('tacos'), 1);
     expect(one.map((c) => c.text)).toEqual([
-      'Chop the pepperoni!',
-      'Spread the sauce!',
+      'Chop the tomato!',
+      'Stir the taco meat!',
+      'Shake the taco spice!',
       'Add the toppings!',
-      'Bake the pizza!',
     ]);
-    expect(one[0].icon).toBe('🔪');
-    expect(recipeCards(dishById('pizza'), 2).every((c) => c.icon === null)).toBe(true);
+    expect(one[0].icon).toBe('🍅');
+    expect(recipeCards(dishById('tacos'), 2).every((c) => c.icon === null)).toBe(true);
   });
 
   it('never lays the tray out with the first step first, and repeats for a seed', () => {
@@ -72,8 +75,8 @@ describe('put the recipe in order', () => {
   });
 });
 
-/** A round of pizza on its cards. */
-function onCards(level: Level = 1, seed = 1, id = 'pizza') {
+/** A round of tacos on its cards. */
+function onCards(level: Level = 1, seed = 1, id = 'tacos') {
   const dish = dishById(id);
   const steps = recipeOrder.weave({ dish, level, random: seeded(seed), start: 900 });
   const state = createState(dish, seeded(), {
@@ -149,7 +152,7 @@ describe('the sequence step', () => {
     expect(s.wrong).toBe(1);
     expect(s.gliding.map((g) => g.card)).toEqual([2]);
     expect(sequenceBubble(opts(state), s)).toEqual(['Hmm! What do we', 'do first?']);
-    // A tap sends a card to the first empty slot: the bake isn't first either.
+    // A tap sends a card to the first empty slot: the toppings aren't first either.
     tapCard(state, 3);
     expect(s.shown).toBe(true);
     expect(sequenceBubble(opts(state), s)).toEqual(['Look for the', 'glowing card!']);
@@ -165,9 +168,9 @@ describe('the sequence step', () => {
     // after the toppings.
     expect(recipeGroups(dishById('fruit-salad'))).toEqual([0, 0, 2, 3]);
     expect(recipeGroups(dishById('strawberry-smoothie'))).toEqual([0, 0, 2, 3]);
-    expect(recipeGroups(dishById('pancakes'))).toEqual([0, 0, 2, 3]);
-    expect(recipeGroups(dishById('ice-cream-sundae'))).toEqual([0, 1, 2, 2]);
-    expect(recipeGroups(dishById('pizza'))).toBeUndefined();
+    expect(recipeGroups(dishById('pancakes'))).toEqual([0, 0, 2, 3, 4]);
+    expect(recipeGroups(dishById('ice-cream-sundae'))).toEqual([0, 1, 1, 3]);
+    expect(recipeGroups(dishById('tacos'))).toBeUndefined();
     for (const shape of ['page', 'tall'] as const) {
       const state = onCards(1, 1, 'fruit-salad');
       const s = current<SequenceState>(state);

@@ -57,6 +57,10 @@ const DOING: Record<string, string> = {
   scoop: 'Scooping',
   stack: 'Stacking',
   roll: 'Rolling',
+  'dough-toss': 'Tossing the dough',
+  flambe: 'The flambé',
+  tower: 'Building the tower',
+  party: 'The party',
 };
 
 /** "Stirring", or "Cooking" for a step this doesn't know. */

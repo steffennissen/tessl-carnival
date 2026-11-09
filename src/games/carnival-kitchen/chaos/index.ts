@@ -45,8 +45,15 @@ export function chaosOf(id: string): Chaos {
   return chaos;
 }
 
-/** Learning steps (a ticket, a question) never get a surprise. */
-const learning = (run: StepRun) => !!stepOf(run.kind).learning;
+/**
+ * Steps that never get a surprise: learning steps (a ticket, a question),
+ * and the show-off finishers (a dough toss, a party), which are short
+ * spectacles of their own.
+ */
+const learning = (run: StepRun) => {
+  const step = stepOf(run.kind);
+  return !!step.learning || !!step.finisher;
+};
 
 /** The round's surprise's event, or null. */
 function eventOf(round: KitchenState): Chaos | null {
