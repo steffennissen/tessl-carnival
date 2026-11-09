@@ -1,6 +1,7 @@
 import { CONFETTI, starPath } from '../art';
 import { cakeToppings, drawBirthdayCake } from '../ingredients/birthday-cake';
 import { findStep, type Dish } from '../kit';
+import type { PartyState } from '../steps/party';
 import type { TopState } from '../steps/top';
 
 /** The toppings, in the cake's own units, when nobody put any on. */
@@ -26,21 +27,28 @@ const birthdayCake: Dish = {
     { kind: 'pour', pours: ['flour', 'sugar'], amounts: ['2 cups', '1 cup'] },
     { kind: 'mix', vessel: 'mixing-bowl', contents: 'cupcake-batter' },
     { kind: 'bake', item: 'birthday-cake', minutes: 30 },
+    // The candles go on (and get lit and blown out) at the party.
     {
       kind: 'top',
       base: 'birthday-cake',
-      always: ['candle', 'candle', 'candle'],
-      extras: ['sprinkles', 'cherry', 'candy-heart'],
-      count: 5,
+      always: ['sprinkles', 'cherry'],
+      extras: ['candy-heart', 'heart-cutter', 'star-cutter'],
+      count: 4,
     },
+    { kind: 'party', cake: 'birthday-cake', candles: 5, minutes: 5 },
   ],
 
   draw(g, time, state) {
     const top = state && findStep<TopState>(state, 'top');
+    // The party's candles stand on it too, where they were lit.
+    const party = state && findStep<PartyState>(state, 'party');
+    const candles = cakeToppings(
+      (party?.state.candles ?? []).map((c) => ({ id: 'candle', x: c.x, y: c.y - 16 })),
+    );
     g.save();
     g.translate(0, -10);
     g.scale(0.62, 0.62);
-    drawBirthdayCake(g, top ? cakeToppings(top.state.spots) : TOPPINGS, 'joy');
+    drawBirthdayCake(g, top ? [...cakeToppings(top.state.spots), ...candles] : TOPPINGS, 'joy');
     g.restore();
 
     // Party stars twinkling round it.

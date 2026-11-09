@@ -333,7 +333,7 @@ const tower: Step<TowerOptions, TowerState, TowerFx> = {
 
   title: () => 'Build a tower!',
   hint: () => ['Tap when the scoop', 'is over the top!'],
-  icon: () => '🗼',
+  icon: () => '🍨',
   progress: ({ state }) => [state.scoops.length, state.results.length],
   points: ({ state }) => state.points,
 

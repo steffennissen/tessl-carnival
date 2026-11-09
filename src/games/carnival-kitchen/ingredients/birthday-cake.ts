@@ -1,6 +1,6 @@
 import { C, type G, blend, face, fillStroke, oval, palette, rounded, vertical } from '../art';
-import { GOLDEN, type Ingredient } from '../kit';
-import type { ToppingSpot } from '../steps/top';
+import { GOLDEN, findStep, type Ingredient, type KitchenState } from '../kit';
+import type { TopOptions, TopState, ToppingSpot } from '../steps/top';
 import { artOf } from './index';
 
 const K = palette({
@@ -77,6 +77,12 @@ export function cakeToppings(toppings: readonly ToppingSpot[]): ToppingSpot[] {
   return toppings.map((s) => ({ id: s.id, x: s.x - ORIGIN.x, y: s.y - ORIGIN.y }));
 }
 
+/** The round's toppings on the cake, in its own units, if it had any. */
+function toppingsOf(round: KitchenState | null): ToppingSpot[] {
+  const top = round && findStep<TopState, TopOptions>(round, 'top');
+  return top ? cakeToppings(top.state.spots) : [];
+}
+
 /** A birthday cake: a round tin rising in the oven, then a big frosted cake for candles. */
 const birthdayCake: Ingredient = {
   id: 'birthday-cake',
@@ -117,6 +123,24 @@ const birthdayCake: Ingredient = {
       g.translate(ORIGIN.x, ORIGIN.y);
       drawBirthdayCake(g, cakeToppings(toppings));
       g.restore();
+    },
+  },
+
+  /** The finished cake, with candles in a gentle arc across its top for the party. */
+  partyCake: {
+    draw(g, { round }) {
+      g.save();
+      g.translate(ORIGIN.x, ORIGIN.y);
+      drawBirthdayCake(g, toppingsOf(round), 'joy');
+      g.restore();
+    },
+    candles(count) {
+      return Array.from({ length: count }, (_, i) => {
+        const x = count === 1 ? 0 : -88 + (176 * i) / (count - 1);
+        // Round the frosting's oval: the middle ones a little further back.
+        const y = 4 - 12 * Math.cos((x / 132) * (Math.PI / 2));
+        return { x: ORIGIN.x + x, y: ORIGIN.y + y };
+      });
     },
   },
 };
