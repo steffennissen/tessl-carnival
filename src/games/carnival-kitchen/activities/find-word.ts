@@ -1,6 +1,7 @@
 import { ingredient } from '../ingredients';
 import {
   listOf,
+  pick,
   shuffle,
   type Activity,
   type Dish,
@@ -57,7 +58,8 @@ export const WORD_BANK: readonly BankWord[] = [
   {
     word: 'cheese',
     picture: '🧀',
-    sounds: ['ch', 'ee', 'silent e'],
+    // Its last e is silent, but it isn't the silent e that makes a vowel long (rice, cake).
+    sounds: ['ch', 'ee'],
     alike: [
       { word: 'chess', picture: '♟️' },
       { word: 'cherry', picture: '🍒' },
@@ -158,8 +160,8 @@ export const WORD_BANK: readonly BankWord[] = [
     picture: '☁️',
     sounds: ['wh', 'ea'],
     alike: [
-      { word: 'whipped dream', picture: '💭' },
-      { word: 'ripped cream', picture: '🥛' },
+      { word: 'ice cream', picture: '🍦' },
+      { word: 'sour cream', picture: '🥣' },
     ],
   },
 ];
@@ -219,13 +221,25 @@ export function findTargets(dish: Dish): FindTarget[] {
   return targets;
 }
 
-const pick = <T>(items: readonly T[], random: () => number): T =>
-  items[Math.floor(random() * items.length) % items.length];
+/**
+ * The sound a word starts with, roughly as a reader hears it: "ch", "sh",
+ * "th" and "wh" (as w); a hard c or k as "k" (cream, ketchup, cupcakes);
+ * otherwise its first letter.
+ */
+export function firstSound(word: string): string {
+  const w = word.toLowerCase();
+  if (/^(ch|sh|th)/.test(w)) return w.slice(0, 2);
+  if (w.startsWith('wh')) return 'w';
+  if (/^(c[^eiy]|k|q)/.test(w)) return 'k';
+  if (/^c[eiy]/.test(w)) return 's';
+  return w[0];
+}
 
 /**
  * The three words on the jars and their pictures, the word to find among
  * them. Level 1: two other one-word bank words, each starting with a
- * different letter from the word and each other. Level 2: the word's two look-alikes.
+ * different letter and a different sound from the word and each other.
+ * Level 2: the word's two look-alikes, real words.
  */
 export function jarWords(
   target: BankWord,
@@ -239,8 +253,12 @@ export function jarWords(
   } else {
     others = [];
     for (const w of shuffle(WORD_BANK, random)) {
-      const firsts = [target, ...others].map((o) => o.word[0]);
-      const fits = !firsts.includes(w.word[0]) && !w.word.includes(' ');
+      const taken = [target, ...others];
+      // Different first letters and different first sounds: cream, ketchup
+      // and cupcakes all start with a k sound, cheese with a c but not a k.
+      const fits =
+        !taken.some((o) => o.word[0] === w.word[0] || firstSound(o.word) === firstSound(w.word)) &&
+        !w.word.includes(' ');
       if (others.length < 2 && fits) others.push(w);
     }
   }

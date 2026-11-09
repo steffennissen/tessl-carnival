@@ -5,9 +5,10 @@ import type { SequenceCard, SequenceOptions } from '../steps/sequence';
 /**
  * Put the recipe in order (sequencing and reading). The round starts with
  * the dish's step cards shuffled in a tray: she drags them (or taps them in
- * order) into First, Next, Then and Last. Then she cooks them in that order,
- * which is the recipe's real one. Level 1 cards have each step's emoji and
- * words; Level 2 cards have words only.
+ * order) into First, Next, Then and Last. Then she cooks them in the
+ * recipe's order. Steps the dish marks as either way round (its `either`:
+ * chopping the strawberry or the banana first) take either order. Level 1
+ * cards have each step's emoji and words; Level 2 cards have words only.
  *
  * It fits dishes with three or four cooking steps: enough to think about,
  * few enough for a young reader.
@@ -24,6 +25,21 @@ export function recipeCards(dish: Dish, level: Level): SequenceCard[] {
     const run = { kind: options.kind, options, state: null };
     return { text: titleOf(run), icon: level === 1 ? iconOf(run) : null };
   });
+}
+
+/**
+ * Each card's group for the sequence step: the dish's `either` steps share
+ * one (the first of them), so they fit each other's slots; every other card
+ * is its own. Undefined when nothing can swap.
+ */
+export function recipeGroups(dish: Dish): number[] | undefined {
+  const cooking = cookingSteps(dish);
+  const groups = cooking.map((_, i) => i);
+  for (const group of dish.either ?? []) {
+    const cards = group.map((i) => cooking.indexOf(dish.steps[i])).filter((i) => i >= 0);
+    for (const card of cards) groups[card] = Math.min(...cards);
+  }
+  return groups.some((g, i) => g !== i) ? groups : undefined;
 }
 
 /**
@@ -52,10 +68,12 @@ const recipeOrder: Activity = {
 
   weave({ dish, level, random }) {
     const cards = recipeCards(dish, level);
+    const groups = recipeGroups(dish);
     const sequence: SequenceOptions = {
       kind: 'sequence',
       cards,
       tray: shuffledTray(cards.length, random),
+      ...(groups ? { groups } : {}),
     };
     return [sequence, ...dish.steps];
   },

@@ -1,8 +1,11 @@
+import { titleOf } from '../steps';
 import {
   clockHour,
   clockText,
+  pick,
   quarterWords,
   sayTime,
+  shuffle,
   stepMinutes,
   timeAtStep,
   type Activity,
@@ -68,9 +71,6 @@ export function fitsLevel(time: number, level: Level): boolean {
   return time % (level === 1 ? 15 : 5) === 0;
 }
 
-const pick = <T>(items: readonly T[], random: () => number): T =>
-  items[Math.floor(random() * items.length) % items.length];
-
 /** An afternoon time with this clock hour (1 to 12) and minute. */
 const afternoon = (hour: number, minute: number) => ((hour % 12) + 12) * 60 + minute;
 
@@ -131,12 +131,7 @@ export function timeChoices(
     const t = text(slip);
     if (t !== answer && !picked.includes(t) && picked.length < 2) picked.push(t);
   }
-  const choices = [answer, ...picked];
-  // Shuffle with the round's random.
-  for (let i = choices.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1)) % (i + 1);
-    [choices[i], choices[j]] = [choices[j], choices[i]];
-  }
+  const choices = shuffle([answer, ...picked], random);
   return { choices, index: choices.indexOf(answer) };
 }
 
@@ -148,11 +143,13 @@ export function handsHelp(time: number): string {
   const short =
     minute === 0
       ? `The short hand points at the ${hour}`
-      : minute < 30
+      : minute < 20
         ? `The short hand is just past the ${hour}`
         : minute === 30
           ? `The short hand is halfway between the ${hour} and the ${next}`
-          : `The short hand is almost at the ${next}`;
+          : minute <= 40
+            ? `The short hand is between the ${hour} and the ${next}`
+            : `The short hand is almost at the ${next}`;
   const long =
     minute === 0
       ? 'the long hand points straight up at the 12'
@@ -188,6 +185,17 @@ export function readStep(
   return { kind: 'read-clock', question, time, title: 'What time is it?', icon: '🕒' };
 }
 
+/**
+ * Where the hands start for setting `target`: at Level 1 on the hour before
+ * it (4:00 for 4:30, 3:00 for 4:00), so the minute hand turns the hour
+ * hand the last little way; at Level 2 at 12:00, both hands to set.
+ */
+export function setFrom(target: number, level: Level): number | undefined {
+  if (level === 2) return undefined;
+  const minute = ((target % 60) + 60) % 60;
+  return minute === 0 ? target - 60 : target - minute;
+}
+
 /** "Set the clock to 4:15!": the time step `index` will be done, or the start if `index` is null. */
 export function setStep(
   steps: readonly RecipeStep[],
@@ -209,12 +217,16 @@ export function setStep(
     target,
     geared: level === 1,
     help: `Look! ${handsHelp(target)}`,
+    ...(level === 1 ? { from: setFrom(target, level) } : {}),
     title: 'Set the clock!',
     icon: '⏰',
   };
 }
 
-/** "Baking takes 15 minutes. It's 3:10 now. When will it be done?", before step `index`. */
+/**
+ * "Next: Bake the pizza! That takes 15 minutes. It's 3:10 now. When will it
+ * be done?", before step `index`. The choices are shuffled.
+ */
 export function elapsedStep(
   steps: readonly RecipeStep[],
   index: number,
@@ -230,16 +242,17 @@ export function elapsedStep(
   while (picked.length < 2 && slips.length) {
     picked.push(slips.splice(Math.floor(random() * slips.length) % slips.length, 1)[0]);
   }
-  const times = [done, ...picked].sort((a, b) => a - b);
+  const times = shuffle([done, ...picked], random);
   const counting: string[] = [];
   for (let t = now + 5; t <= done; t += 5) counting.push(sayTime(t));
   return {
     kind: 'read-clock',
     question: {
-      text: `${doing(steps[index])} takes ${minutesText(minutes)}. It's ${clockText(now)} now. When will it be done?`,
+      text: `Next: ${titleOf({ kind: steps[index].kind, options: steps[index], state: null })} That takes ${minutesText(minutes)}. It's ${clockText(now)} now. When will it be done?`,
       choices: times.map(clockText),
       answer: times.indexOf(done),
       hint: ['Count on by fives', 'round the clock!'],
+      shownLines: ['It will be done', `at ${clockText(done)}!`],
       help: `Start at ${sayTime(now)} and count on by fives: ${counting.join(', ')}. Done at ${sayTime(done)}!`,
     },
     time: now,

@@ -3,6 +3,8 @@ import {
   amountText,
   fractionText,
   parseAmount,
+  pick,
+  shuffle,
   type Activity,
   type Dish,
   type Level,
@@ -20,24 +22,28 @@ import { amountOf, type PourOptions } from '../steps/pour';
  * Level 1 reads the cup, every line numbered: ½ cup, 1 cup or 2 cups.
  * Level 2 reads ¼, ¾ or 1½ cups with only the whole cups (and ½) numbered,
  * or works out how much more: "We need 1 cup of milk and have ½ cup. How
- * much more?", then pours the rest.
+ * much more?" (always a whole or half cup more: counting on, not taking
+ * fractions away), then pours the rest: the pour's cup starts with the ½
+ * cup in it, and its star is on the 1 cup line.
+ *
+ * Both amounts always sit on a line of the cup drawn (see `cupScale`).
  */
 
 /** Level 1's amounts, and Level 2's for reading a cup. */
 export const LEVEL_1_CUPS = [0.5, 1, 2];
 export const LEVEL_2_CUPS = [0.25, 0.75, 1.5];
-/** Every amount an answer can be. */
+/** Every amount a reading answer can be. */
 const ANSWERS = [0.25, 0.5, 0.75, 1, 1.5, 2];
-/** Level 2's "how much more": [need, have]. */
+/** Every amount a "how much more" answer can be: whole and half cups. */
+const MORE_ANSWERS = [0.5, 1, 1.5, 2];
+/** Level 2's "how much more": [need, have], always a whole or half cup apart. */
 export const MORE_PAIRS: [number, number][] = [
   [1, 0.5],
-  [1, 0.25],
-  [1, 0.75],
-  [0.75, 0.5],
   [1.5, 1],
   [1.5, 0.5],
   [2, 1],
   [2, 1.5],
+  [2, 0.5],
 ];
 
 /** A pour that can be measured: its step, and which of its pours. */
@@ -58,17 +64,17 @@ export function measurable(dish: Dish): Measurable[] {
   );
 }
 
-const pick = <T>(items: readonly T[], random: () => number): T =>
-  items[Math.floor(random() * items.length) % items.length];
-
-/** `answer` and two other amounts, smallest first, as cups ("½ cup"). */
-function cupChoices(answer: number, random: () => number): { choices: string[]; answer: number } {
-  const others = ANSWERS.filter((v) => v !== answer);
-  const picked = [answer];
-  while (picked.length < 3) {
-    picked.push(others.splice(Math.floor(random() * others.length) % others.length, 1)[0]);
-  }
-  picked.sort((a, b) => a - b);
+/** `answer` and two other amounts from `from`, shuffled, as cups ("½ cup"). */
+function cupChoices(
+  answer: number,
+  from: readonly number[],
+  random: () => number,
+): { choices: string[]; answer: number } {
+  const others = shuffle(
+    from.filter((v) => v !== answer),
+    random,
+  );
+  const picked = shuffle([answer, ...others.slice(0, 2)], random);
   return {
     choices: picked.map((value) => amountText({ value, unit: 'cup' })),
     answer: picked.indexOf(answer),
@@ -83,7 +89,7 @@ export function measureQuestion(
   item: string,
   level: Level,
   random: () => number,
-): { cup: CupOptions; pour: number } {
+): { cup: CupOptions; pour: number; start?: number } {
   const label = ingredient(item).label;
   const cup = (question: Question, have: number, need?: number): CupOptions => ({
     kind: 'cup',
@@ -102,7 +108,7 @@ export function measureQuestion(
             choices: LEVEL_1_CUPS.map((value) => amountText({ value, unit: 'cup' })),
             answer: LEVEL_1_CUPS.indexOf(have),
           }
-        : cupChoices(have, random);
+        : cupChoices(have, ANSWERS, random);
     const amount = amountText({ value: have, unit: 'cup' });
     return {
       cup: cup(
@@ -125,22 +131,25 @@ export function measureQuestion(
   }
   const [need, have] = pick(MORE_PAIRS, random);
   const more = need - have;
-  const { choices, answer } = cupChoices(more, random);
+  const { choices, answer } = cupChoices(more, MORE_ANSWERS, random);
   const needText = amountText({ value: need, unit: 'cup' });
   const haveText = amountText({ value: have, unit: 'cup' });
+  const moreText = amountText({ value: more, unit: 'cup' });
   return {
     cup: cup(
       {
         text: `We need ${needText} of ${label} and have ${haveText}. How much more?`,
         choices,
         answer,
-        hint: ['Count the lines', 'up to the star!'],
-        help: `${fractionText(need)} take away ${fractionText(have)} is ${fractionText(more)}. We need ${amountText({ value: more, unit: 'cup' })} more!`,
+        hint: [`Start at ${fractionText(have)},`, 'count up to the star!'],
+        help: `From ${fractionText(have)} up to ${fractionText(need)} is ${fractionText(more)}. We need ${moreText} more!`,
       },
       have,
       need,
     ),
-    pour: more,
+    // The pour starts with what we have in the cup and fills it up to what we need.
+    pour: need,
+    start: have,
   };
 }
 
@@ -153,13 +162,18 @@ const measure: Activity = {
   weave({ dish, level, random }) {
     const target = pick(measurable(dish), random);
     const { step, pour } = target;
-    const { cup, pour: value } = measureQuestion(step.pours[pour], level, random);
+    const { cup, pour: value, start } = measureQuestion(step.pours[pour], level, random);
     const amounts = step.pours.map((_, i) =>
       i === pour ? amountText({ value, unit: 'cup' }) : (amountOf(step, i) ?? ''),
     );
+    const starts =
+      start === undefined
+        ? undefined
+        : step.pours.map((_, i) => (i === pour ? amountText({ value: start, unit: 'cup' }) : ''));
+    const poured: PourOptions = { ...step, amounts, ...(starts ? { starts } : {}) };
     const steps: RecipeStep[] = [];
     for (const s of dish.steps) {
-      if (s === step) steps.push(cup, { ...step, amounts });
+      if (s === step) steps.push(cup, poured);
       else steps.push(s);
     }
     return steps;

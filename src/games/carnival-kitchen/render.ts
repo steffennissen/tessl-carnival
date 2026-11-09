@@ -1134,9 +1134,9 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.globalAlpha = 1;
   }
 
-  /** What a card says under its title: the step's number and minutes, or Smart Chef. */
+  /** What a card says under its title: the step's number and minutes, or that it's for learning. */
   function cardLine(state: KitchenState): string {
-    if (isLearning(state, state.stepIndex)) return '🎓 Smart Chef!';
+    if (isLearning(state, state.stepIndex)) return '🎓 Learning time!';
     const cooking = cookingSteps(state);
     const number = `Step ${cooking.indexOf(state.stepIndex) + 1} of ${cooking.length}`;
     const minutes = stepMinutes(currentRun(state).options);

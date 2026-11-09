@@ -44,6 +44,8 @@ const strawberrySmoothie: Dish = {
     { kind: 'pour', pours: ['milk'], into: 'blender', inside: 'smoothie', amounts: ['1 cup'] },
     { kind: 'blend', blender: 'blender', contents: 'smoothie' },
   ],
+  // Chop the strawberry or the banana first: either way.
+  either: [[0, 1]],
 
   draw(g, t) {
     // A tall glass of pink smoothie with a bendy straw and a strawberry on the rim.

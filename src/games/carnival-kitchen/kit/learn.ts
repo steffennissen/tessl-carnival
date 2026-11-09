@@ -1,3 +1,4 @@
+import { pick, shuffle } from './rules';
 import type { Dish, KitchenState, LearnRound, LearnSettings, Level, RecipeStep } from './types';
 
 /**
@@ -161,17 +162,56 @@ export function smartSticker(dishId: string): string {
   return `smart:${dishId}`;
 }
 
-/** Three answer choices round `answer`: it and two near it, at least `min`, shuffled. */
+/**
+ * Chef Bunny's cheer for a right answer: "a Smart Chef!" only while the
+ * round is still earning its star (this answer and every one before it
+ * right on her own), otherwise a plain "Yes" with `helped` (the answer).
+ */
+export function cheerLines(
+  round: KitchenState,
+  state: AnswerState,
+  helped: [string, string],
+): [string, string] {
+  if (state.outcome !== 'right') return helped;
+  return smartChef(round) ? ['Yes! You are', 'a Smart Chef!'] : ['Yes! You', 'got it!'];
+}
+
+/**
+ * Numbers to pick from, smallest first, with the answer as likely to be the
+ * first, the middle or the last (so where it sits gives nothing away):
+ * `answer` and `count - 1` others, taken in order from `below` (smaller than
+ * it) and `above` (bigger). A place it can't have, for want of numbers
+ * below or above, is skipped.
+ */
+export function spreadChoices(
+  answer: number,
+  below: readonly number[],
+  above: readonly number[],
+  random: () => number,
+  count = 3,
+): { choices: number[]; index: number } {
+  const lower = [...new Set(below)].filter((n) => n < answer);
+  const higher = [...new Set(above)].filter((n) => n > answer);
+  const places = Array.from({ length: count }, (_, i) => i).filter(
+    (i) => i <= lower.length && count - 1 - i <= higher.length,
+  );
+  const index = places.length ? pick(places, random) : Math.min(lower.length, count - 1);
+  const choices = [...lower.slice(0, index), answer, ...higher.slice(0, count - 1 - index)].sort(
+    (a, b) => a - b,
+  );
+  return { choices, index: choices.indexOf(answer) };
+}
+
+/**
+ * Three answer choices round `answer`: it and two within 2 of it, at least
+ * `min`, smallest first, the answer's place spread (see `spreadChoices`).
+ */
 export function nearChoices(
   answer: number,
   random: () => number,
   min = 0,
 ): { choices: number[]; index: number } {
-  const near = [-2, -1, 1, 2].map((d) => answer + d).filter((n) => n >= min);
-  const picked: number[] = [];
-  while (picked.length < 2 && near.length) {
-    picked.push(near.splice(Math.floor(random() * near.length) % near.length, 1)[0]);
-  }
-  const choices = [answer, ...picked].sort((a, b) => a - b);
-  return { choices, index: choices.indexOf(answer) };
+  const below = shuffle([answer - 1, answer - 2], random).filter((n) => n >= min);
+  const above = shuffle([answer + 1, answer + 2], random);
+  return spreadChoices(answer, below, above, random);
 }

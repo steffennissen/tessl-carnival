@@ -1,6 +1,5 @@
 import {
   C,
-  CONFETTI,
   circle,
   clamp01,
   easeOutBack,
@@ -16,14 +15,17 @@ import {
   SMART_BONUS,
   angleAt,
   answer,
-  autoReadDelay,
+  answerFx,
+  cheerLines,
   clockText,
   drawClock,
   drawQuestion,
   finishStep,
   handAngles,
+  inBox,
   inCircle,
   middleOf,
+  observeAnswer,
   quizPlaces,
   sameClockTime,
   sayTime,
@@ -31,26 +33,25 @@ import {
   turnMinuteHand,
   withHourHand,
   withMinuteHand,
+  type AnswerFx,
   type AnswerState,
   type Box,
   type Disc,
-  type Feedback,
   type Step,
   type StepBasics,
   type Turn,
 } from '../kit';
-import type { Reading } from '../sound';
 
 /**
- * Set the clock: "Set the clock to 4:30!" A big clock starts at 12:00; she
+ * Set the clock: "Set the clock to 4:30!" A big clock starts at `from` (12:00 if left out); she
  * drags its hands (any touch on the face grabs the nearer hand, and the
  * minute hand snaps to the 5-minute marks), then taps Check!. With `geared`
  * (Level 1) the hour hand turns along with the minute hand, as on a real
  * clock; without it (Level 2) each hand is set on its own.
  *
  * The shared answer rules: a wrong check gets a hint about the hand that's
- * off and another go; after two, Chef Bunny turns the hands to the time and
- * Check! carries on. A learning step: no part of the cooking score.
+ * off (said, and that hand glows) and another go; after two, Chef Bunny says
+ * which hand was off, turns the hands to the time and Check! carries on. A learning step: no part of the cooking score.
  */
 
 export interface SetClockOptions extends StepBasics {
@@ -203,8 +204,25 @@ export function handOff(time: number, target: number): HandOff | null {
   return minuteOff ? 'minute' : 'hour';
 }
 
-const inBox = (b: Box, x: number, y: number) =>
-  x >= b.x - 8 && x <= b.x + b.w + 8 && y >= b.y - 8 && y <= b.y + b.h + 8;
+/** What Chef Bunny says about the hand that's off. */
+export function handTip(off: HandOff | null): string {
+  return off === 'minute'
+    ? 'The long hand shows the minutes.'
+    : off === 'hour'
+      ? 'The short hand shows the hour.'
+      : 'The long hand shows the minutes, and the short hand shows the hour.';
+}
+
+/**
+ * The hand that glows: the one being dragged, else the one that was off at
+ * the last wrong check (taking turns when both were), else none.
+ */
+export function glowingHand(s: SetClockState, t: number): 'hour' | 'minute' | null {
+  if (s.holding) return s.holding;
+  if (s.done || !s.off) return null;
+  if (s.off === 'both') return Math.floor(t * 1.5) % 2 ? 'hour' : 'minute';
+  return s.off;
+}
 
 /** Turns the held hand to point at (x, y). */
 function turnHand(turn: Turn<SetClockOptions, SetClockState>, x: number, y: number) {
@@ -247,21 +265,12 @@ export function pressSetClock(
   return true;
 }
 
-interface SetClockFx {
-  reading: Reading | null;
-  reads: number;
-  autoRead: boolean;
-  wrong: number;
-  shown: boolean;
-  done: boolean;
+interface SetClockFx extends AnswerFx {
   /** The time the hands show while sweeping round to the answer. */
   shownTime: number | null;
   /** The time last frame, for the ticks. */
   time: number | null;
 }
-
-const CHEER: Feedback = { grade: 'Perfect!', points: 0, combo: 0, age: 0 };
-const ENCOURAGE: Feedback = { grade: 'Nice try!', points: 0, combo: 0, age: 0 };
 
 const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
   kind: 'set-clock',
@@ -285,12 +294,9 @@ const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
     s.after += dt;
     if (s.after >= QUIZ_OUTRO) finishStep(turn.round, 0);
   },
-  bubble({ state: s, options }) {
+  bubble({ state: s, options, round }) {
     const target = clockText(options.target);
-    if (s.done)
-      return s.outcome === 'right'
-        ? ['Yes! You are', 'a Smart Chef!']
-        : ['Yes, that is', `${target}!`];
+    if (s.done) return cheerLines(round, s, ['Yes, that is', `${target}!`]);
     if (s.shown) return [`That's ${target}!`, 'Tap Check!'];
     if (s.off === 'minute') return ['The long hand', 'shows the minutes!'];
     if (s.off === 'hour') return ['The short hand', 'shows the hour!'];
@@ -304,33 +310,13 @@ const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
     setClock.update?.(turn, QUIZ_OUTRO);
   },
 
-  fx: () => ({
-    reading: null,
-    reads: 0,
-    autoRead: false,
-    wrong: 0,
-    shown: false,
-    done: false,
-    shownTime: null,
-    time: null,
-  }),
+  fx: () => ({ ...answerFx(), shownTime: null, time: null }),
 
-  observe({ state: s, options, fx, effects, round, taking, dt, shape }) {
+  observe(view) {
+    const { state: s, options, fx, effects, dt, shape } = view;
     const places = setClockPlaces(shape);
-    const { sound } = effects;
-    const settings = round.learn.settings;
-    const delay = autoReadDelay(settings);
-    if (taking && !fx.autoRead && delay !== null && s.age >= delay && !s.done) {
-      fx.autoRead = true;
-      fx.reading = sound.read(options.text);
-    }
-    if (s.reads > fx.reads) {
-      fx.reads = s.reads;
-      fx.autoRead = true;
-      fx.reading = sound.read(options.text);
-    }
     // A soft tick for every 5 minutes the hands are turned.
-    if (fx.time !== null && fx.time !== s.time && !s.shown) sound.tick(1.3);
+    if (fx.time !== null && fx.time !== s.time && !s.shown) effects.sound.tick(1.3);
     fx.time = s.time;
     // The hands sweep round to the time when Chef Bunny shows it.
     if (fx.shownTime === null) fx.shownTime = s.time;
@@ -340,37 +326,17 @@ const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
         Math.sign(gap) * Math.min(Math.abs(gap), dt * Math.max(60, Math.abs(gap) * 2));
     } else fx.shownTime = s.time;
     const middle = middleOf(places.check);
-    if (s.wrong > fx.wrong && !s.shown) {
-      fx.wrong = s.wrong;
-      sound.boop();
-      effects.celebrate(middle.x, middle.y, ENCOURAGE);
-      const tip =
-        s.off === 'minute'
-          ? 'The long hand shows the minutes.'
-          : s.off === 'hour'
-            ? 'The short hand shows the hour.'
-            : 'The long hand shows the minutes, and the short hand shows the hour.';
-      if (!settings.readMyself) sound.say(`Not quite! ${tip} Try again!`);
-    }
-    if (s.shown && !fx.shown) {
-      fx.shown = true;
-      sound.chime([1046.5, 1318.5], 0.12, 0.12);
-      if (!settings.readMyself) sound.say(options.help);
-    }
-    if (s.done && !fx.done) {
-      fx.done = true;
-      sound.chime([1046.5, 1318.5, 1568, 2093], 0.07, 0.16);
-      effects.burst(
-        places.clock.x,
-        places.clock.y,
-        20,
-        ['star', 'heart', 'star', 'dot'],
-        CONFETTI,
-        280,
-      );
-      effects.celebrate(middle.x, middle.y, CHEER);
-      sound.say(`Yes! It's ${sayTime(options.target)}!`);
-    }
+    observeAnswer(view, s, fx, {
+      read: options.text,
+      done: s.done,
+      wrongAt: () => middle,
+      wrongSay: () => `Not quite! ${handTip(s.off)} Try again!`,
+      // Which hand was off, every time: then she shows the time.
+      helpSay: () => `Not quite! ${handTip(s.off)} ${options.help}`,
+      doneAt: () => middle,
+      burstAt: () => places.clock,
+      doneSay: () => `Yes! It's ${sayTime(options.target)}!`,
+    });
   },
 
   draw({ g, t, state: s, options, fx, taking, shape }) {
@@ -393,7 +359,7 @@ const setClock: Step<SetClockOptions, SetClockState, SetClockFx> = {
     g.translate(x, y);
     g.scale(pop, pop);
     g.translate(-x, -y);
-    drawClock(g, x, y, r, time, { t, glow: s.holding ?? (s.shown ? 'minute' : null) });
+    drawClock(g, x, y, r, time, { t, glow: glowingHand(s, t) });
     const knobs = knobsOf(places.clock, time);
     const knob = (at: Disc, color: string, held: boolean) => {
       circle(g, at.x, at.y, at.r * (held ? 1.25 : 1));

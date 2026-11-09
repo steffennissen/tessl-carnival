@@ -42,6 +42,8 @@ const iceCreamSundae: Dish = {
       count: 3,
     },
   ],
+  // The chocolate can go on before or after the toppings.
+  either: [[2, 3]],
 
   draw(g, time, state) {
     // A rainbow behind it.

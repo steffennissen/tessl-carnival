@@ -1,6 +1,5 @@
 import {
   C,
-  CONFETTI,
   type G,
   clamp01,
   easeOutBack,
@@ -15,17 +14,19 @@ import type { Shape } from '../layout';
 import {
   SMART_BONUS,
   answer,
-  autoReadDelay,
+  answerFx,
   drawQuestion,
   finishStep,
+  inBox,
   inCircle,
+  observeAnswer,
   middleOf,
   quizBubble,
   quizPlaces,
   startQuiz,
+  type AnswerFx,
   type AnswerResult,
   type Box,
-  type Feedback,
   type KitchenState,
   type Question,
   type QuizState,
@@ -33,7 +34,6 @@ import {
   type StepBasics,
   type Turn,
 } from '../kit';
-import type { Reading } from '../sound';
 
 /**
  * Find: "Tap the CHEESE!" before a step that uses it. Three jars, each with
@@ -92,9 +92,6 @@ export function jarBoxes(count: number, shape: Shape = 'page'): Box[] {
   return Array.from({ length: count }, (_, i) => ({ x: left + i * (w + gap), y, w, h }));
 }
 
-const inBox = (b: Box, x: number, y: number, slop = 8) =>
-  x >= b.x - slop && x <= b.x + b.w + slop && y >= b.y - slop && y <= b.y + b.h + slop;
-
 /**
  * Answers with the shared rules, except that a right answer after hearing
  * the word is 'helped': no bonus, no Smart Chef star, nothing taken away.
@@ -125,18 +122,6 @@ export function pressFind(turn: Turn<FindOptions, FindState>, x: number, y: numb
   else s.tried.push(i);
   return true;
 }
-
-interface FindFx {
-  reading: Reading | null;
-  reads: number;
-  autoRead: boolean;
-  tried: number;
-  shown: boolean;
-  picked: boolean;
-}
-
-const CHEER: Feedback = { grade: 'Perfect!', points: 0, combo: 0, age: 0 };
-const ENCOURAGE: Feedback = { grade: 'Nice try!', points: 0, combo: 0, age: 0 };
 
 /** A jar with a lid, its picture (or a "?") in the glass and its word on the label. */
 function drawJar(
@@ -218,7 +203,7 @@ function drawJar(
   g.restore();
 }
 
-const find: Step<FindOptions, FindState, FindFx> = {
+const find: Step<FindOptions, FindState, AnswerFx> = {
   kind: 'find',
   learning: true,
   // The word's ingredient is checked where it's used: the next step.
@@ -236,7 +221,7 @@ const find: Step<FindOptions, FindState, FindFx> = {
     s.after += dt;
     if (s.after >= OUTRO) finishStep(turn.round, 0);
   },
-  bubble: ({ state }) => quizBubble(state),
+  bubble: ({ state, round }) => quizBubble(state, round),
   solve(turn) {
     const q = turn.state.question;
     const b = jarBoxes(q.choices.length, turn.shape)[q.answer];
@@ -244,43 +229,22 @@ const find: Step<FindOptions, FindState, FindFx> = {
     find.update?.(turn, OUTRO);
   },
 
-  fx: () => ({ reading: null, reads: 0, autoRead: false, tried: 0, shown: false, picked: false }),
+  fx: answerFx,
 
-  observe({ state: s, options, fx, effects, round, taking, shape }) {
-    const { sound } = effects;
-    const settings = round.learn.settings;
+  observe(view) {
+    const { state: s, options, shape } = view;
     const boxes = jarBoxes(options.question.choices.length, shape);
-    const delay = autoReadDelay(settings);
-    if (taking && !fx.autoRead && delay !== null && s.age >= delay && s.picked === null) {
-      fx.autoRead = true;
-      // Never the word itself: that's what she reads.
-      sound.say(FIND_SAY);
-    }
-    if (s.reads > fx.reads) {
-      fx.reads = s.reads;
-      fx.autoRead = true;
-      fx.reading = sound.read(`Tap the ${options.word}!`);
-    }
-    if (s.tried.length > fx.tried) {
-      fx.tried = s.tried.length;
-      const at = middleOf(boxes[s.tried[s.tried.length - 1]]);
-      sound.boop();
-      effects.celebrate(at.x, at.y, ENCOURAGE);
-      if (!s.shown && !settings.readMyself) sound.say('Try again! Look at the letters.');
-    }
-    if (s.shown && !fx.shown) {
-      fx.shown = true;
-      sound.chime([1046.5, 1318.5], 0.12, 0.12);
-      if (!settings.readMyself) sound.say(options.question.help);
-    }
-    if (s.picked !== null && !fx.picked) {
-      fx.picked = true;
-      const at = middleOf(boxes[s.picked]);
-      sound.chime([1046.5, 1318.5, 1568, 2093], 0.07, 0.16);
-      effects.burst(at.x, at.y, 18, ['star', 'heart', 'star', 'dot'], CONFETTI, 260);
-      effects.celebrate(at.x, at.y, CHEER);
-      sound.say(`Yes! ${options.word}!`);
-    }
+    observeAnswer(view, s, view.fx, {
+      read: `Tap the ${options.word}!`,
+      // Never the word itself when it reads by itself: that's what she reads.
+      autoSay: FIND_SAY,
+      done: s.picked !== null,
+      wrongAt: () => middleOf(boxes[s.tried[s.tried.length - 1] ?? 0]),
+      wrongSay: () => 'Try again! Look at the letters.',
+      helpSay: () => options.question.help,
+      doneAt: () => middleOf(boxes[s.picked ?? options.question.answer]),
+      doneSay: () => `Yes! ${options.word}!`,
+    });
   },
 
   draw({ g, t, state: s, options, fx, taking, shape }) {

@@ -3,6 +3,7 @@ import { artOf, ingredient } from '../ingredients';
 import {
   BOWL,
   CUP_METER,
+  amountText,
   type KitchenState,
   POUR_RULES,
   TARGET_HIGH,
@@ -60,6 +61,12 @@ export interface PourOptions extends StepBasics {
    * on this amount's line (see kit/measure.ts).
    */
   amounts?: string[];
+  /**
+   * What's already in the measuring cup for each pour ("½ cup", or "" for
+   * none): it starts there, and fills up to its amount's star. For "We have
+   * ½ cup, how much more?".
+   */
+  starts?: string[];
 }
 
 /** How something you pour into the bowl draws itself. */
@@ -147,11 +154,29 @@ export function amountOf(options: PourOptions, i: number): string | undefined {
   return options.amounts?.[i] ?? ingredient(options.pours[i]).amount;
 }
 
-/** Chef Bunny's lines for pour `i`: ["1½ cups of flour,", "let go at the star!"]. */
-function pourLines(options: PourOptions, i: number): [string, string] | null {
+/** What's in pour `i`'s measuring cup when it starts, in its unit: 0 for an empty one. */
+export function startOf(options: PourOptions, i: number): number {
+  return parseAmount(options.starts?.[i])?.value ?? 0;
+}
+
+/**
+ * Chef Bunny's lines for pour `i`: ["1½ cups of flour,", "let go at the
+ * star!"], or for a cup with some in it already, how much more: ["½ cup
+ * more milk,", "up to the star!"].
+ */
+export function pourLines(options: PourOptions, i: number): [string, string] | null {
   const amount = amountOf(options, i);
   if (!amount) return null;
-  return [`${amount} of ${ingredient(options.pours[i]).label},`, 'let go at the star!'];
+  const label = ingredient(options.pours[i]).label;
+  const start = startOf(options, i);
+  const real = parseAmount(amount);
+  if (start > 0 && real) {
+    return [
+      `${amountText({ value: real.value - start, unit: real.unit })} more ${label},`,
+      'up to the star!',
+    ];
+  }
+  return [`${amount} of ${label},`, 'let go at the star!'];
 }
 
 interface PourFx {
@@ -169,11 +194,12 @@ const pour: Step<PourOptions, HoldState, PourFx> = {
 
   start: (o, random) => {
     const [low, high] = o.targets ?? [TARGET_LOW, TARGET_HIGH];
+    const reals = o.pours.map((_, i) => parseAmount(amountOf(o, i)));
     return startHold(
-      o.pours.map((_, i) => {
-        const real = parseAmount(amountOf(o, i));
-        return real ? measureTarget(real.value) : between(random, low, high);
-      }),
+      reals.map((real) => (real ? measureTarget(real.value) : between(random, low, high))),
+      o.starts?.some((x) => x)
+        ? reals.map((real, i) => (real ? startOf(o, i) / measureScale(real.value).capacity : 0))
+        : undefined,
     );
   },
 
@@ -198,9 +224,9 @@ const pour: Step<PourOptions, HoldState, PourFx> = {
       effects.sound.pop();
       effects.celebrate(mouth.x - 26, mouth.y - 45);
       // The next pour's amount, said out loud (its words are in Chef Bunny's bubble too).
-      const next = s.index < options.pours.length ? amountOf(options, s.index) : undefined;
+      const next = s.index < options.pours.length ? pourLines(options, s.index) : null;
       if (next && !round.learn.settings.readMyself) {
-        effects.sound.say(`Now ${next} of ${ingredient(options.pours[s.index]).label}!`);
+        effects.sound.say(`Now ${next[0].replace(/,$/, '')}!`);
       }
     }
     fx.index = s.index;

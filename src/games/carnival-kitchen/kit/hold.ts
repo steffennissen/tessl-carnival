@@ -25,6 +25,11 @@ export interface HoldState {
   /** Which let-go is next; `targets.length` once they're all done. */
   index: number;
   points: number;
+  /**
+   * Where the meter starts for each let-go, 0 to 1 (0 if left out): a
+   * measuring cup that already has some in it ("we have ½ cup").
+   */
+  starts?: number[];
 }
 
 export interface HoldRules {
@@ -67,8 +72,20 @@ export const POUR_RULES: HoldRules = {
  */
 export const GOLDEN = 0.7;
 
-export function startHold(targets: number[]): HoldState {
-  return { targets, level: 0, holding: false, index: 0, points: 0 };
+export function startHold(targets: number[], starts?: number[]): HoldState {
+  return {
+    targets,
+    level: starts?.[0] ?? 0,
+    holding: false,
+    index: 0,
+    points: 0,
+    ...(starts ? { starts } : {}),
+  };
+}
+
+/** Where the meter starts for the let-go being done. */
+export function holdStart(s: HoldState): number {
+  return s.starts?.[s.index] ?? 0;
 }
 
 export function pressHold(turn: Turn<StepBasics, HoldState>): void {
@@ -81,7 +98,7 @@ function letGo(turn: Turn<StepBasics, HoldState>, rules: HoldRules): number {
   const points = scoreAction(turn.round, share, STEP_POINTS / s.targets.length);
   s.points += points;
   s.index += 1;
-  if (!rules.keep) s.level = 0;
+  if (!rules.keep) s.level = holdStart(s);
   s.holding = false;
   if (s.index === s.targets.length) finishStep(turn.round, s.points);
   return points;
@@ -97,9 +114,9 @@ export function releaseHold(
 ): number | 'not yet' | null {
   const s = turn.state;
   if (!s.holding) return null;
-  if (rules.tooSoon(s.level, s.targets[s.index])) {
+  if (rules.tooSoon(s.level - holdStart(s), s.targets[s.index])) {
     s.holding = false;
-    if (!rules.keep) s.level = 0;
+    if (!rules.keep) s.level = holdStart(s);
     return 'not yet';
   }
   return letGo(turn, rules);

@@ -1,11 +1,11 @@
 import {
   C,
-  CONFETTI,
   type G,
   circle,
   clamp01,
   easeOutBack,
   fillStroke,
+  font,
   palette,
   plainText,
   rounded,
@@ -17,28 +17,32 @@ import {
   QUIZ_OUTRO,
   SMART_BONUS,
   answer,
-  autoReadDelay,
+  answerFx,
+  cheerLines,
   drawQuestion,
   finishStep,
+  inBox,
   inCircle,
   middleOf,
+  observeAnswer,
   quizPlaces,
   startAnswer,
+  type AnswerFx,
   type AnswerState,
   type Box,
   type Disc,
-  type Feedback,
   type Step,
   type StepBasics,
   type Turn,
 } from '../kit';
-import type { Reading } from '../sound';
 
 /**
  * Pay: a customer buys the finished dish. "That's 45¢. Tap the coins to
- * pay!" She taps coins in the bank at the bottom (each drawn with its value
- * and name) into the tray, and the total counts up. Paying exactly right
- * checks itself; Check! asks whether it's enough. Too much gets a gentle
+ * pay!" She taps coins in the bank at the bottom into the tray, and the
+ * total counts up. At Level 1 each coin shows its value and name; at Level 2
+ * only its name, with the values shown after a wrong check. Paying exactly right
+ * checks itself (after adding a coin or giving one back); Check! asks
+ * whether it's enough. Too much gets a gentle
  * "Oops, too much!" and a tap on a coin in the tray gives it back.
  *
  * The shared answer rules: Check! short of the price gets a hint and
@@ -75,6 +79,12 @@ export interface PayOptions extends StepBasics {
   coins: CoinId[];
   /** What she reads, and the voice reads out: "That's 45¢. Tap the coins to pay!" */
   text: string;
+  /**
+   * Whether each coin shows its value ("25¢") from the start (Level 1, and
+   * if left out). False (Level 2): the coins show only their names, so she
+   * has to know them, and their values appear after a wrong check, as help.
+   */
+  values?: boolean;
 }
 
 declare module '../kit/types' {
@@ -217,6 +227,8 @@ export interface PayState extends AnswerState {
   after: number;
   /** Coins tapped in so far (for the clinks). */
   taps: number;
+  /** Coins tapped while the tray was full: "The tray is full!". */
+  full: number;
 }
 
 export function startPay(): PayState {
@@ -229,11 +241,9 @@ export function startPay(): PayState {
     age: 0,
     after: 0,
     taps: 0,
+    full: 0,
   };
 }
-
-const inBox = (b: Box, x: number, y: number) =>
-  x >= b.x - 8 && x <= b.x + b.w + 8 && y >= b.y - 8 && y <= b.y + b.h + 8;
 
 /** Checks what's in the tray: right, or a wrong try (short, or too much). */
 function check(turn: Turn<PayOptions, PayState>) {
@@ -269,12 +279,18 @@ export function pressPay(turn: Turn<PayOptions, PayState>, x: number, y: number)
     const at = traySpot(i, turn.shape);
     if (Math.hypot(x - at.x, y - at.y) <= at.r + 3) {
       s.tray.splice(i, 1);
+      // Exactly right after giving one back checks itself too.
+      if (s.tray.length && coinTotal(s.tray) === price) check(turn);
       return true;
     }
   }
   const coin = bankSpots(coins, turn.shape).find((c) => Math.hypot(x - c.x, y - c.y) <= c.reach);
   if (!coin) return true;
-  if (s.tray.length >= TRAY_MOST) return false;
+  // A full tray isn't "Not yet!": Chef Bunny says it's full.
+  if (s.tray.length >= TRAY_MOST) {
+    s.full += 1;
+    return true;
+  }
   s.tray.push(coin.id);
   s.taps += 1;
   // Exactly right checks itself.
@@ -282,8 +298,25 @@ export function pressPay(turn: Turn<PayOptions, PayState>, x: number, y: number)
   return true;
 }
 
-/** Draws a coin centred on (x, y), radius r: silver or copper, its value, and its name if there's room. */
-export function drawCoin(g: G, id: CoinId, x: number, y: number, r: number, named = true) {
+/** Whether the coins show their values now: always at Level 1, after a wrong check (or the answer shown) at Level 2. */
+export function valuesShown(options: PayOptions, state: PayState): boolean {
+  return options.values !== false || state.wrong > 0 || state.shown;
+}
+
+/**
+ * Draws a coin centred on (x, y), radius r: silver or copper, with its value
+ * and its name (`named`, if there's room). A coin with no value shown has
+ * its name only, bigger.
+ */
+export function drawCoin(
+  g: G,
+  id: CoinId,
+  x: number,
+  y: number,
+  r: number,
+  named = true,
+  value = true,
+) {
   const coin = COINS[id];
   const copper = id === 'penny';
   circle(g, x, y, r);
@@ -296,24 +329,27 @@ export function drawCoin(g: G, id: CoinId, x: number, y: number, r: number, name
   g.strokeStyle = copper ? K.copperDark : C.steelDark;
   g.lineWidth = 2;
   g.stroke();
+  if (!value) {
+    // The name alone, as big as fits across the coin.
+    g.save();
+    g.font = font(Math.max(11, r * 0.42));
+    const fit = Math.min(1, (r * 1.55) / Math.max(1, g.measureText(coin.name).width));
+    g.translate(x, y);
+    g.scale(fit, fit);
+    plainText(g, coin.name, 0, 1, Math.max(11, r * 0.42), C.ink);
+    g.restore();
+    return;
+  }
   const size = Math.max(12, r * (named ? 0.52 : 0.7));
   plainText(g, `${coin.value}¢`, x, y - (named ? r * 0.16 : 0), size, C.ink);
   if (named) plainText(g, coin.name, x, y + r * 0.44, Math.max(12, r * 0.34), C.ink);
 }
 
-const CHEER: Feedback = { grade: 'Perfect!', points: 0, combo: 0, age: 0 };
-const ENCOURAGE: Feedback = { grade: 'Nice try!', points: 0, combo: 0, age: 0 };
-
-interface PayFx {
-  reading: Reading | null;
-  reads: number;
-  autoRead: boolean;
+interface PayFx extends AnswerFx {
   taps: number;
   coins: number;
   over: boolean;
-  wrong: number;
-  shown: boolean;
-  done: boolean;
+  full: number;
 }
 
 const pay: Step<PayOptions, PayState, PayFx> = {
@@ -333,14 +369,12 @@ const pay: Step<PayOptions, PayState, PayFx> = {
     s.after += dt;
     if (s.after >= QUIZ_OUTRO) finishStep(turn.round, 0);
   },
-  bubble({ state: s, options }) {
+  bubble({ state: s, options, round }) {
     const total = coinTotal(s.tray);
-    if (s.done)
-      return s.outcome === 'right'
-        ? ['Yes! You are', 'a Smart Chef!']
-        : ['Yes, that is', `${options.price}¢!`];
+    if (s.done) return cheerLines(round, s, ['Yes, that is', `${options.price}¢!`]);
     if (s.shown) return [`That makes ${options.price}¢!`, 'Tap Check!'];
     if (total > options.price) return ['Oops, too much!', 'Tap a coin to give it back.'];
+    if (s.full > 0 && s.tray.length >= TRAY_MOST) return ['The tray is full!', 'Try bigger coins.'];
     if (s.wrong > 0 && s.short > 0) return [`We need ${s.short}¢ more!`, 'Tap more coins.'];
     return null;
   },
@@ -351,32 +385,13 @@ const pay: Step<PayOptions, PayState, PayFx> = {
     pay.update?.(turn, QUIZ_OUTRO);
   },
 
-  fx: () => ({
-    reading: null,
-    reads: 0,
-    autoRead: false,
-    taps: 0,
-    coins: 0,
-    over: false,
-    wrong: 0,
-    shown: false,
-    done: false,
-  }),
+  fx: () => ({ ...answerFx(), taps: 0, coins: 0, over: false, full: 0 }),
 
-  observe({ state: s, options, fx, effects, round, taking, shape }) {
+  observe(view) {
+    const { state: s, options, fx, effects, round, shape } = view;
     const { tray, check } = payPlaces(shape);
     const { sound } = effects;
     const settings = round.learn.settings;
-    const delay = autoReadDelay(settings);
-    if (taking && !fx.autoRead && delay !== null && s.age >= delay && !s.done) {
-      fx.autoRead = true;
-      fx.reading = sound.read(options.text);
-    }
-    if (s.reads > fx.reads) {
-      fx.reads = s.reads;
-      fx.autoRead = true;
-      fx.reading = sound.read(options.text);
-    }
     if (s.taps > fx.taps) {
       // A coin clinks into the tray.
       fx.taps = s.taps;
@@ -393,38 +408,25 @@ const pay: Step<PayOptions, PayState, PayFx> = {
         sound.say('Oops, too much! Tap a coin in the tray to give it back.');
     }
     fx.over = over;
-    const middle = middleOf(check);
-    if (s.wrong > fx.wrong && !s.shown) {
-      fx.wrong = s.wrong;
+    if (s.full > fx.full) {
+      fx.full = s.full;
       sound.boop();
-      effects.celebrate(middle.x, middle.y, ENCOURAGE);
-      if (!settings.readMyself) {
-        sound.say(
-          s.short > 0
-            ? `Not quite! We need ${s.short} cents more.`
-            : 'Oops, too much! Tap a coin in the tray to give it back.',
-        );
-      }
+      if (!settings.readMyself) sound.say('The tray is full! Try bigger coins.');
     }
-    if (s.shown && !fx.shown) {
-      fx.shown = true;
-      sound.chime([1046.5, 1318.5], 0.12, 0.12);
-      if (!settings.readMyself) sound.say(countOn(s.tray));
-    }
-    if (s.done && !fx.done) {
-      fx.done = true;
-      sound.chime([1046.5, 1318.5, 1568, 2093], 0.07, 0.16);
-      effects.burst(
-        tray.x + tray.w / 2,
-        tray.y + 40,
-        20,
-        ['star', 'heart', 'star', 'dot'],
-        CONFETTI,
-        280,
-      );
-      effects.celebrate(middle.x, middle.y, CHEER);
-      sound.say(`Yes! ${options.price} cents. Thank you!`);
-    }
+    const middle = middleOf(check);
+    observeAnswer(view, s, fx, {
+      read: options.text,
+      done: s.done,
+      wrongAt: () => middle,
+      wrongSay: () =>
+        s.short > 0
+          ? `Not quite! We need ${s.short} cents more.`
+          : 'Oops, too much! Tap a coin in the tray to give it back.',
+      helpSay: () => countOn(s.tray),
+      doneAt: () => middle,
+      burstAt: () => ({ x: tray.x + tray.w / 2, y: tray.y + 40 }),
+      doneSay: () => `Yes! ${options.price} cents. Thank you!`,
+    });
   },
 
   draw({ g, t, state: s, options, fx, taking, shape }) {
@@ -454,9 +456,10 @@ const pay: Step<PayOptions, PayState, PayFx> = {
         Math.round(traySpot(0, shape).r * 0.95),
         C.woodDark,
       );
+    const values = valuesShown(options, s);
     s.tray.forEach((id, i) => {
       const at = traySpot(i, shape);
-      drawCoin(g, id, at.x, at.y, at.r, false);
+      drawCoin(g, id, at.x, at.y, at.r, false, values);
     });
 
     // How much is in the tray: pink while short, mint when it's right, lavender if too much.
@@ -505,7 +508,7 @@ const pay: Step<PayOptions, PayState, PayFx> = {
       g.translate(c.x, c.y);
       g.scale(pop, pop);
       g.globalAlpha = s.shown ? 0.5 : 1;
-      drawCoin(g, c.id, 0, 0, c.r);
+      drawCoin(g, c.id, 0, 0, c.r, true, values);
       g.restore();
     });
     g.globalAlpha = 1;

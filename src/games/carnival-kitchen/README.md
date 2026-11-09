@@ -321,14 +321,22 @@ Nothing can be failed:
 - After two wrong tries Chef Bunny shows the answer: it glows, she says how
   to get it ("Let's count: one, two, three. Three!"), and a tap on it carries
   on.
-- A right answer gets sparkles, a cheer and "Yes! +10".
+- A right answer gets sparkles, a cheer and "Yes! +10". Chef Bunny says "You
+  are a Smart Chef!" only while the round is still earning its star (this
+  answer and every one before it right on her own; `cheerLines` in
+  `kit/learn.ts`), otherwise "Yes! You got it!".
 - A round whose every question was answered on her own earns the dish's
   **Smart Chef** star (the sticker `smart:<dish id>`, kept by `earnSticker`),
   shown on the end card and in the recipe book.
+- A learning step's card says "🎓 Learning time!" under its title.
+- Where the right answer sits never gives it away: choices are shuffled, and
+  numbers (counts, trays) stay smallest first with the answer as likely
+  first, middle or last (`spreadChoices` in `kit/learn.ts`). A test checks
+  every activity in every dish at both levels.
 
 **Order tickets** (`activities/ticket.ts`: reading and counting) fit dishes
 with toppings you can count, and the burger. The round starts with a
-customer's ticket: "One pizza with 2 olives and 3 mushrooms, please!". She
+customer's ticket: "A pizza with 2 olives and 3 pepperoni slices, please!". She
 reads it (Level 1 reads itself out straight away; Level 2 waits 4 seconds
 first, so she gets the first go; 🔊 reads it any time) and taps **Let's
 cook!**. The toppings (or the burger's layers) are then exactly what the
@@ -337,7 +345,12 @@ ticking each line off: clipped to a little ticket rail under the kitchen
 clock and the shelf on a computer or a phone held sideways, pinned up at the
 right on a phone held upright. Right after comes a counting
 question with a picture of what she made: "How many toppings did you put
-on?", or "You put on 5 toppings. Add 2 more. How many is that?".
+on?", or "You put on 5 toppings. Add 2 more. How many is that?". A burger's
+question counts the layers between the buns, as the ticket's note does:
+"How many layers did you put between the buns?". Tickets use words that fit
+the food (`TICKET_WORDS` in `activities/ticket.ts`): "pepperoni slices",
+"avocado slices", "carrot sticks", "egg strips", and "a taco", "a sushi
+roll" or "a fruit salad", not "a bowl".
 
 | Level | Ticket                                                            | Question                                   |
 | ----- | ----------------------------------------------------------------- | ------------------------------------------ |
@@ -359,18 +372,24 @@ the round's real kitchen time, and is one of:
   hour hand is nearest (5:45 for 4:45). At Level 1 the answers are sometimes
   words: "half past 4", "quarter to 5".
 - **Set the clock** (`steps/set-clock.ts`) "Stirring will be done at 4:15.
-  Set the clock to 4:15!" A big clock starts at 12:00. Touching the face
+  Set the clock to 4:15!" A big clock starts on the hour before the time at
+  Level 1 (4:00 for 4:15, 3:00 for 4:00), so the minute hand turns the hour
+  hand the last little way, and at 12:00 at Level 2. Touching the face
   grabs the nearer hand (the outer ring is the minute hand's), the minute
   hand snaps to the 5-minute marks, and **Check!** checks it. At Level 1 the
   hands are geared like a real clock: turning the minute hand past 12 moves
-  the hour hand on. At Level 2 each hand is set on its own. A wrong check
-  says which hand is off; after two, the hands sweep to the time. Then she
-  cooks the step and watches the kitchen clock get there.
-- **When will it be done?** (Level 2) "Baking takes 15 minutes. It's 3:10 now.
-  When will it be done?", right before the bake (or another step of 5
-  minutes or more), so the kitchen clock then really sweeps those minutes.
-  Once answered, the big clock shades the minutes in. So the bake can start
-  on a 5, the step before it may take a few minutes longer than usual.
+  the hour hand on. At Level 2 each hand is set on its own. Every wrong check
+  says which hand is off ("The short hand shows the hour."), and that hand
+  glows (both take turns); after two, Chef Bunny says it once more and the
+  hands sweep to the time. Then she cooks the step and watches the kitchen
+  clock get there.
+- **When will it be done?** (Level 2) "Next: Bake the cookies! That takes 15
+  minutes. It's 3:10 now. When will it be done?", naming the very step next,
+  right before the bake (or another step of 5 minutes or more), so the
+  kitchen clock then really sweeps those minutes. Shown, Chef Bunny says "It
+  will be done at 3:25!". Once answered, the big clock shades the minutes in.
+  So the bake can start on a 5, the step before it may take a few minutes
+  longer than usual.
 
 | Level | Times                         | Kinds                                   | The hands            |
 | ----- | ----------------------------- | --------------------------------------- | -------------------- |
@@ -379,21 +398,24 @@ the round's real kitchen time, and is one of:
 
 Chef Bunny says times the way people do ("four thirty", "half past four",
 "quarter to five": `sayTime` and `quarterWords` in `kit/clock.ts`), and
-when she shows an answer she says where the hands point.
+when she shows an answer she says where the hands point: the short hand
+"just past the 4" up to 4:15, "between the 4 and the 5" from 4:20 to 4:40
+("halfway" at 4:30), and "almost at the 5" after.
 
 **The customer pays** (`activities/customer-pays.ts`, `steps/pay.ts`:
 money) fits every dish. After the last step, before decorating, a customer
 buys the dish: "That's 45¢. Tap the coins to pay!" She taps coins in the bank
-(each drawn with its value and name, sized like the real coins) into the
-tray, and a total counts up. A coin tapped in the tray goes back. Paying
-exactly right checks itself; too much gets a gentle "Oops, too much!"; a
-**Check!** that's short says how much more is needed. After two short
+(sized like the real coins) into the tray, and a total counts up. A coin
+tapped in the tray goes back. Paying exactly right checks itself, whether
+the last tap added a coin or gave one back; too much gets a gentle "Oops,
+too much!"; a **Check!** that's short says how much more is needed. A full
+tray (16 coins) says "The tray is full! Try bigger coins.". After two wrong
 checks, Chef Bunny lays out the fewest coins and counts them on.
 
-| Level | Price      | Coins                             |
-| ----- | ---------- | --------------------------------- |
-| 1     | 10¢ to 50¢ | Dimes, nickels and pennies        |
-| 2     | 26¢ to 99¢ | Quarters, dimes, nickels, pennies |
+| Level | Price      | Coins                             | On the coins                                   |
+| ----- | ---------- | --------------------------------- | ---------------------------------------------- |
+| 1     | 10¢ to 50¢ | Dimes, nickels and pennies        | Value and name                                 |
+| 2     | 26¢ to 99¢ | Quarters, dimes, nickels, pennies | Name only; the values show after a wrong check |
 
 #### Measure it, Equal parts and Tray arrays (math)
 
@@ -401,7 +423,15 @@ checks, Chef Bunny lays out the fewest coins and counts them on.
   ½ cup or more of something (pancakes, cupcakes, mac & cheese, smoothie,
   bisque). Just before that pour, a big measuring cup with the ingredient in
   it and its bag or jug beside it: "How much milk is in the measuring cup?".
-  The pour after it then pours that amount, its star on the same line.
+  The pour after it then pours that amount, its star on the same line. The
+  cup is a 1 cup measure with a line every ¼ cup for up to 1 cup, else a jug
+  with a line every ½ cup, so what's in it and the star are always on a line
+  (a test checks every question).
+
+  "How much more?" is always a whole or half cup more (½ to 1, 1 to 2, ½ to
+  2...): counting on along the cup, not taking fractions away. The pour after
+  it starts with what we have already in its cup ("½ cup more milk, up to
+  the star!") and fills it up to the star on what we need.
 
   | Level | Question                                                                                                                                                                     |
   | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -413,8 +443,11 @@ checks, Chef Bunny lays out the fewest coins and counts them on.
   Three pictures of it on the answer buttons: cut into equal pieces, cut
   into the same number of pieces that aren't equal, and cut into a different
   number of equal pieces. The pieces are honest: equal ones really are the
-  same size (a test measures them). Then a question beside the food, big and
-  cut the right way.
+  same size (a test measures them), and unequal ones clearly aren't (a tenth
+  beside a half). The cuts are wide gaps edged in ink, so they read small on
+  a phone. Then a question beside the food, big and cut the right way. At
+  Level 1 its three names come in any order; "one third" is never the answer
+  there, only a name to think past.
 
   | Level | Pick the picture                                   | Then                                                  |
   | ----- | -------------------------------------------------- | ----------------------------------------------------- |
@@ -424,7 +457,8 @@ checks, Chef Bunny lays out the fewest coins and counts them on.
 - **Tray arrays** (`activities/trays.ts`, step `tray`) fits the cupcakes and
   cookies after baking, and the sushi after it's cut: they sit on a tray in
   rows, and a question asks how many. The wrong answers are a row more or
-  less (or one off).
+  less (or one off), smallest first, the answer first, middle or last as
+  often.
 
   | Level | Tray                                                               | Help                                                                        |
   | ----- | ------------------------------------------------------------------ | --------------------------------------------------------------------------- |
@@ -443,15 +477,16 @@ without the bonus or the Smart Chef star; nothing is taken away). A wrong
 jar greys out with a hint about the letters ("Look at the letters: find ch
 and ee!").
 
-| Level | The jars                                                                                             |
-| ----- | ---------------------------------------------------------------------------------------------------- |
-| 1     | The word and two other ingredient words, all starting with different letters (cheese, rice, pancake) |
-| 2     | The word and two that look and sound like it (cheese, chess, cherry; shells, sells, bells)           |
+| Level | The jars                                                                                                                                  |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | The word and two other ingredient words, all starting with different letters and sounds (cheese, rice, pancake; never cream with ketchup) |
+| 2     | The word and two real words that look and sound like it (cheese, chess, cherry; whipped cream, ice cream, sour cream)                     |
 
 The word bank (`WORD_BANK`) has the ingredient labels that practise a 2nd-grade
 pattern (ch, sh, th, wh, ee, ea, oa, ai, ay, igh, ow, silent e): cheese,
 cherry, shells, cream, meatball, rice, pancake, cupcakes, sushi, smoothie,
-ketchup and whipped cream, each with its patterns and two look-alikes. A new
+ketchup and whipped cream, each with its patterns (only the ones it really
+has: cheese is ch and ee, not a silent e) and two real look-alikes. A new
 ingredient whose label is in the bank can be found with no other change. The
 tests check every word has its patterns and is still an ingredient's label.
 
@@ -463,11 +498,16 @@ She drags each card up into its slot (First, Next, Then, Last; three cards
 have First, Next, Last), or just taps the cards in order and each flies to
 the next empty slot. A card dropped near a slot counts for it; one let go
 away from the slots just slides back. A card in the wrong slot slides
-gently back with "Hmm! What do we do next?", and after two wrong tries the
-card that comes next glows. Each card is read out as it's picked up (unless
-"Read it myself" is on). While she does, the recipe along the top shows a
-"?" for each step, so it doesn't give the order away. Then she cooks the
-dish, in that order. On a phone
+gently back with "Hmm! What do we do next?". Steps that could just as well
+go either way take either order: a dish marks them with `either` (fruit
+salad and smoothie chop either fruit first, pancakes take the eggs or the
+flour and milk first, the sundae's chocolate goes on before or after the
+toppings). The whole order is one question by the shared rules: one slip
+still earns the Smart Chef star; the second means Chef Bunny helps (the card
+that comes next glows, and each one after it) and the star is gone. Each
+card is read out as it's picked up (unless "Read it myself" is on). While
+she does, the recipe along the top shows a "?" for each step, so it doesn't
+give the order away. Then she cooks the dish, in the recipe's order. On a phone
 held upright each card has its own row, slot at the left and tray at the
 right.
 
@@ -488,23 +528,23 @@ generous drop zone.
 
 ### How it's built
 
-| Piece                   | What it is                                                                                                                |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `activities/`           | One file per activity, default export an `Activity`; `activities/index.ts` finds them and has `planRound`.                |
-| `kit/learn.ts`          | Settings (`settingsFrom`, `DEFAULT_SETTINGS`), `Activity`, `RoundPlan`, answering (`answer`), `smartChef`.                |
-| `kit/quiz.ts`           | The quiz mini-game: a question with answer buttons, its drawing, voice and Chef Bunny reactions, and `quizPlaces(shape)`. |
-| `kit/words.ts`          | Reading: `wordsOf`, `numberWord`, `fitWords`, `drawWords` (with the word being read lit up), `drawSpeaker`.               |
-| `kit/clock.ts`          | Kitchen time: `stepMinutes`, `roundTime`, `startTime`, `drawClock`, and the maths for dragging a clock's hands.           |
-| `kit/order.ts`          | Order tickets: `Order`, `drawOrderNote`.                                                                                  |
-| `kit/measure.ts`        | Real amounts: `parseAmount`, `amountText`, `measureScale`, `measureTarget`, `drawMeasuringCup`.                           |
-| `kit/picture-quiz.ts`   | `pictureQuiz(kind, picture)`: a step that plays like `ask` with a picture of its own (the cup and tray steps).            |
-| `steps/ask.ts`          | A question step with a picture of the step before. Most activities use it as is.                                          |
-| `steps/ticket.ts`       | The order ticket step.                                                                                                    |
-| `sound.ts` `read(text)` | Reads out loud like `say`, and follows the word being said (or times it), for lighting words up.                          |
+| Piece                   | What it is                                                                                                                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `activities/`           | One file per activity, default export an `Activity`; `activities/index.ts` finds them and has `planRound`.                                                                                   |
+| `kit/learn.ts`          | Settings (`settingsFrom`, `DEFAULT_SETTINGS`), `Activity`, `RoundPlan`, answering (`answer`), `smartChef`.                                                                                   |
+| `kit/quiz.ts`           | The quiz mini-game: a question with answer buttons, its drawing, voice and Chef Bunny reactions, and `quizPlaces(shape)`; `observeAnswer`, the sounds and popups every learning step shares. |
+| `kit/words.ts`          | Reading: `wordsOf`, `numberWord`, `fitWords`, `drawWords` (with the word being read lit up), `drawSpeaker`.                                                                                  |
+| `kit/clock.ts`          | Kitchen time: `stepMinutes`, `roundTime`, `startTime`, `drawClock`, and the maths for dragging a clock's hands.                                                                              |
+| `kit/order.ts`          | Order tickets: `Order`, `drawOrderNote`.                                                                                                                                                     |
+| `kit/measure.ts`        | Real amounts: `parseAmount`, `amountText`, `measureScale`, `measureTarget`, `drawMeasuringCup`.                                                                                              |
+| `kit/picture-quiz.ts`   | `pictureQuiz(kind, picture)`: a step that plays like `ask` with a picture of its own (the cup and tray steps).                                                                               |
+| `steps/ask.ts`          | A question step with a picture of the step before. Most activities use it as is.                                                                                                             |
+| `steps/ticket.ts`       | The order ticket step.                                                                                                                                                                       |
+| `sound.ts` `read(text)` | Reads out loud like `say`, and follows the word being said (or times it), for lighting words up.                                                                                             |
 
 A round's steps can include **learning steps** (a `Step` with
 `learning: true`): they're not in the recipe along the top, their card says
-"🎓 Smart Chef!" instead of a step number, and they score nothing toward the
+"🎓 Learning time!" instead of a step number, and they score nothing toward the
 stars. `createState(dish, random, plan)` takes the plan from `planRound`;
 without one it's the dish's own recipe with learning off, so tests and old
 code work as before. `state.learn` has the settings, the activity and the

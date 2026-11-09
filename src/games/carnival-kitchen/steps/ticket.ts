@@ -26,8 +26,8 @@ import type { Shape } from '../layout';
 import type { Reading } from '../sound';
 
 /**
- * Ticket: an order ticket at the start of the round, such as "One pizza with
- * 2 olives and 3 mushrooms, please!". She reads it (or taps 🔊 to hear it),
+ * Ticket: an order ticket at the start of the round, such as "A pizza with
+ * 2 olives and 3 pepperoni slices, please!". She reads it (or taps 🔊 to hear it),
  * then taps "Let's cook!". The step that adds the toppings or layers then
  * puts on exactly what it says, with its note pinned up. A learning step:
  * there's nothing to get wrong here, and it's no part of the cooking score.

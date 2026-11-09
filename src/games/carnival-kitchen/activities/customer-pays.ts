@@ -1,4 +1,4 @@
-import type { Activity, Level } from '../kit';
+import { wholeBetween, type Activity, type Level } from '../kit';
 import type { CoinId, PayOptions } from '../steps/pay';
 
 /**
@@ -6,8 +6,9 @@ import type { CoinId, PayOptions } from '../steps/pay';
  * carnival customer buys the dish: "That's 45¢. Tap the coins to pay!" She
  * taps coins into the tray until they make the price.
  *
- * Level 1: up to 50¢ with dimes, nickels and pennies. Level 2: up to 99¢,
- * with quarters too.
+ * Level 1: up to 50¢ with dimes, nickels and pennies, each coin showing
+ * its value. Level 2: up to 99¢, with quarters too, and the coins show only
+ * their names until a wrong check.
  */
 
 /** The coins in the bank at each level, biggest value first. */
@@ -21,8 +22,7 @@ export const BANK: Record<Level, CoinId[]> = {
  * fives (counting by tens and fives); Level 2 26¢ to 99¢.
  */
 export function priceFor(level: Level, random: () => number): number {
-  const roll = (low: number, high: number) =>
-    low + (Math.floor(random() * (high - low + 1)) % (high - low + 1));
+  const roll = (low: number, high: number) => wholeBetween(random, low, high);
   if (level === 2) return roll(26, 99);
   return random() < 0.5 ? roll(2, 10) * 5 : roll(10, 50);
 }
@@ -34,6 +34,8 @@ export function payStep(level: Level, random: () => number): PayOptions {
     kind: 'pay',
     price,
     coins: BANK[level],
+    // Level 2 knows the coins by name: their values show only as help.
+    values: level === 1,
     text:
       level === 1
         ? `That's ${price}¢. Tap the coins to pay!`

@@ -1,4 +1,14 @@
-import type { Activity, Dish, Level, Question, RecipeStep } from '../kit';
+import {
+  pick,
+  shuffle,
+  spreadChoices,
+  wholeBetween,
+  type Activity,
+  type Dish,
+  type Level,
+  type Question,
+  type RecipeStep,
+} from '../kit';
 import type { TrayItem, TrayOptions } from '../steps/tray';
 
 /**
@@ -28,22 +38,24 @@ const THINGS: Record<TrayItem, string> = {
   sushi: 'sushi pieces',
 };
 
-const between = (random: () => number, low: number, high: number) =>
-  low + (Math.floor(random() * (high - low + 1)) % (high - low + 1));
-
 /** Level 1 counts by these, with this many rows at most. */
 export const SKIP_ROWS: Record<number, number> = { 2: 5, 5: 4, 10: 3 };
 
 /** The tray's rows and columns at `level`. */
 export function traySize(level: Level, random: () => number): { rows: number; cols: number } {
   if (level === 1) {
-    const cols = [2, 5, 10][Math.floor(random() * 3) % 3];
-    return { rows: between(random, 2, SKIP_ROWS[cols]), cols };
+    const cols = pick([2, 5, 10], random);
+    return { rows: wholeBetween(random, 2, SKIP_ROWS[cols]), cols };
   }
-  return { rows: between(random, 2, 5), cols: between(random, 2, 5) };
+  return { rows: wholeBetween(random, 2, 5), cols: wholeBetween(random, 2, 5) };
 }
 
-/** The answer and two wrong ones near it (a row more or less, or one off), smallest first. */
+/**
+ * The answer and two wrong ones near it, smallest first, with the answer as
+ * likely first, middle or last. Level 1's wrong ones are a row more or less
+ * (the slips skip counting makes) before one more or less; Level 2's a row
+ * or column more or less, or one off, at random.
+ */
 export function trayChoices(
   rows: number,
   cols: number,
@@ -51,19 +63,20 @@ export function trayChoices(
   random: () => number,
 ): { choices: number[]; index: number } {
   const total = rows * cols;
-  const near =
+  const below =
     level === 1
-      ? [total - cols, total + cols, total + 1, total - 1]
-      : [total - cols, total + cols, total - rows, total + rows, total - 1, total + 1];
-  const pool = [...new Set(near)].filter((n) => n > 0 && n !== total);
-  // Level 1's first two are a row more and less: the slips skip counting makes.
-  const picked: number[] = [];
-  if (level === 1) picked.push(...pool.slice(0, 2));
-  while (picked.length < 2) {
-    picked.push(pool.splice(Math.floor(random() * pool.length) % pool.length, 1)[0]);
-  }
-  const choices = [total, ...picked.slice(0, 2)].sort((a, b) => a - b);
-  return { choices, index: choices.indexOf(total) };
+      ? [total - cols, total - 1]
+      : shuffle([total - cols, total - rows, total - 1], random);
+  const above =
+    level === 1
+      ? [total + cols, total + 1]
+      : shuffle([total + cols, total + rows, total + 1], random);
+  return spreadChoices(
+    total,
+    below.filter((n) => n > 0),
+    above,
+    random,
+  );
 }
 
 /** The tray question for `item` at `level`. */

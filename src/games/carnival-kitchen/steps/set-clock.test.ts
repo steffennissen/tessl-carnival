@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { dishById } from '../dishes';
 import { createState, maxScore, move, press, release, tick, totalScore } from '../game';
-import { QUIZ_OUTRO, SMART_BONUS, clockText, plainPlan, type KitchenState } from '../kit';
-import { current, drawRound, nextStep, playThrough, seeded } from '../test-kit';
+import {
+  QUIZ_OUTRO,
+  SMART_BONUS,
+  clockText,
+  currentTurn,
+  plainPlan,
+  type AnswerFx,
+  type KitchenState,
+} from '../kit';
+import type { Sound } from '../sound';
+import { current, drawRound, nextStep, playThrough, quietEffects, seeded } from '../test-kit';
 import setClock, {
   CHECK,
   SET_CLOCK,
+  glowingHand,
   grabHand,
   handOff,
   type SetClockOptions,
@@ -131,6 +141,47 @@ describe('set the clock', () => {
     tick(state, QUIZ_OUTRO);
     expect(state.stepIndex).toBe(1);
     expect(totalScore(state)).toBe(0);
+  });
+
+  it('says which hand is off at every wrong check, the show too, and makes it glow', () => {
+    const state = onClock(false);
+    const s = current<SetClockState>(state);
+    const said: string[] = [];
+    const sound = new Proxy({} as Sound, {
+      get: (_target, prop) =>
+        prop === 'say'
+          ? (text: string) => said.push(text)
+          : prop === 'read'
+            ? () => ({ count: 0, word: () => -1, done: () => true })
+            : prop === 'muted'
+              ? false
+              : () => undefined,
+    });
+    const effects = { ...quietEffects(), sound };
+    const fx = setClock.fx?.() as AnswerFx;
+    const observe = () =>
+      setClock.observe?.({
+        ...currentTurn(state),
+        g: null as never,
+        t: 0,
+        dt: 1 / 60,
+        pointer: { x: 0, y: 0, down: false },
+        taking: true,
+        fx,
+        fxOf: () => undefined,
+        effects,
+      } as never);
+    drag(state, 'minute', 0, 30);
+    expect(glowingHand(s, 0)).toBeNull();
+    check(state);
+    observe();
+    expect(said.at(-1)).toBe('Not quite! The short hand shows the hour. Try again!');
+    expect(glowingHand(s, 0)).toBe('hour');
+    check(state);
+    observe();
+    expect(s.shown).toBe(true);
+    expect(said.at(-1)).toBe("Not quite! The short hand shows the hour. Look! It's four thirty!");
+    expect(glowingHand(s, 0)).toBe('hour');
   });
 
   it('plays through and draws in every layout', () => {

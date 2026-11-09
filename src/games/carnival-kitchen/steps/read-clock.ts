@@ -70,7 +70,7 @@ const readClock: Step<ReadClockOptions, QuizState, QuizFx> = {
   progress: ({ state }) => [1, state.picked === null ? 0 : 1],
   press: (turn, x, y) => pressQuiz(turn, x, y),
   update: (turn, dt) => updateQuiz(turn, dt),
-  bubble: ({ state }) => quizBubble(state),
+  bubble: ({ state, round }) => quizBubble(state, round),
   solve: (turn) => solveQuiz(turn),
   fx: quizFx,
   observe: (view) => observeQuiz(view),

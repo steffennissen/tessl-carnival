@@ -104,6 +104,14 @@ export interface Dish {
   /** The steps, in the order you cook them, each with what it uses. */
   steps: RecipeStep[];
   /**
+   * Steps that could just as well be cooked in either order, as indices into
+   * `steps`, each group next to each other: `[[0, 1]]` when it doesn't matter
+   * whether the strawberry or the banana is chopped first. Putting the
+   * recipe in order (activities/recipe-order.ts) takes any order within a
+   * group; the cooking itself keeps `steps`' order.
+   */
+  either?: number[][];
+  /**
    * Draws the finished dish, centred on the origin, about 240 wide and 160
    * tall, for the end card. `state` is the round that made it, or null for a
    * dish nobody has cooked yet. `time` is in seconds, for steam and wobbles.
@@ -295,7 +303,7 @@ export interface Step<O extends StepBasics = StepBasics, S = unknown, F = unknow
   draw(view: StepView<O, S, F>): void;
   /**
    * A learning moment (a question, an order ticket) rather than cooking: its
-   * card says "Smart Chef!" instead of a step number, it isn't in the recipe
+   * card says "Learning time!" instead of a step number, it isn't in the recipe
    * along the top, and it doesn't count toward the cooking score or stars.
    */
   learning?: boolean;

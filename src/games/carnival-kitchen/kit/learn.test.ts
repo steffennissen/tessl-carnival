@@ -8,7 +8,9 @@ import {
   SMART_BONUS,
   answer,
   autoReadDelay,
+  cheerLines,
   nearChoices,
+  spreadChoices,
   settingsFrom,
   smartChef,
   smartSticker,
@@ -94,5 +96,30 @@ describe('learning rules', () => {
         expect([...choices].sort((a, b) => a - b)).toEqual(choices);
       }
     }
+  });
+
+  it('puts the answer first, middle or last about as often', () => {
+    const at = [0, 0, 0];
+    for (let seed = 1; seed <= 300; seed++) at[nearChoices(7, seeded(seed), 1).index] += 1;
+    for (const n of at) expect(n).toBeGreaterThan(60);
+    // A place it can't have is skipped: nothing below 1.
+    expect(spreadChoices(1, [0], [2, 3], seeded())).toEqual({ choices: [1, 2, 3], index: 0 });
+    expect(spreadChoices(5, [4, 3], [6, 7], () => 0.99)).toEqual({ choices: [3, 4, 5], index: 2 });
+  });
+
+  it('cheers "a Smart Chef!" only while the round is earning its star', () => {
+    const state = round();
+    const first = startAnswer();
+    answer(state, first, false);
+    answer(state, first, false); // shown
+    answer(state, first, true);
+    expect(cheerLines(state, first, ['Yes, it is', '4!'])).toEqual(['Yes, it is', '4!']);
+    const second = startAnswer();
+    answer(state, second, true);
+    expect(cheerLines(state, second, ['Yes, it is', '4!'])).toEqual(['Yes! You', 'got it!']);
+    const fresh = round();
+    const only = startAnswer();
+    answer(fresh, only, true);
+    expect(cheerLines(fresh, only, ['Yes', '!'])).toEqual(['Yes! You are', 'a Smart Chef!']);
   });
 });

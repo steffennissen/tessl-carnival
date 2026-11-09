@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { press, tick } from '../game';
+import { press, release, tick } from '../game';
 import { DISHES } from '../dishes';
 import {
   BOWL,
@@ -12,7 +12,14 @@ import {
   type HoldState,
 } from '../kit';
 import { current, drawRound, nextStep, pourPerfectly, ready, seeded } from '../test-kit';
-import pour, { amountOf, insideSmoothness, mouthOf, POUR_TOP, type PourOptions } from './pour';
+import pour, {
+  amountOf,
+  insideSmoothness,
+  mouthOf,
+  pourLines,
+  POUR_TOP,
+  type PourOptions,
+} from './pour';
 
 const meter = current<HoldState>;
 
@@ -25,6 +32,33 @@ describe('pour', () => {
       expect(p).toBeGreaterThanOrEqual(TARGET_LOW);
       expect(p).toBeLessThanOrEqual(TARGET_HIGH);
     }
+  });
+
+  it('starts a cup that has some in it already there, and fills it up to the star', () => {
+    const options: PourOptions = {
+      kind: 'pour',
+      pours: ['flour', 'milk'],
+      amounts: ['1½ cups', '1 cup'],
+      starts: ['', '½ cup'],
+    };
+    const s = pour.start(options, seeded());
+    expect(s.level).toBe(0);
+    expect(s.targets[1]).toBe(0.5);
+    // A 2 cup jug for 1 cup: ½ cup is a quarter of the way up.
+    expect(s.starts).toEqual([0, 0.25]);
+    expect(pourLines(options, 1)).toEqual(['½ cup more milk,', 'up to the star!']);
+    const state = ready('pancakes', 'pour');
+    state.steps[state.stepIndex].options = options;
+    state.steps[state.stepIndex].state = pour.start(options, seeded());
+    const m = meter(state);
+    m.index = 1;
+    m.level = 0.25;
+    // A tap that hardly pours is "Not yet!", and the cup stays at ½ cup.
+    press(state, 400, 300);
+    tick(state, 0.1);
+    expect(release(state)).toBe('not yet');
+    expect(m.level).toBe(0.25);
+    expect(m.index).toBe(1);
   });
 
   it('puts the star on the line of the real amount, on a measuring cup', () => {

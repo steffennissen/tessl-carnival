@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dishById } from '../dishes';
 import { createState, press, tick } from '../game';
-import { QUIZ_OUTRO, SMART_BONUS, plainPlan, type KitchenState } from '../kit';
+import { QUIZ_OUTRO, SMART_BONUS, currentTurn, plainPlan, type KitchenState } from '../kit';
 import { current, drawRound, nextStep, playThrough, seeded } from '../test-kit';
 import pay, {
   PAY_CHECK,
@@ -11,6 +11,7 @@ import pay, {
   countOn,
   fewestCoins,
   traySpot,
+  valuesShown,
   type CoinId,
   type PayOptions,
   type PayState,
@@ -120,8 +121,38 @@ describe('the customer pays', () => {
   it(`holds at most ${TRAY_MOST} coins`, () => {
     const state = onPay(99);
     for (let i = 0; i < TRAY_MOST; i++) tapCoin(state, 'penny');
-    expect(tapCoin(state, 'penny')).toBe(false);
+    // Not "Not yet!": Chef Bunny says the tray is full.
+    expect(tapCoin(state, 'penny')).toBe(true);
     expect(current<PayState>(state).tray).toHaveLength(TRAY_MOST);
+    expect(current<PayState>(state).full).toBe(1);
+    expect(pay.bubble?.(currentTurn(state) as never)).toEqual([
+      'The tray is full!',
+      'Try bigger coins.',
+    ]);
+  });
+
+  it('finishes when giving a coin back makes it exactly right', () => {
+    const state = onPay(30);
+    tapCoin(state, 'quarter');
+    tapCoin(state, 'dime'); // 35¢: too much
+    const s = current<PayState>(state);
+    expect(s.done).toBe(false);
+    tapCoin(state, 'nickel'); // 40¢
+    const dime = traySpot(1);
+    press(state, dime.x, dime.y); // the dime back: 30¢, exactly right
+    expect(coinTotal(s.tray)).toBe(30);
+    expect(s.done).toBe(true);
+    expect(s.outcome).toBe('right');
+  });
+
+  it('shows coin values from the start at Level 1, at Level 2 only after a wrong check', () => {
+    const state = onPay(45);
+    const s = current<PayState>(state);
+    expect(valuesShown(options(state), s)).toBe(true);
+    const level2 = { ...options(state), values: false };
+    expect(valuesShown(level2, s)).toBe(false);
+    s.wrong = 1;
+    expect(valuesShown(level2, s)).toBe(true);
   });
 
   it('plays through and draws in every layout', () => {
