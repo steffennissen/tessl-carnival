@@ -405,8 +405,9 @@ when she shows an answer she says where the hands point: the short hand
 **The customer pays** (`activities/customer-pays.ts`, `steps/pay.ts`:
 money) fits every dish. After the last step, before decorating, a customer
 buys the dish: "That's 45¢. Tap the coins to pay!" She taps coins in the bank
-(sized like the real coins) into the tray, and a total counts up. A coin
-tapped in the tray goes back. Paying exactly right checks itself, whether
+(sized like the real coins) into the tray, and a total counts up. Each kind of coin
+piles up in its own cell of the tray ("×3" when there are several), and a
+tap anywhere on a cell gives one of its coins back. Paying exactly right checks itself, whether
 the last tap added a coin or gave one back; too much gets a gentle "Oops,
 too much!"; a **Check!** that's short says how much more is needed. A full
 tray (16 coins) says "The tray is full! Try bigger coins.". After two wrong
@@ -514,7 +515,7 @@ right.
 **On a phone**, everything a finger taps in a learning moment is at least
 about 60 CSS pixels: answer buttons, the 🔊 speaker (and the step card's,
 for "Read it myself"), **Let's cook!**, the jars, **Check!**, the coins in
-the bank and the clock's hands (a touch near a hand's knob grabs it). Held
+the bank, the tray's cells (to give a coin back) and the clock's hands (a touch near a hand's knob grabs it). Held
 sideways, the side answers fill the room at the right two to a row; held
 upright, the question spans the screen with the picture under it and the
 answers beside it. Setting the clock, the clock is as big as fits: held

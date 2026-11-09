@@ -46,6 +46,23 @@ describe('put the recipe in order', () => {
     }
   });
 
+  it('never starts the tray with a card that could go first, swaps included', () => {
+    for (let seed = 1; seed < 80; seed++) {
+      const tray = shuffledTray(4, seeded(seed), [0, 0, 2, 3]);
+      expect([...tray].sort()).toEqual([0, 1, 2, 3]);
+      expect([0, 1]).not.toContain(tray[0]);
+      // Even a roll that always comes out the same way.
+      expect([0, 1]).not.toContain(shuffledTray(4, () => 0, [0, 0, 2, 3])[0]);
+      const steps = recipeOrder.weave({
+        dish: dishById('fruit-salad'),
+        level: 1,
+        random: seeded(seed),
+        start: 900,
+      });
+      expect([0, 1]).not.toContain((steps[0] as SequenceOptions).tray[0]);
+    }
+  });
+
   it('starts the round with the cards, then cooks the real recipe', () => {
     const dish = dishById('soup');
     const steps = recipeOrder.weave({ dish, level: 1, random: seeded(), start: 900 });

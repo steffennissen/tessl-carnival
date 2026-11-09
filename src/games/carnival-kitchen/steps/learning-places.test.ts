@@ -31,7 +31,8 @@ import {
   TRAY_MOST,
   bankSpots,
   payPlaces,
-  traySpot,
+  pileSpots,
+  trayCells,
   type CoinId,
   type PayState,
 } from './pay';
@@ -251,8 +252,6 @@ describe('paying on every shape', () => {
       paid: PAID,
       check: PAY_CHECK,
     });
-    expect(traySpot(0)).toEqual({ x: 240, y: 282, r: 19 });
-    expect(traySpot(9)).toEqual({ x: 280, y: 328, r: 19 });
     const spots = bankSpots(['quarter', 'dime', 'nickel', 'penny']);
     expect(spots.map((s) => [s.x, s.y, s.r])).toEqual([
       [274.375, 414, 43],
@@ -273,16 +272,16 @@ describe('paying on every shape', () => {
         );
         expectClear(shape, { bubble, tray, paid, check, ...bank });
       }
-      for (let i = 0; i < TRAY_MOST; i++)
-        expect(inside(boxOf(traySpot(i, shape)), tray), `tray coin ${i}`).toBe(true);
-      for (let i = 0; i < TRAY_MOST - 1; i++) {
-        const a = traySpot(i, shape);
-        const b = traySpot(i + 1, shape);
-        if (i % 8 !== 7) expect(b.x - a.x).toBeGreaterThanOrEqual(a.r * 2);
+      for (const coins of banks) {
+        const cells = trayCells(coins, shape);
+        cells.forEach((cell, i) => {
+          expect(inside(cell, tray), `tray cell ${i}`).toBe(true);
+          cells.slice(i + 1).forEach((other) => expect(overlaps(cell, other)).toBe(false));
+          // A full pile stays in its cell.
+          for (const at of pileSpots(cell, TRAY_MOST))
+            expect(inside(boxOf(at), { ...cell, x: cell.x - 2, w: cell.w + 4 })).toBe(true);
+        });
       }
-      expect(traySpot(8, shape).y - traySpot(0, shape).y).toBeGreaterThanOrEqual(
-        traySpot(0, shape).r * 2,
-      );
     });
 
     it(`taps coins in and out, and Check!, where they're drawn, on ${shape}`, () => {
@@ -295,7 +294,7 @@ describe('paying on every shape', () => {
         press(state, spot.x + spot.reach - 1, spot.y, shape);
       }
       expect(pay().tray).toEqual(coins);
-      const back = traySpot(1, shape);
+      const back = middleOf(trayCells(coins, shape)[1]);
       press(state, back.x, back.y, shape);
       expect(pay().tray).toEqual(['quarter', 'nickel', 'penny']);
       const { speaker, check } = payPlaces(shape);
@@ -320,7 +319,16 @@ describe('paying on every shape', () => {
       expect(check.w * scale).toBeGreaterThanOrEqual(60);
       expect(check.h * scale).toBeGreaterThanOrEqual(60);
       expect(speaker.r * 2 * scale).toBeGreaterThanOrEqual(60);
-      expect(traySpot(0, shape).r * 2 * scale, `${shape} tray coins`).toBeGreaterThanOrEqual(34);
+      // Giving a coin back: a tap anywhere on its kind's cell, at least 60 CSS pixels.
+      for (const coins of banks) {
+        for (const cell of trayCells(coins, shape)) {
+          expect(cell.w * scale, `${shape} tray cell`).toBeGreaterThanOrEqual(60);
+          expect(cell.h * scale, `${shape} tray cell`).toBeGreaterThanOrEqual(60);
+        }
+      }
+      expect(pileSpots(trayCells(banks[1], shape)[0], 1)[0].r * 2 * scale).toBeGreaterThanOrEqual(
+        34,
+      );
     }
   });
 });

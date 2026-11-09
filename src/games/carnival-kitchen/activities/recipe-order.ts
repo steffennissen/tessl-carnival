@@ -43,15 +43,18 @@ export function recipeGroups(dish: Dish): number[] | undefined {
 }
 
 /**
- * How the cards lie in the tray: shuffled, never already in order, and
- * with the first step not first, so there's always something to do.
+ * How the cards lie in the tray: shuffled, and never starting with a card
+ * that could go first (the first step, or one in its `groups` group), so
+ * there's always something to do.
  */
-export function shuffledTray(count: number, random: () => number): number[] {
+export function shuffledTray(count: number, random: () => number, groups?: number[]): number[] {
   const order = Array.from({ length: count }, (_, i) => i);
+  const first = (card: number | undefined) =>
+    card !== undefined && (groups?.[card] ?? card) === (groups?.[0] ?? 0);
   let tray = shuffle(order, random);
-  for (let i = 0; tray[0] === 0 && i < 20; i++) tray = shuffle(order, random);
-  // Still first after all that (a very unlucky roll): swap it along.
-  if (tray[0] === 0) tray = [...tray.slice(1), 0];
+  for (let i = 0; first(tray[0]) && i < 20; i++) tray = shuffle(order, random);
+  // Still first after all that (a very unlucky roll): move them along.
+  for (let i = 0; first(tray[0]) && i < count; i++) tray = [...tray.slice(1), tray[0]];
   return tray;
 }
 
@@ -72,7 +75,7 @@ const recipeOrder: Activity = {
     const sequence: SequenceOptions = {
       kind: 'sequence',
       cards,
-      tray: shuffledTray(cards.length, random),
+      tray: shuffledTray(cards.length, random, groups),
       ...(groups ? { groups } : {}),
     };
     return [sequence, ...dish.steps];

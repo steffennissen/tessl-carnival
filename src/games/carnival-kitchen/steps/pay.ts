@@ -43,7 +43,8 @@ import {
  * only its name, with the values shown after a wrong check. Paying exactly right
  * checks itself (after adding a coin or giving one back); Check! asks
  * whether it's enough. Too much gets a gentle
- * "Oops, too much!" and a tap on a coin in the tray gives it back.
+ * "Oops, too much!" and a tap on a coin's pile in the tray gives one back
+ * (each kind of coin has its own cell, a big target).
  *
  * The shared answer rules: Check! short of the price gets a hint and
  * another go; after two, Chef Bunny lays out the coins and Check! carries
@@ -107,8 +108,6 @@ export interface PayPlaces {
   tray: Box;
   paid: Box;
   check: Box;
-  /** The tray's first coin, the gaps to the next one (8 to a row) and the next row, and the coins' size. */
-  trayCoins: { x: number; y: number; dx: number; dy: number; r: number };
   /**
    * The bank's row of coins: across `x` to `x + w` at height `y`, drawn
    * `scale` times their size in COINS, and a tap within `reach` of one (or
@@ -121,7 +120,7 @@ export interface PayPlaces {
  * Where everything goes for the canvas's shape, clear of Chef Bunny, the
  * HUD and the progress pill. On a computer: the tray under the question,
  * the total and Check! beside it, and the bank along the bottom. On a phone
- * held sideways the tray's coins are bigger and Check! is big at the right.
+ * held sideways the tray is wider and Check! is big at the right.
  * Held upright the tray spans the screen under the question, then the bank
  * with bigger coins, then the total and Check! either side of the pill.
  * Everything a finger taps is at least about 60 CSS pixels.
@@ -135,7 +134,6 @@ export function payPlaces(shape: Shape = 'page'): PayPlaces {
       tray: { x: 110, y: 214, w: 580, h: 118 },
       paid: { x: 110, y: 450, w: 240, h: 94 },
       check: { x: 450, y: 450, w: 240, h: 94 },
-      trayCoins: { x: 155, y: 244, dx: 70, dy: 58, r: 27 },
       bank: { x: 110, w: 580, y: 388, scale: 1.2, reach: 48 },
     };
   }
@@ -147,7 +145,6 @@ export function payPlaces(shape: Shape = 'page'): PayPlaces {
       tray: { x: 215, y: 250, w: 380, h: 110 },
       paid: { x: 607, y: 250, w: 178, h: 62 },
       check: { x: 607, y: 328, w: 178, h: 102 },
-      trayCoins: { x: 240, y: 280, dx: 46, dy: 50, r: 22 },
       bank: { x: 215, w: 385, y: 420, scale: 1, reach: 44 },
     };
   }
@@ -157,7 +154,6 @@ export function payPlaces(shape: Shape = 'page'): PayPlaces {
     tray: TRAY,
     paid: PAID,
     check: PAY_CHECK,
-    trayCoins: { x: 240, y: 282, dx: 40, dy: 46, r: 19 },
     bank: { x: 215, w: 475, y: 414, scale: 1, reach: 44 },
   };
 }
@@ -181,10 +177,39 @@ export function bankSpots(coins: readonly CoinId[], shape: Shape = 'page'): Bank
   });
 }
 
-/** Where the `i`th coin in the tray sits, and its size: two rows of 8. */
-export function traySpot(i: number, shape: Shape = 'page'): { x: number; y: number; r: number } {
-  const { trayCoins: c } = payPlaces(shape);
-  return { x: c.x + (i % 8) * c.dx, y: c.y + Math.floor(i / 8) * c.dy, r: c.r };
+/**
+ * The tray's cells, one per coin in the bank, in the bank's order, side by
+ * side across the tray: the coins tapped in pile up in their own kind's
+ * cell, and a tap anywhere in a cell gives one of them back. So each cell,
+ * not a little coin, is the target: at least about 60 CSS pixels on a phone.
+ */
+export function trayCells(coins: readonly CoinId[], shape: Shape = 'page'): Box[] {
+  const { tray } = payPlaces(shape);
+  const pad = 8;
+  const gap = 6;
+  const w = (tray.w - pad * 2 - gap * (coins.length - 1)) / coins.length;
+  return coins.map((_, i) => ({
+    x: tray.x + pad + i * (w + gap),
+    y: tray.y + pad,
+    w,
+    h: tray.h - pad * 2,
+  }));
+}
+
+/**
+ * Where each coin of a pile sits in its cell, and how big: fanned out from
+ * left to right, overlapping when there are many.
+ */
+export function pileSpots(cell: Box, count: number): { x: number; y: number; r: number }[] {
+  const r = Math.min(cell.h * 0.33, cell.w * 0.3);
+  const room = cell.w - r * 2 - 14;
+  const dx = count > 1 ? Math.min(r * 0.75, room / (count - 1)) : 0;
+  const left = cell.x + cell.w / 2 - (dx * (count - 1)) / 2;
+  return Array.from({ length: count }, (_, i) => ({
+    x: left + i * dx,
+    y: cell.y + cell.h / 2 + 4 + (i % 2 ? -3 : 3),
+    r,
+  }));
 }
 
 /** What coins add up to, in cents. */
@@ -274,15 +299,16 @@ export function pressPay(turn: Turn<PayOptions, PayState>, x: number, y: number)
   }
   // Once Chef Bunny has laid out the coins, they stay.
   if (s.shown) return true;
-  // A coin in the tray goes back.
-  for (let i = s.tray.length - 1; i >= 0; i--) {
-    const at = traySpot(i, turn.shape);
-    if (Math.hypot(x - at.x, y - at.y) <= at.r + 3) {
+  // A tap on a cell of the tray gives one of its coins back.
+  const cell = trayCells(coins, turn.shape).findIndex((b) => inBox(b, x, y, 0));
+  if (cell >= 0) {
+    const i = s.tray.lastIndexOf(coins[cell]);
+    if (i >= 0) {
       s.tray.splice(i, 1);
       // Exactly right after giving one back checks itself too.
       if (s.tray.length && coinTotal(s.tray) === price) check(turn);
-      return true;
     }
+    return true;
   }
   const coin = bankSpots(coins, turn.shape).find((c) => Math.hypot(x - c.x, y - c.y) <= c.reach);
   if (!coin) return true;
@@ -301,6 +327,16 @@ export function pressPay(turn: Turn<PayOptions, PayState>, x: number, y: number)
 /** Whether the coins show their values now: always at Level 1, after a wrong check (or the answer shown) at Level 2. */
 export function valuesShown(options: PayOptions, state: PayState): boolean {
   return options.values !== false || state.wrong > 0 || state.shown;
+}
+
+/**
+ * What the total box says, its label and its number: "Paid 35¢" while the
+ * coins show their values; at Level 2 before that, how many coins are in
+ * the tray (the cents would give the values away): "Coins 3".
+ */
+export function paidText(options: PayOptions, state: PayState): [string, string] {
+  if (valuesShown(options, state)) return ['Paid', `${coinTotal(state.tray)}¢`];
+  return ['Coins', String(state.tray.length)];
 }
 
 /**
@@ -453,13 +489,28 @@ const pay: Step<PayOptions, PayState, PayFx> = {
         'Tap coins to put them here',
         tray.x + tray.w / 2,
         tray.y + tray.h / 2,
-        Math.round(traySpot(0, shape).r * 0.95),
+        Math.round(Math.min(26, tray.h * 0.2)),
         C.woodDark,
       );
+    // Each kind of coin in its own cell, piled up, with how many on a tag.
     const values = valuesShown(options, s);
-    s.tray.forEach((id, i) => {
-      const at = traySpot(i, shape);
-      drawCoin(g, id, at.x, at.y, at.r, false, values);
+    trayCells(options.coins, shape).forEach((cell, k) => {
+      const id = options.coins[k];
+      const count = s.tray.filter((c) => c === id).length;
+      if (!count) return;
+      const spots = pileSpots(cell, count);
+      for (const at of spots) drawCoin(g, id, at.x, at.y, at.r, false, values);
+      if (count > 1) {
+        const tag = Math.max(14, cell.h * 0.18);
+        stickerText(
+          g,
+          `×${count}`,
+          cell.x + cell.w - tag * 0.9,
+          cell.y + tag * 0.6,
+          tag,
+          C.hotPink,
+        );
+      }
     });
 
     // How much is in the tray: pink while short, mint when it's right, lavender if too much.
@@ -468,10 +519,11 @@ const pay: Step<PayOptions, PayState, PayFx> = {
     const k = paid.h / PAID.h;
     rounded(g, paid.x, paid.y, paid.w, paid.h, 16 * k);
     fillStroke(g, color, 3.5);
-    plainText(g, 'Paid', paid.x + 32 * k, paid.y + paid.h / 2 + 1, 18 * k, C.ink);
+    const [label, amount] = paidText(options, s);
+    plainText(g, label, paid.x + 34 * k, paid.y + paid.h / 2 + 1, 18 * k, C.ink);
     stickerText(
       g,
-      `${total}¢`,
+      amount,
       paid.x + paid.w - 42 * k,
       paid.y + paid.h / 2 + 1,
       30 * k,
