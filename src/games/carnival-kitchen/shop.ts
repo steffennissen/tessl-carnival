@@ -29,28 +29,33 @@ import {
  * on a phone.
  */
 
-/** The title screen's shop button and rank badge, in canvas units. */
-export function titlePlaces(layout: Layout): { shop: Box; rank: Box } {
+/** The title screen's shop button, rank badge and cook-off button, in canvas units. */
+export function titlePlaces(layout: Layout): { shop: Box; rank: Box; cookoff: Box } {
   if (layout.shape === 'tall') {
-    // Under the home and sound buttons, either side.
+    // Under the home and sound buttons, either side. The cook-off beside
+    // Chef Bunny, under the big start button and clear of the gear.
     const h = layout.height >= 1000 ? 100 : 72;
+    const bunnyY = Math.min(layout.height - 150, layout.sceneY + 635);
     return {
       rank: { x: 16, y: 114, w: 290, h },
       shop: { x: layout.width - 16 - 250, y: 114, w: 250, h },
+      cookoff: { x: 200, y: bunnyY - 90, w: layout.width - 216, h: 100 },
     };
   }
-  // The shop under the book button at the right. On a computer the badge
-  // sits above the title; on a phone held sideways, where it's bigger for a
-  // finger, at the left under 🏠, above Chef Bunny.
+  // The shop and the cook-off under the book button at the right. On a
+  // computer the badge sits above the title; on a phone held sideways, where
+  // it's bigger for a finger, at the left under 🏠, above Chef Bunny.
   const book = bookButtonFor(layout);
+  const h = layout.shape === 'wide' ? 80 : 60;
+  const shop = { x: book.x, y: book.y + book.h + 12, w: book.w, h };
+  // Clear of the coins on the shop button's corner, and a little wider, for its words.
+  const cookoff = { x: book.x - 40, y: shop.y + h + 26, w: book.w + 40, h };
   if (layout.shape === 'wide') {
-    return {
-      shop: { x: book.x, y: book.y + book.h + 12, w: book.w, h: 80 },
-      rank: { x: 16, y: layout.sceneY + 112, w: 270, h: 80 },
-    };
+    return { shop, cookoff, rank: { x: 16, y: layout.sceneY + 112, w: 270, h: 80 } };
   }
   return {
-    shop: { x: book.x, y: book.y + book.h + 12, w: book.w, h: 60 },
+    shop,
+    cookoff,
     rank: { x: layout.sceneX + 290, y: layout.sceneY + 8, w: 300, h: 62 },
   };
 }

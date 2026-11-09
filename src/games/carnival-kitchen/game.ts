@@ -8,6 +8,29 @@ import {
   type CarnivalGame,
 } from '../../carnival';
 import { planRound } from './activities';
+import {
+  CHEFS,
+  JUDGES,
+  YOU,
+  bestDishes,
+  bestOf,
+  bestSticker,
+  challengeLines,
+  chefPlaces,
+  claimCookoffCoins,
+  cookoffCards,
+  cookoffCoins,
+  cookoffPlan,
+  createCookoff,
+  finishTurn,
+  menuPlaces,
+  newSeed,
+  roundRandom,
+  seededRandom,
+  verdictOf,
+  type Cookoff,
+} from './cookoff';
+import type { Plate, TurnCardKind } from './cookoff-draw';
 import { bookButtonFor, bookPlaces, cellAt, inBox, trophyAt } from './book';
 import {
   BOSSES,
@@ -77,13 +100,22 @@ import {
   saveCelebrated,
   surpriseHint,
 } from './ranks';
-import { createRenderer, type RoundEnd, type StageKind, type StandEnd } from './render';
+import {
+  createRenderer,
+  type CookoffScreen,
+  type RoundEnd,
+  type StageKind,
+  type StandEnd,
+} from './render';
 import { createShop, pressShop, shopPlaces, titlePlaces } from './shop';
-import { createSound } from './sound';
+import { NOTE, createSound } from './sound';
 import { stepOf } from './steps';
 import { loadOutfit, ownSticker, saveOutfit, type Outfit } from './wardrobe';
 
 const { width: WIDTH, height: HEIGHT } = theme.canvas;
+
+/** Seconds a cook-off's card between rounds is up before a tap moves on. */
+export const TURN_CARD_WAIT = 1;
 
 /** The most canvas pixels per CSS pixel, whatever the screen's density. */
 export const MOST_PIXELS = 2;
@@ -437,7 +469,8 @@ export const carnivalKitchen: CarnivalGame = {
     const till = createTill();
     // The title screen waits for a tap to start cooking; the recipe book
     // opens from it; the kitchen is where the cooking (and decorating) is.
-    let screen: 'title' | 'book' | 'grownups' | 'kitchen' | 'shop' | 'ceremony' = 'title';
+    let screen: 'title' | 'book' | 'grownups' | 'kitchen' | 'shop' | 'ceremony' | 'cookoff' =
+      'title';
     // The grown-ups' settings, remembered between visits.
     let settings: LearnSettings = loadSettings();
     // The last round's learning activity, so the next one is different.
@@ -481,6 +514,14 @@ export const carnivalKitchen: CarnivalGame = {
     let shop = createShop();
     // What happens once the rank ceremony is done: cooking.
     let afterCeremony: (() => void) | null = null;
+    // The cook-off (cookoff.ts) while one is on: its page between rounds,
+    // the chefs being picked, the card up between rounds, and each chef's
+    // finished dish for the judges' table.
+    let cookoff: Cookoff | null = null;
+    let cookoffPage: 'menu' | 'chefs' | 'card' | 'judging' = 'menu';
+    let taken: number[] = [];
+    let turnCard: { kind: TurnCardKind; lines: [string, string]; age: number } | null = null;
+    let plates: Plate[] = [];
 
     /**
      * A new rank to celebrate? Then the ceremony first: the rank's hat goes
@@ -518,10 +559,16 @@ export const carnivalKitchen: CarnivalGame = {
       if (state.phase === 'over' && !scoreRecorded) {
         recordScore(carnivalKitchen.id, totalScore(state));
         const { id, level } = stickerFor(state);
-        const before = stickersFor(carnivalKitchen.id)[id];
-        sticker = stickerNews(before, earnSticker(carnivalKitchen.id, id, level));
-        smart = smartChef(state);
-        if (smart) earnSticker(carnivalKitchen.id, smartSticker(state.dish.id), 1);
+        // Two chefs share the device, so their rounds earn no stickers.
+        if (cookoff?.mode !== 'duo') {
+          const before = stickersFor(carnivalKitchen.id)[id];
+          sticker = stickerNews(before, earnSticker(carnivalKitchen.id, id, level));
+          smart = smartChef(state);
+          if (smart) earnSticker(carnivalKitchen.id, smartSticker(state.dish.id), 1);
+          // Her best score on the dish, for beat your best.
+          const score = Math.round(totalScore(state));
+          earnSticker(carnivalKitchen.id, bestSticker(state.dish.id), score);
+        }
         // The customer pays: the coins go in the jar.
         if (stand) {
           noteStreak();
@@ -557,13 +604,18 @@ export const carnivalKitchen: CarnivalGame = {
      * at random is shown on the dish spinner first (`spin`), which lands on
      * it; a chosen dish starts straight away unless `spin` says otherwise.
      */
-    const cook = (dish: Dish, spin: boolean) => {
+    const cook = (
+      dish: Dish,
+      spin: boolean,
+      round?: { plan: RoundPlan; random: () => number; reel: Dish[] },
+    ) => {
       lastDish = dish;
-      const plan = planRound(dish, settings, Math.random, lastActivity);
+      // A cook-off's chefs all cook the same planned round.
+      const plan = round?.plan ?? planRound(dish, settings, Math.random, lastActivity);
       lastActivity = plan.activity ?? lastActivity;
       // An order ticket comes from the guest, and "the customer pays" is them paying.
       const steps = visit ? withGuest(plan.steps, visit.guest) : plan.steps;
-      state = createState(dish, Math.random, { ...plan, steps });
+      state = createState(dish, round?.random ?? Math.random, { ...plan, steps });
       scoreRecorded = false;
       decor = createDecor();
       sticker = null;
@@ -576,7 +628,156 @@ export const carnivalKitchen: CarnivalGame = {
       staging = null;
       renderer.reset();
       spinning = spin;
-      if (spin) renderer.startSpin(dish, playableDishes(stickersFor(carnivalKitchen.id)));
+      if (spin) {
+        renderer.startSpin(dish, round?.reel ?? playableDishes(stickersFor(carnivalKitchen.id)));
+      }
+    };
+
+    // -----------------------------------------------------------------------
+    // The cook-off: beat your best, or two chefs (see cookoff.ts)
+
+    /** Cooks the cook-off's round for the chef whose turn it is: no customer, the same round for all. */
+    const cookTurn = (c: Cookoff, spin: boolean, reel: Dish[] = []) => {
+      visit = null;
+      cook(c.dish, spin, {
+        plan: cookoffPlan(c, settings, lastActivity),
+        random: roundRandom(c),
+        reel,
+      });
+    };
+
+    /** The card between rounds: Chef Bunny's challenge, Player 1's turn, or "Pass the iPad". */
+    const showTurnCard = (c: Cookoff, kind: TurnCardKind) => {
+      const lines: [string, string] =
+        kind === 'challenge'
+          ? challengeLines(c.dish, c.best)
+          : kind === 'turn'
+            ? [`Player 1: ${c.chefs[0].name}!`, 'You cook first!']
+            : ['Pass the iPad to Player 2!', `${c.chefs[1].name}, it's your turn!`];
+      turnCard = { kind, lines, age: 0 };
+      cookoffPage = 'card';
+      screen = 'cookoff';
+      sound.chime([NOTE.C5, NOTE.E5, NOTE.G5], 0.1, 0.12);
+      sound.say(lines.join(' '));
+    };
+
+    /** Beat your best: one of the dishes she has cooked, on the spinner, then Chef Bunny's challenge. */
+    const startBest = () => {
+      const stickers = stickersFor(carnivalKitchen.id);
+      const reel = bestDishes(stickers, bookDishes(), playableDishes(stickers));
+      const dish = reel.length > 1 ? pickDish(Math.random, lastDish, reel) : reel[0];
+      cookoff = createCookoff('best', dish, newSeed(), [YOU], bestOf(stickers, dish.id));
+      plates = [];
+      cookTurn(cookoff, true, reel);
+    };
+
+    /** Two chefs: a dish on the spinner, then Player 1's turn. */
+    const startDuo = () => {
+      const reel = playableDishes(stickersFor(carnivalKitchen.id));
+      const dish = pickDish(Math.random, lastDish, reel);
+      cookoff = createCookoff(
+        'duo',
+        dish,
+        newSeed(),
+        taken.map((i) => CHEFS[i]),
+      );
+      plates = [];
+      cookTurn(cookoff, true, reel);
+    };
+
+    /** A cook-off round is decorated: the next chef's turn, or the judges. */
+    const finishCookoffRound = (c: Cookoff) => {
+      saveScore();
+      plates.push({ state, decor });
+      const score = Math.round(totalScore(state));
+      if (finishTurn(c, { score, max: maxScore(state) }) === 'pass') {
+        cookTurn(c, false);
+        showTurnCard(c, 'pass');
+        return;
+      }
+      // The coins, once, as the judges come out.
+      const coins =
+        claimCookoffCoins(c, (n) => earnCoins(carnivalKitchen.id, n)) ?? cookoffCoins(verdictOf(c));
+      const roll = seededRandom(c.seed + 31);
+      renderer.startJudging({
+        cookoff: c,
+        plates,
+        cards: cookoffCards(c),
+        verdict: verdictOf(c),
+        coins,
+        picks: c.results.map(() => JUDGES.map(() => Math.floor(roll() * 6))),
+      });
+      cookoffPage = 'judging';
+      screen = 'cookoff';
+    };
+
+    /** Back to the title screen, the cook-off over. */
+    const endCookoff = () => {
+      cookoff = null;
+      plates = [];
+      turnCard = null;
+      screen = 'title';
+      refresh();
+    };
+
+    /** Whether a canvas point is on a page's ✕. */
+    const onClose = (close: { x: number; y: number; r: number }, x: number, y: number) =>
+      Math.hypot(x - close.x, y - close.y) <= close.r + 8;
+
+    /** A tap on a cook-off page. */
+    const tapCookoff = (x: number, y: number) => {
+      if (cookoffPage === 'menu') {
+        const p = menuPlaces(layout);
+        if (inBox(p.best, x, y)) {
+          sound.pop();
+          startBest();
+        } else if (inBox(p.duo, x, y)) {
+          sound.pop();
+          taken = [];
+          cookoffPage = 'chefs';
+          sound.say('Player 1, pick your chef!');
+        } else if (onClose(p.close, x, y)) {
+          sound.whoosh();
+          endCookoff();
+        }
+      } else if (cookoffPage === 'chefs') {
+        const p = chefPlaces(layout);
+        const i = cellAt(p.cells, x, y);
+        if (i >= 0 && i < CHEFS.length && !taken.includes(i)) {
+          sound.bloop();
+          taken.push(i);
+          if (taken.length === 2) startDuo();
+          else sound.say(`${CHEFS[i].name}! Player 2, pick your chef!`);
+        } else if (onClose(p.close, x, y)) {
+          sound.whoosh();
+          endCookoff();
+        }
+      } else if (cookoffPage === 'card') {
+        // Once it has been up a moment, a tap anywhere goes on to cook.
+        if (turnCard && turnCard.age >= TURN_CARD_WAIT) {
+          sound.pop();
+          turnCard = null;
+          screen = 'kitchen';
+        }
+      } else if (renderer.judgingReady()) {
+        sound.pop();
+        endCookoff();
+      }
+    };
+
+    /** What the cook-off page shows. */
+    const cookoffScreen = (): CookoffScreen => {
+      if (cookoffPage === 'chefs') return { page: 'chefs', picking: taken.length, taken };
+      if (cookoffPage === 'card' && turnCard && cookoff) {
+        return {
+          page: 'card',
+          ...turnCard,
+          cookoff,
+          ready: turnCard.age >= TURN_CARD_WAIT,
+        };
+      }
+      if (cookoffPage === 'judging') return { page: 'judging' };
+      return { page: 'menu' };
     };
 
     /**
@@ -712,6 +913,10 @@ export const carnivalKitchen: CarnivalGame = {
         if (tapped.event?.kind === 'close') screen = 'title';
         return;
       }
+      if (screen === 'cookoff') {
+        tapCookoff(at.x, at.y);
+        return;
+      }
       if (screen === 'grownups') {
         const tap = grownupTap(grownupPlaces(layout), at.x, at.y);
         if (tap === 'close') {
@@ -772,6 +977,13 @@ export const carnivalKitchen: CarnivalGame = {
         sound.pop();
         bookStickers = stickersFor(carnivalKitchen.id);
         screen = 'book';
+        return;
+      }
+      if (screen === 'title' && inBox(titlePlaces(layout).cookoff, at.x, at.y, 8)) {
+        sound.pop();
+        cookoffPage = 'menu';
+        screen = 'cookoff';
+        sound.say('Cook-off! Beat your best, or two chefs?');
         return;
       }
       if (screen === 'title' && inBox(titlePlaces(layout).shop, at.x, at.y, 8)) {
@@ -884,13 +1096,18 @@ export const carnivalKitchen: CarnivalGame = {
         renderer.drawShop(dt, shop, { coins, stickers, rank, outfit });
       } else if (screen === 'ceremony') {
         renderer.drawCeremony(dt);
+      } else if (screen === 'cookoff') {
+        if (turnCard) turnCard.age += dt;
+        renderer.drawCookoff(dt, cookoffScreen());
       } else if (spinning) {
         // The round doesn't tick while the spinner runs.
         renderer.drawSpin(dt);
         if (renderer.spinDone()) {
           spinning = false;
-          // The customer walks up to the counter and asks for the dish.
-          showStage('arrive');
+          // The customer walks up to the counter and asks for the dish (or
+          // in a cook-off, Chef Bunny's challenge, or Player 1's turn).
+          if (cookoff) showTurnCard(cookoff, cookoff.mode === 'best' ? 'challenge' : 'turn');
+          else showStage('arrive');
         }
       } else if (staging) {
         renderer.drawStage(dt);
@@ -913,7 +1130,10 @@ export const carnivalKitchen: CarnivalGame = {
           saveScore();
           if (decorating()) decorTick(decor, dt);
         }
-        renderer.draw(state, pointer, dt, roundEnd());
+        // A cook-off round has no customer or end card: once decorated, on to
+        // the next chef, or the judges.
+        if (cookoff && state.phase === 'over' && decor.done) finishCookoffRound(cookoff);
+        else renderer.draw(state, pointer, dt, roundEnd());
       }
       frame = requestAnimationFrame(loop);
     };

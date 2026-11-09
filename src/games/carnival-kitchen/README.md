@@ -36,7 +36,8 @@ gear in the bottom corner, "Hold for grown-ups", opens the grown-ups'
 settings when it's held for 1.5 seconds (see "Learning" below). The title
 screen also has **🛍️ Shop**, with her coins on it (see "The shop"), and her
 chef rank's badge (see "Chef ranks and kitchens"): tap the badge and Chef
-Bunny says her rank and what comes next.
+Bunny says her rank and what comes next. **🏆 Cook-off** starts a challenge:
+beat your best, or two chefs on one device (see "The cook-off").
 
 A round goes like this:
 
@@ -250,6 +251,78 @@ cap).
   top left of the page beside the title, or along the bottom on a phone held
   upright, clear of the dishes and the wrapped surprise. Tapping a trophy
   has Chef Bunny say whose it is.
+
+## The cook-off
+
+The title screen's **🏆 Cook-off** button (under **🛍️ Shop**; on a phone held
+upright, beside Chef Bunny) opens a page with two choices and a ✕. It's in
+`cookoff.ts` (the rules, timings and places, as plain functions tested in
+`cookoff.test.ts`) and `cookoff-draw.ts` (the drawing, judges included).
+
+- **Beat your best.** The dish spinner picks one of the dishes she has a
+  sticker for (any dish, if she hasn't cooked one yet), then Chef Bunny holds
+  up a card: "Your best Pizza is 380 points. Can you beat it?" (or "Let's set
+  your first Pizza record!"). A tap after a moment starts cooking. Her best
+  score on each dish is the sticker `best:<dish>`, its level the score (the
+  sticker book keeps the best level), earned at the end of every round she
+  cooks: normal rounds, boss rounds and beat-your-best rounds. Best stickers
+  don't count as chef points.
+- **Two chefs.** Two players on one device each pick an animal chef ("Player
+  1: pick your chef!"): Chef Fox, Bear, Kitten, Penguin, Frog or Pig, one
+  each. The spinner picks a dish, a card says "Player 1: Chef Fox! You cook
+  first!", and Player 1 cooks and decorates the whole dish. Then a big card,
+  "Pass the iPad to Player 2!", waits for a tap, and Player 2 cooks the same
+  dish. Both rounds are the very same round, from one seed: the same steps,
+  dotted lines, stars and floating toppings, the same start time on the
+  kitchen clock, and the same learning moment (`cookoffPlan` and
+  `roundRandom`). Learning stays as the grown-ups set it, for both chefs:
+  it's the same question for each, and learning moments never cost points,
+  so it stays fair. Two chefs' rounds record their scores but earn no
+  stickers, best scores or Smart Chef stars, since the sticker book is hers.
+
+A cook-off round has no customer: no stand, no serving and no end card.
+Once the dish is decorated, it's the next chef's turn, or the judges.
+
+**The judges** sit behind a long table: Duchess Purrington (a fancy white cat
+with a monocle and pearls), Hugo the Hippo (with a napkin bib) and Lulu the
+Lobster. A drumroll, then each chef's decorated dish slides onto the table
+("Chef Fox's Pizza"), and each judge in turn tastes it: a fork carries a bite
+over, they munch, and say something in a bubble and out loud ("Magnifique!",
+"Mmm, crunchy!", "More cheese please!"). Then they hold up a score card that
+flips round to its number, read out. When all three are up, the chef's total
+goes on their pill at the top. Then the verdict, with confetti:
+
+- **Beat your best** compares her points with her best. More is "🏆 New
+  record!" with a golden trophy, and the sticker already holds the new best;
+  otherwise a kind "💖 So close! Only 20 points to go!" (or "Just as good!"
+  for the same score).
+- **Two chefs** compare the judges' totals: "🏆 Chef Fox wins!", with a crown,
+  or "🎉 Both win!" for a tie.
+
+Then **All done!** (or a tap anywhere) goes back to the title screen.
+
+**Score cards** (`judgeCards`) go from 5 to 10, never lower: 5 plus 5 times
+the round's share of its most (`score / max`, as for the stars), then each
+judge leans their own way (the Duchess -0.4, Hugo +0.6, Lulu 0) and their
+taste wobbles it up to 1½ either way (`TASTE_WOBBLE`), rolled from the cook-off's seed, so the
+same cook-off always gets the same cards. Better cooking always means cards
+at least as good.
+
+**A head start for a young chef.** When a grown-up cooks against a child,
+the judges are generous: the cards squeeze the whole range of cooking into 5
+to 10, the taste wobble can swing a close cook-off either way, and card
+totals within 1 point (`TIE_MARGIN`) are a tie, so both win. A grown-up who
+cooks a little better doesn't always win: with 300 points against 340, the
+child wins about one cook-off in ten and both win about one in three (a test
+checks it). Nothing about the cooking itself changes for anyone.
+
+**Coins** (`cookoffCoins`), once per cook-off as the judges come out
+(`claimCookoffCoins`, with `earnCoins`): 25 for a new record, or for two chefs
+(there's always a winner, or two), and 10 for trying. The stand's coins
+aren't earned, as there's no customer.
+
+On a phone the Cook-off button, the two choices, the chefs, the ✕ and **All
+done!** are all at least 60 CSS pixels.
 
 ## The shop
 
@@ -1320,6 +1393,10 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
 - `stand.ts`: drawing the guests, the coin jar, coins and the trophy, and
   where the stand goes in each layout (`guestSpot`, `walletSpot`,
   `stageSpot`) and its timings. `stand.test.ts` tests it.
+- `cookoff.ts`: the cook-off's rules (best scores, sharing one round, the
+  judges' cards, the verdict, coins), the judging's timing, and where its
+  pages go. `cookoff-draw.ts`: drawing its pages, the judges and their score
+  cards. `cookoff.test.ts` tests both.
 - `grownups.ts`: the grown-ups' settings: the gear, the page's layout and
   hit testing, and loading and saving them. `grownups.test.ts` tests it.
 - `activities/`: one file per learning activity, and `index.ts`, which finds

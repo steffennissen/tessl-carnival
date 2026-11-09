@@ -6,7 +6,16 @@ import { gearFor } from './grownups';
 import { layoutFor } from './layout';
 import { leavePlaces, placesFor } from './render';
 import { carnivalKitchen } from './game';
-import { RANKS, chefPoints, loadCelebrated, openDishes, rankFor, saveCelebrated } from './ranks';
+import { chefPlaces, judgingTimes, menuPlaces, bestSticker } from './cookoff';
+import {
+  RANKS,
+  bookDishes,
+  chefPoints,
+  loadCelebrated,
+  openDishes,
+  rankFor,
+  saveCelebrated,
+} from './ranks';
 import { shopPlaces, titlePlaces } from './shop';
 import { itemsOn } from './wardrobe';
 
@@ -158,6 +167,24 @@ function phone() {
   };
 }
 
+/** Cooks the round on screen without knowing its steps, until `done` says it's over. */
+function cookUntil(p: ReturnType<typeof phone>, done: () => boolean) {
+  const [cx, cy] = p.scene(CIRCLE.x, CIRCLE.y);
+  for (let go = 0; go < 400 && !done(); go++) {
+    p.down(...p.scene(480, 275));
+    for (let i = 0; i <= 36; i++) {
+      const a = (i / 36) * Math.PI * 2;
+      p.move(cx + Math.cos(a) * 80, cy + Math.sin(a) * 80);
+    }
+    p.run(0.05 * (1 + (go % 20)));
+    p.up(...p.scene(480, 275));
+    p.run(0.1);
+  }
+}
+
+const middleOf = (b: { x: number; y: number; w: number; h: number }) =>
+  [b.x + b.w / 2, b.y + b.h / 2] as const;
+
 beforeEach(() => {
   vi.mocked(carnival.recordScore).mockClear();
   vi.mocked(carnival.earnCoins).mockClear();
@@ -212,6 +239,12 @@ describe('start', () => {
       p.run(0.1);
     }
     expect(record).toHaveBeenCalledTimes(1);
+    // Her best score on the dish is kept, for a cook-off's beat your best.
+    const [, score] = record.mock.calls[0];
+    const bests = Object.entries(carnival.stickersFor('carnival-kitchen')).filter(([id]) =>
+      id.startsWith('best:'),
+    );
+    expect(bests.some(([, best]) => best >= Math.round(score))).toBe(true);
     const earn = vi.mocked(carnival.earnCoins);
     expect(earn).toHaveBeenCalledTimes(1);
     const [, coins] = earn.mock.calls[0];
@@ -415,5 +448,110 @@ describe('start', () => {
     expect(again.texts).toContain('🛍️ Shop');
     expect(again.texts.some((text) => text.includes(jar))).toBe(true);
     stop2();
+  });
+
+  it('plays a two chefs cook-off: picking chefs, passing the iPad, and the judges', () => {
+    const id = 'carnival-kitchen';
+    const stickers = carnival.stickersFor(id);
+    const p = phone();
+    const stop = carnivalKitchen.start(p.canvas as unknown as HTMLCanvasElement);
+    p.run(0.2);
+    p.tap(...middleOf(titlePlaces(p.layout).cookoff));
+    p.texts.length = 0;
+    p.run(0.2);
+    expect(p.texts).toContain('🏆 Cook-off! 🏆');
+    p.tap(...middleOf(menuPlaces(p.layout).duo));
+    p.texts.length = 0;
+    p.run(0.2);
+    expect(p.texts).toContain('Player 1: pick your chef!');
+    const cells = chefPlaces(p.layout).cells;
+    p.tap(...middleOf(cells[0]));
+    p.texts.length = 0;
+    p.run(0.2);
+    expect(p.texts).toContain('Player 2: pick your chef!');
+    // Player 1's chef is taken; another one starts the cook-off.
+    p.tap(...middleOf(cells[0]));
+    p.run(0.2);
+    expect(p.texts).toContain('Player 2: pick your chef!');
+    p.tap(...middleOf(cells[1]));
+    // The spinner, then Player 1's card, which waits for a tap.
+    p.texts.length = 0;
+    p.run(7);
+    expect(p.texts).toContain('Player 1: Chef Fox!');
+    expect(p.texts.some((text) => text.startsWith("Hi! I'm"))).toBe(false);
+    p.tap(p.layout.width / 2, p.layout.height / 2);
+    const record = vi.mocked(carnival.recordScore);
+    const earn = vi.mocked(carnival.earnCoins);
+    cookUntil(p, () => record.mock.calls.length === 1);
+    expect(record).toHaveBeenCalledTimes(1);
+    // Decorating times out; then the pass card, with no customer or coins yet.
+    p.texts.length = 0;
+    p.run(25);
+    expect(p.texts).toContain('Pass the iPad to Player 2!');
+    expect(earn).not.toHaveBeenCalled();
+    p.run(1);
+    p.tap(p.layout.width / 2, p.layout.height / 2);
+    cookUntil(p, () => record.mock.calls.length === 2);
+    expect(record).toHaveBeenCalledTimes(2);
+    // Decorating times out again, then the judges.
+    p.run(21);
+    expect(earn).toHaveBeenCalledTimes(1);
+    p.texts.length = 0;
+    p.run(judgingTimes(2).ready);
+    // The judges: a drumroll, each chef's dish, their cards, the verdict.
+    expect(p.texts).toContain('🥁 The judges! 🥁');
+    expect(
+      p.texts.some((text) => text.startsWith('Chef Fox')) && p.texts.includes('Chef Bear'),
+    ).toBe(true);
+    expect(p.texts.some((text) => / wins! 🏆$/.test(text) || text === '🎉 Both win! 🎉')).toBe(
+      true,
+    );
+    expect(p.texts).toContain('All done! 🎉');
+    // 25 coins, once; and two chefs' rounds earn her no stickers.
+    expect(earn).toHaveBeenCalledTimes(1);
+    expect(earn.mock.calls[0][1]).toBe(25);
+    expect(carnival.stickersFor(id)).toEqual(stickers);
+    p.tap(p.layout.width / 2, p.layout.height / 2);
+    p.texts.length = 0;
+    p.run(0.3);
+    expect(p.texts).toContain('Tap to cook!');
+    expect(earn).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  it('plays a beat your best: the challenge, the judges, and a kind "So close!"', () => {
+    const id = 'carnival-kitchen';
+    // A best no round can reach, on every dish she could get.
+    for (const dish of bookDishes()) carnival.earnSticker(id, bestSticker(dish.id), 5000);
+    const p = phone();
+    const stop = carnivalKitchen.start(p.canvas as unknown as HTMLCanvasElement);
+    p.run(0.2);
+    p.tap(...middleOf(titlePlaces(p.layout).cookoff));
+    p.run(0.2);
+    p.tap(...middleOf(menuPlaces(p.layout).best));
+    p.texts.length = 0;
+    p.run(7);
+    expect(p.texts.some((text) => /^Your best .+ is 5000 points\.$/.test(text))).toBe(true);
+    expect(p.texts).toContain('Can you beat it?');
+    p.tap(p.layout.width / 2, p.layout.height / 2);
+    const record = vi.mocked(carnival.recordScore);
+    const earn = vi.mocked(carnival.earnCoins);
+    cookUntil(p, () => record.mock.calls.length === 1);
+    p.texts.length = 0;
+    p.run(25 + judgingTimes(1).ready);
+    expect(p.texts).toContain('🥁 The judges! 🥁');
+    expect(p.texts).toContain('💖 So close! 💖');
+    expect(p.texts.some((text) => /^Only \d+ points to go!$/.test(text))).toBe(true);
+    expect(earn).toHaveBeenCalledTimes(1);
+    expect(earn.mock.calls[0][1]).toBe(10);
+    // Her best stays; the dish keeps its sticker.
+    for (const dish of bookDishes()) {
+      expect(carnival.stickersFor(id)[bestSticker(dish.id)]).toBe(5000);
+    }
+    p.tap(p.layout.width / 2, p.layout.height / 2);
+    p.texts.length = 0;
+    p.run(0.3);
+    expect(p.texts).toContain('Tap to cook!');
+    stop();
   });
 });

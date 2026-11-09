@@ -245,8 +245,8 @@ describe('the shop page', () => {
       }
       for (const r of [p.yes.r, p.no.r, p.close.r])
         expect(r * 2 * scale).toBeGreaterThanOrEqual(60);
-      const { shop, rank } = titlePlaces(layout);
-      for (const b of [shop, rank]) {
+      const { shop, rank, cookoff } = titlePlaces(layout);
+      for (const b of [shop, rank, cookoff]) {
         expect(b.w * scale).toBeGreaterThanOrEqual(60);
         expect(b.h * scale).toBeGreaterThanOrEqual(60);
       }
@@ -257,8 +257,8 @@ describe('the shop page', () => {
 
 describe('the title screen', () => {
   for (const [name, layout] of Object.entries(LAYOUTS)) {
-    it(`puts the shop button and rank badge clear of the other buttons, ${name}`, () => {
-      const { shop, rank } = titlePlaces(layout);
+    it(`puts the shop, cook-off and rank badge clear of the other buttons, ${name}`, () => {
+      const { shop, rank, cookoff } = titlePlaces(layout);
       const places = placesFor(layout);
       const round = (c: { x: number; y: number }, r: number): Box => ({
         x: c.x - r,
@@ -273,13 +273,23 @@ describe('the title screen', () => {
         round(gear, gear.r + 12),
       ];
       if (places.home) others.push(round(places.home, places.buttonR));
-      for (const b of [shop, rank]) {
+      for (const b of [shop, rank, cookoff]) {
         expect(b.x).toBeGreaterThanOrEqual(0);
         expect(b.y).toBeGreaterThanOrEqual(0);
         expect(b.x + b.w).toBeLessThanOrEqual(layout.width);
+        expect(b.y + b.h).toBeLessThanOrEqual(layout.height);
         for (const o of others) expect(overlaps(b, o)).toBe(false);
       }
       expect(overlaps(shop, rank)).toBe(false);
+      expect(overlaps(cookoff, shop)).toBe(false);
+      expect(overlaps(cookoff, rank)).toBe(false);
+      // The cook-off is clear of the big start button, the covered dish and
+      // Chef Bunny (about 90 either side of her, 135 above and below).
+      const cx = layout.sceneX + (layout.shape === 'tall' ? 400 : 440);
+      const start: Box = { x: cx - 158, y: layout.sceneY + 355, w: 316, h: 74 };
+      const dish: Box = { x: cx - 142, y: layout.sceneY + 250, w: 284, h: 92 };
+      const bunny: Box = { x: places.bunny.x - 90, y: places.bunny.y - 135, w: 180, h: 270 };
+      for (const o of [start, dish, bunny]) expect(overlaps(cookoff, o)).toBe(false);
       // The title's words and the covered dish sit below the badges on the scene.
       const title: Box = {
         x: layout.sceneX + (layout.shape === 'tall' ? 400 : 440) - 150,
@@ -287,7 +297,7 @@ describe('the title screen', () => {
         w: 300,
         h: 100,
       };
-      for (const b of [shop, rank]) expect(overlaps(b, title)).toBe(false);
+      for (const b of [shop, rank, cookoff]) expect(overlaps(b, title)).toBe(false);
     });
   }
 });
