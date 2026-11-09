@@ -16,7 +16,15 @@ import {
   trayAt,
   type DecorState,
 } from './decorate';
-import { fakeCanvas } from './test-kit';
+import { cssScale, fakeCanvas, keepClear, overlaps } from './test-kit';
+
+/** Done!'s box. */
+const boxOfDone = (p: ReturnType<typeof decorPlaces>) => ({
+  x: p.done.x - p.done.w / 2,
+  y: p.done.y - p.done.h / 2,
+  w: p.done.w,
+  h: p.done.h,
+});
 
 const places = decorPlaces('page');
 
@@ -127,11 +135,21 @@ describe('decorating the dish', () => {
       const p = decorPlaces(shape);
       // A phone held upright only shows about x 100 to 700.
       const [left, right] = shape === 'tall' ? [100, 700] : [0, 800];
-      for (const spot of [...p.tray, p.done]) {
+      for (const spot of p.tray) {
         expect(spot.x, shape).toBeGreaterThanOrEqual(left + p.trayRadius);
         expect(spot.x, shape).toBeLessThanOrEqual(right - p.trayRadius);
         expect(spot.y, shape).toBeGreaterThanOrEqual(p.trayTop);
       }
+      // Done! sits in the tray's row, or (held sideways) at the top right, clear of the dish.
+      expect(p.done.x - p.done.w / 2, shape).toBeGreaterThanOrEqual(left);
+      expect(p.done.x + p.done.w / 2, shape).toBeLessThanOrEqual(right);
+      const dish = {
+        x: p.dish.x - DISH_REACH.x * p.dish.scale,
+        y: p.dish.y - DISH_REACH.y * p.dish.scale,
+        w: 2 * DISH_REACH.x * p.dish.scale,
+        h: 2 * DISH_REACH.y * p.dish.scale,
+      };
+      expect(overlaps(boxOfDone(p), dish), shape).toBe(false);
       p.tray.forEach((spot, i) => {
         expect(trayAt(p, spot.x, spot.y), shape).toBe(DECORATIONS[i]);
         expect(hitDone(p, spot.x, spot.y), shape).toBe(false);
@@ -139,6 +157,33 @@ describe('decorating the dish', () => {
       expect(trayAt(p, p.done.x, p.done.y), shape).toBeNull();
       // The whole dish sits above the tray.
       expect(p.dish.y + DISH_REACH.y * p.dish.scale, shape).toBeLessThan(p.trayTop);
+    }
+  });
+
+  it('makes the treats and Done! big enough for a finger on a phone, clear of Chef Bunny', () => {
+    for (const shape of ['wide', 'tall'] as const) {
+      const p = decorPlaces(shape);
+      const scale = cssScale(shape);
+      expect(p.trayRadius * 2 * scale, shape).toBeGreaterThanOrEqual(60);
+      expect(p.done.w * scale, shape).toBeGreaterThanOrEqual(60);
+      expect(p.done.h * scale, shape).toBeGreaterThanOrEqual(60);
+      p.tray.slice(1).forEach((spot, i) => {
+        expect(spot.x - p.tray[i].x, shape).toBeGreaterThanOrEqual(p.trayRadius * 2);
+      });
+      // Chef Bunny and the edges of the screen (the HUD isn't drawn while decorating).
+      const clear = keepClear(shape).filter((_, i) =>
+        shape === 'tall' ? i !== 2 && i < 4 : i === 0 || i === 4,
+      );
+      const boxes = [
+        ...p.tray.map((spot) => ({
+          x: spot.x - p.trayRadius,
+          y: spot.y - p.trayRadius,
+          w: p.trayRadius * 2,
+          h: p.trayRadius * 2,
+        })),
+        boxOfDone(p),
+      ];
+      for (const box of boxes) for (const c of clear) expect(overlaps(box, c), shape).toBe(false);
     }
   });
 

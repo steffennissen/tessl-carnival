@@ -96,7 +96,11 @@ import { hintOf, iconOf, stepOf, titleOf } from './steps';
 /** The big start button on the title screen. */
 const START_BUTTON = { x: W / 2 + 40, y: 392, w: 300, h: 70 };
 
+/** The sound and home buttons' radius on a computer; on a phone they're bigger (`buttonR`). */
 const BUTTON_RADIUS = 24;
+
+/** How much bigger the kitchen clock gets while its hands sweep on. */
+const CLOCK_GROW = 1.08;
 
 /** Seconds something Chef Bunny said stays in her bubble. */
 const SAID_TIME = 2;
@@ -126,20 +130,26 @@ export function placesFor(layout: Layout) {
     const bunnyY = Math.min(height - 150, sy + 635);
     // The dish being made: big on the wall between the score and the recipe
     // when there's room, or small between the buttons and the score.
-    const room = sy - 24 - 84;
+    // (Below the buttons, which are big for a finger.)
+    const below = 112;
+    const room = sy - 24 - below;
     const badge: Box =
-      room >= 70
+      room >= 60
         ? {
             x: width / 2 - Math.min(210, width / 2 - 50),
-            y: 84 + (room - Math.min(room, 200)) / 2,
+            y: below + (room - Math.min(room, 200)) / 2,
             w: Math.min(420, width - 100),
             h: Math.min(room, 200),
           }
-        : { x: 134, y: 26, w: width - 134 - 180, h: 48 };
+        : { x: 254, y: 26, w: width - 254 - 180, h: 48 };
+    // Big enough for a finger (60 CSS pixels on a phone), and well apart, so
+    // a tap meant for the sound doesn't land on home.
+    const buttonR = height >= 1000 ? 48 : 36;
     return {
       badge,
-      home: { x: 40, y: 50 } as Spot | null,
-      sound: { x: 100, y: 50 },
+      buttonR,
+      home: { x: 58, y: 54 } as Spot | null,
+      sound: { x: 196, y: 54 },
       score: { x: width - 168, y: 28 },
       combo: { x: width / 2, y: sy + 75 },
       recipe: { x: width / 2, y: sy + 13 },
@@ -166,18 +176,55 @@ export function placesFor(layout: Layout) {
     side >= 110
       ? { x: sx + W + sx / 2, y: sy + 200, r: Math.min(72, sx / 2 - 16) }
       : { x: sx + 742, y: sy + 196, r: 42 };
+  // On a phone held sideways the buttons are 60 CSS pixels: home in the top
+  // left corner, and the sound in the top right one when there's room
+  // beside or above the scene, else beside home.
+  const wide = layout.shape === 'wide';
+  const buttonR = wide ? 40 : BUTTON_RADIUS;
+  const roomRight = sx >= 100 || sy >= 100;
   return {
     clock,
     shelf: side >= 110,
     badge,
-    home: layout.shape === 'wide' ? { x: sx + 40, y: sy + 80 } : null,
-    sound: { x: sx + (layout.shape === 'wide' ? 100 : 40), y: sy + 80 },
+    buttonR,
+    home: wide ? ({ x: 44, y: 46 } as Spot) : null,
+    sound: wide
+      ? roomRight
+        ? { x: width - 50, y: 50 }
+        : { x: sx + 125 - buttonR, y: 46 }
+      : { x: sx + 40, y: sy + 80 },
     score: { x: sx + W - 168, y: sy + 58 },
     combo: { x: sx + W - 93, y: sy + 126 },
     recipe: { x: sx + W / 2, y: sy + 80 },
     bunny: { x: sx + 86, y: sy + 392 },
     speech: { x: sx + 12, y: sy + 230, w: 188, tail: 'down' } as Bubble,
   };
+}
+
+/**
+ * The little "Leave the kitchen?" card a tap on 🏠 opens, in canvas units:
+ * ✓ leaves, ✕ (or a tap anywhere else) stays. So a stray tap on 🏠 never
+ * ends a round by itself. Its buttons are at least 60 CSS pixels on a phone.
+ */
+export function leavePlaces(layout: Layout) {
+  const tall = layout.shape === 'tall';
+  const w = Math.min(layout.width - 40, tall ? 520 : 480);
+  const h = tall ? 300 : 250;
+  const cx = layout.width / 2;
+  const cy = tall ? layout.height * 0.4 : layout.height / 2;
+  const r = tall ? 58 : 48;
+  const box: Box = { x: cx - w / 2, y: cy - h / 2, w, h };
+  return {
+    box,
+    title: { x: cx, y: box.y + (tall ? 58 : 48) },
+    yes: { x: cx - w * 0.22, y: box.y + h - r - 34, r },
+    no: { x: cx + w * 0.22, y: box.y + h - r - 34, r },
+  };
+}
+
+/** How near the sound or home button a tap counts as on it. */
+function hitRadius(places: ReturnType<typeof placesFor>): number {
+  return places.buttonR + (places.buttonR > BUTTON_RADIUS ? 4 : 8);
 }
 
 /**
@@ -203,8 +250,11 @@ export function recipeVeiled(state: KitchenState): boolean {
 function tallClock(width: number, height: number, bunnyY: number) {
   const room = height - bunnyY;
   const r = Math.max(48, Math.min(140, room / 2 - 28));
-  const x = room >= 260 ? width / 2 + 60 : width - 92;
-  return { x, y: bunnyY + Math.max(72, room / 2 + 10), r };
+  // Room for the rim, and for the clock growing a little while its hands move.
+  const reach = r * CLOCK_GROW + 8;
+  const x = room >= 260 ? width / 2 + 60 : width - reach;
+  const y = Math.min(height - reach, bunnyY + Math.max(72, room / 2 + 10));
+  return { x, y, r };
 }
 
 /** What the end of a round shows besides the round: decorating, and sticker news. */
@@ -529,7 +579,8 @@ function drawBadge(g: G, dish: Dish, box: Box, t: number, wiggle: number) {
   g.clip();
   const tall = h >= 100;
   // A tall card's name goes on as many lines as it needs, up to three.
-  const name = tall ? wrapName(g, dish.name, w - 16, Math.min(24, w / 8)) : null;
+  // At least 18 units, so it's readable on a phone held sideways (about 14 CSS pixels).
+  const name = tall ? wrapName(g, dish.name, w - 12, badgeNameSize(w), 4) : null;
   const nameHeight = name ? name.lines.length * name.size * 1.15 + 12 : 0;
   // The picture's space, and the name's.
   const art = tall
@@ -543,7 +594,7 @@ function drawBadge(g: G, dish: Dish, box: Box, t: number, wiggle: number) {
   if (name) {
     name.lines.forEach((line, i) => {
       const y = h - nameHeight + 6 + (i + 0.5) * name.size * 1.15;
-      stickerText(g, line, w / 2, y, name.size, C.hotPink, 'center', w - 14);
+      stickerText(g, line, w / 2, y, name.size, C.hotPink, 'center', w - 10);
     });
   } else {
     // A short card's name goes beside the picture, on two lines if it's tall enough.
@@ -558,11 +609,16 @@ function drawBadge(g: G, dish: Dish, box: Box, t: number, wiggle: number) {
   g.restore();
 }
 
+/** The biggest size a tall badge's name may be, for a badge `w` wide. */
+export function badgeNameSize(w: number): number {
+  return Math.min(24, Math.max(18, w / 8));
+}
+
 /**
  * Splits a name into lines no wider than `width`, at the biggest size up to
  * `size` that needs `most` lines at most.
  */
-function wrapName(g: G, text: string, width: number, size: number, most = 3) {
+export function wrapName(g: G, text: string, width: number, size: number, most = 3) {
   const words = text.split(' ');
   let lines: string[] = [text];
   for (let s = size; s >= 10; s -= 1) {
@@ -583,7 +639,25 @@ function wrapName(g: G, text: string, width: number, size: number, most = 3) {
 // ---------------------------------------------------------------------------
 // The renderer
 
-export function createRenderer(ctx: G, sound: Sound) {
+export function createRenderer(ctx: G, voice: Sound) {
+  // Everything said out loud (by the renderer or a step) is counted, so
+  // Chef Bunny's chatter can wait for the end of the frame and stay quiet
+  // when an instruction was said in the meantime, instead of starting and
+  // being cut off at once.
+  let spoken = 0;
+  const sound: Sound = new Proxy(voice, {
+    get(target, prop) {
+      if (prop === 'say' || prop === 'read') {
+        return (text: string) => {
+          spoken += 1;
+          return prop === 'say' ? target.say(text) : target.read(text);
+        };
+      }
+      return Reflect.get(target, prop) as unknown;
+    },
+  });
+  /** Chatter waiting for the end of the frame, and how much had been said when it was asked for. */
+  let waiting: { line: string; spoken: number; show: boolean } | null = null;
   let kitchen: HTMLCanvasElement | null = null;
   let layout = layoutFor(0, 0, false);
   let places = placesFor(layout);
@@ -672,7 +746,18 @@ export function createRenderer(ctx: G, sound: Sound) {
       );
       sound.chime([NOTE.G6, NOTE.C7, NOTE.G6, NOTE.C7], 0.09, 0.08);
     }
-    if (line && sound.chatter(line)) fx.said = { text: line, age: 0 };
+    // Only a cheer goes in her bubble: after "Not yet!" or while holding,
+    // the bubble keeps the step's instruction.
+    if (event.kind === 'not yet') fx.said = null;
+    if (line) waiting = { line, spoken, show: event.kind === 'hit' };
+  }
+
+  /** Says the frame's chatter, unless something else was said since it was asked for. */
+  function flushChatter() {
+    const w = waiting;
+    waiting = null;
+    if (!w || w.spoken !== spoken) return;
+    if (sound.chatter(w.line) && w.show) fx.said = { text: w.line, age: 0 };
   }
 
   const fresh = () => ({
@@ -743,6 +828,47 @@ export function createRenderer(ctx: G, sound: Sound) {
 
   /** Seconds since the dish badge was tapped. */
   let badgeAge = 9;
+
+  /** Seconds the "Leave the kitchen?" card has been up, or -1 when it isn't. */
+  let leaveAge = -1;
+
+  /** The "Leave the kitchen?" card, over everything. */
+  function drawLeave(dt: number) {
+    if (leaveAge < 0) return;
+    leaveAge += dt;
+    const g = ctx;
+    const p = leavePlaces(layout);
+    const pop = easeOutBack(clamp01(leaveAge / 0.3));
+    dim(0.35);
+    onCanvas(() => {
+      const { box } = p;
+      g.translate(box.x + box.w / 2, box.y + box.h / 2);
+      g.scale(pop, pop);
+      g.translate(-(box.x + box.w / 2), -(box.y + box.h / 2));
+      rounded(g, box.x, box.y, box.w, box.h, 36);
+      fillStroke(g, C.cream, 5, C.hotPink);
+      emoji(g, '🏠', box.x + 46, p.title.y, 34);
+      stickerText(
+        g,
+        'Leave the kitchen?',
+        p.title.x + 20,
+        p.title.y,
+        34,
+        C.hotPink,
+        'center',
+        box.w - 110,
+      );
+      const buttons: [typeof p.yes, string, string][] = [
+        [p.yes, '✓', C.mint],
+        [p.no, '✕', C.pink],
+      ];
+      for (const [b, mark, fill] of buttons) {
+        circle(g, b.x, b.y, b.r);
+        fillStroke(g, fill, 4);
+        plainText(g, mark, b.x, b.y + 2, b.r * 1.1, C.ink);
+      }
+    });
+  }
 
   const burst: Effects['burst'] = (x, y, count, shapes, colors, speed = 220, gravity = 380) => {
     for (let i = 0; i < count; i++) {
@@ -941,11 +1067,12 @@ export function createRenderer(ctx: G, sound: Sound) {
     onCanvas(() => {
       const buttons: [Spot, string][] = [[places.sound, sound.muted ? '🔇' : '🔊']];
       if (places.home) buttons.push([places.home, '🏠']);
+      const r = places.buttonR;
       for (const [spot, icon] of buttons) {
-        circle(g, spot.x, spot.y, BUTTON_RADIUS);
+        circle(g, spot.x, spot.y, r);
         fillStroke(g, C.white, 3.5);
         g.fillStyle = C.ink;
-        emoji(g, icon, spot.x, spot.y + 1, 22);
+        emoji(g, icon, spot.x, spot.y + 1, r * 0.92);
       }
     });
   }
@@ -1228,7 +1355,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     }
     const moving = fx.clock < target;
     const { x, y, r } = places.clock;
-    const grow = moving ? 1.08 : 1;
+    const grow = moving ? CLOCK_GROW : 1;
     onCanvas(() => {
       shadow(ctx, x + 3, y + r * grow + 4, r * 0.7, 5);
       drawClock(ctx, x, y, r * grow, fx.clock ?? target, {
@@ -1429,7 +1556,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       34,
       vertical(g, p.title.y - 20, p.title.y + 20, [C.hotPink, C.purple]),
       'center',
-      panel.w - 60,
+      p.titleW,
     );
 
     // The tray of treats.
@@ -1438,11 +1565,11 @@ export function createRenderer(ctx: G, sound: Sound) {
     const lastSpot = p.tray[p.tray.length - 1];
     rounded(
       g,
-      first.x - r - 12,
-      first.y - r - 10,
-      lastSpot.x - first.x + 2 * r + 24,
-      2 * r + 20,
-      r + 10,
+      first.x - r - 6,
+      first.y - r - 8,
+      lastSpot.x - first.x + 2 * r + 12,
+      2 * r + 16,
+      r + 8,
     );
     fillStroke(g, C.white, 3.5);
     p.tray.forEach((spot, i) => {
@@ -1457,7 +1584,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       circle(g, spot.x, spot.y, r - 2);
       fillStroke(g, chosen ? C.butter : C.lavenderLight, 2.5);
       const bob = Math.sin(t * 2.5 + i) * 2;
-      drawDecoration(g, kind, spot.x, spot.y + bob, 1.35);
+      drawDecoration(g, kind, spot.x, spot.y + bob, 1.35 * (r / 30));
     });
 
     // Done! It nudges a little more once some treats are on.
@@ -1468,7 +1595,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     g.scale(pulse, pulse);
     rounded(g, -done.w / 2, -done.h / 2, done.w, done.h, done.h / 2);
     fillStroke(g, vertical(g, -done.h / 2, done.h / 2, [C.cabinetLight, C.mint]), 4);
-    stickerText(g, 'Done!', 0, 2, 28, C.hotPink, 'center', done.w - 16);
+    stickerText(g, 'Done!', 0, 2, Math.min(36, done.h * 0.45), C.hotPink, 'center', done.w - 16);
     g.restore();
 
     g.restore();
@@ -1537,7 +1664,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       tall ? 44 : 36,
       vertical(g, b.title.y - 22, b.title.y + 22, [C.hotPink, C.purple]),
       'center',
-      b.page.w - 170,
+      b.page.w - 2 * (b.close.r + 50),
     );
     plainText(
       g,
@@ -1551,7 +1678,7 @@ export function createRenderer(ctx: G, sound: Sound) {
     // Close: or tap anywhere that isn't a dish you've cooked.
     circle(g, b.close.x, b.close.y, b.close.r);
     fillStroke(g, C.white, 3.5);
-    plainText(g, '✕', b.close.x, b.close.y + 1, 28, C.ink);
+    plainText(g, '✕', b.close.x, b.close.y + 1, b.close.r * 0.9, C.ink);
 
     DISHES.forEach((dish, i) => {
       const cell: Box = b.cells[i];
@@ -1686,11 +1813,11 @@ export function createRenderer(ctx: G, sound: Sound) {
       p.tall ? 40 : 34,
       vertical(g, p.title.y - 20, p.title.y + 20, [C.purple, C.hotPink]),
       'center',
-      p.page.w - 170,
+      p.page.w - 2 * (p.close.r + 50),
     );
     circle(g, p.close.x, p.close.y, p.close.r);
     fillStroke(g, C.white, 3.5);
-    plainText(g, '✕', p.close.x, p.close.y + 1, 28, C.ink);
+    plainText(g, '✕', p.close.x, p.close.y + 1, p.close.r * 0.9, C.ink);
     for (const { row, label, note, control } of p.rows) {
       plainText(g, row.label, label.x, label.y, p.tall ? 30 : 26, C.ink, 'left');
       g.font = font(16);
@@ -1724,6 +1851,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       fx.particles = keep;
       spin = null;
       announced = null;
+      waiting = null;
     },
 
     /**
@@ -1808,6 +1936,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       }
       drawButtons();
       drawParticles();
+      drawLeave(dt);
     },
 
     /** Whether a canvas point is on the badge of the dish being made. */
@@ -1845,13 +1974,37 @@ export function createRenderer(ctx: G, sound: Sound) {
 
     /** Whether a canvas point is on the sound button. */
     hitSoundButton(x: number, y: number) {
-      return Math.hypot(x - places.sound.x, y - places.sound.y) <= BUTTON_RADIUS + 8;
+      return Math.hypot(x - places.sound.x, y - places.sound.y) <= hitRadius(places);
     },
 
     /** Whether a canvas point is on the home button (when there is one). */
     hitHomeButton(x: number, y: number) {
       const home = places.home;
-      return !!home && Math.hypot(x - home.x, y - home.y) <= BUTTON_RADIUS + 8;
+      return !!home && Math.hypot(x - home.x, y - home.y) <= hitRadius(places);
+    },
+
+    /** Opens the "Leave the kitchen?" card (a tap on 🏠). */
+    askLeave() {
+      leaveAge = 0;
+      sound.pop();
+      sound.say('Do you want to leave the kitchen?');
+    },
+
+    /** Whether the "Leave the kitchen?" card is up. */
+    leaveAsked() {
+      return leaveAge >= 0;
+    },
+
+    /**
+     * A tap while the "Leave the kitchen?" card is up: 'leave' on ✓, else
+     * 'stay' (✕, or anywhere else). Either way the card closes.
+     */
+    leaveTap(x: number, y: number): 'leave' | 'stay' {
+      const { yes } = leavePlaces(layout);
+      leaveAge = -1;
+      if (Math.hypot(x - yes.x, y - yes.y) <= yes.r + 6) return 'leave';
+      sound.whoosh();
+      return 'stay';
     },
 
     /** Whether the end card has been up long enough to leave it. */
@@ -1871,6 +2024,7 @@ export function createRenderer(ctx: G, sound: Sound) {
       onCanvas(() => drawGear(gearHeld));
       drawButtons();
       drawParticles();
+      drawLeave(dt);
     },
 
     /** Draws the grown-ups' settings page. */
@@ -1943,6 +2097,7 @@ export function createRenderer(ctx: G, sound: Sound) {
         drawButtons();
         drawParticles();
         drawHeld(end.decor);
+        drawLeave(dt);
         return;
       }
 
@@ -1965,6 +2120,8 @@ export function createRenderer(ctx: G, sound: Sound) {
         bunny('cheer', fx.overAge);
         drawParticles();
       }
+      drawLeave(dt);
+      flushChatter();
     },
   };
 }

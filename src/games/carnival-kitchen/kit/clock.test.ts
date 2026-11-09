@@ -72,9 +72,14 @@ describe('kitchen clock', () => {
       expect(one % 30).toBe(0);
       const two = startTime(2, seeded(seed));
       expect(two % 5).toBe(0);
+      expect(two).toBeGreaterThanOrEqual(14 * 60);
+      expect(two).toBeLessThanOrEqual(17 * 60 + 30);
       level2.add(two % 60);
     }
     expect(level2.size).toBeGreaterThan(4);
+    // The latest start at either level is 5:30.
+    expect(startTime(2, () => 0.999)).toBe(17 * 60 + 30);
+    expect(startTime(1, () => 0.999)).toBe(17 * 60 + 30);
   });
 
   it("moves on by each finished step's minutes", () => {

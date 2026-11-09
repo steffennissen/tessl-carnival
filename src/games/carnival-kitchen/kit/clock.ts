@@ -44,7 +44,10 @@ export function stepMinutes(options: StepBasics): number {
  */
 export function startTime(level: Level, random: () => number): number {
   const hour = 14 + (Math.floor(random() * 4) % 4);
-  const minute = level === 1 ? (random() < 0.5 ? 0 : 30) : 5 * (Math.floor(random() * 12) % 12);
+  // Level 2's 5:xx starts stop at 5:30 too: 7 choices then, 12 in the other hours.
+  const fives = hour === 17 ? 7 : 12;
+  const minute =
+    level === 1 ? (random() < 0.5 ? 0 : 30) : 5 * (Math.floor(random() * fives) % fives);
   return hour * 60 + minute;
 }
 
@@ -130,9 +133,99 @@ export interface ClockLook {
 }
 
 /**
+ * A clock's layers that never change: drawn once into a small canvas of
+ * their own and stamped each frame, instead of 60 tick strokes and 12
+ * numbers every frame. Kept by size and pixel density.
+ */
+const layers = new Map<string, HTMLCanvasElement>();
+/** How often each layer has been asked for, so a clock that's growing isn't cached at every size. */
+const asked = new Map<string, number>();
+const MOST_LAYERS = 16;
+
+/**
+ * Draws `paint` (centred on 0, 0, within `reach` of it) at (x, y), from a
+ * cached canvas when the browser has one and `g` is only scaled and moved.
+ */
+function stamp(g: G, key: string, x: number, y: number, reach: number, paint: (g: G) => void) {
+  const m = typeof g.getTransform === 'function' ? g.getTransform() : undefined;
+  const scale = m ? Math.hypot(m.a, m.b) : 0;
+  const plain = !!m && Math.abs(m.b) < 1e-6 && Math.abs(m.c) < 1e-6 && Math.abs(m.a - m.d) < 1e-6;
+  const id = `${key}:${Math.round(reach * scale)}`;
+  const seen = (asked.get(id) ?? 0) + 1;
+  asked.set(id, seen);
+  if (asked.size > 200) asked.clear();
+  let layer = layers.get(id);
+  if (!layer && plain && scale > 0 && seen >= 3 && typeof document !== 'undefined') {
+    const size = Math.ceil(reach * 2 * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const lg = canvas.getContext('2d');
+    if (lg) {
+      lg.scale(size / (reach * 2), size / (reach * 2));
+      lg.translate(reach, reach);
+      paint(lg);
+      if (layers.size >= MOST_LAYERS) layers.clear();
+      layers.set(id, canvas);
+      layer = canvas;
+    }
+  }
+  if (layer && plain) {
+    g.drawImage(layer, x - reach, y - reach, reach * 2, reach * 2);
+    return;
+  }
+  g.save();
+  g.translate(x, y);
+  paint(g);
+  g.restore();
+}
+
+/** The face: a pink rim, white inside, and a tick for every minute (longer every 5). */
+function drawFace(g: G, r: number) {
+  circle(g, 0, 0, r);
+  fillStroke(g, C.hotPink, Math.max(2, r * 0.06));
+  circle(g, 0, 0, r * 0.88);
+  fillStroke(g, C.white, Math.max(1.5, r * 0.035));
+  g.strokeStyle = C.ink;
+  g.lineCap = 'round';
+  for (const five of [false, true]) {
+    // All the ticks of one size in one stroke.
+    g.lineWidth = Math.max(1, r * (five ? 0.04 : 0.018));
+    g.beginPath();
+    for (let i = 0; i < 60; i++) {
+      if ((i % 5 === 0) !== five) continue;
+      const a = (i / 60) * Math.PI * 2;
+      const inner = r * (five ? 0.7 : 0.76);
+      g.moveTo(Math.sin(a) * inner, -Math.cos(a) * inner);
+      g.lineTo(Math.sin(a) * r * 0.82, -Math.cos(a) * r * 0.82);
+    }
+    g.stroke();
+  }
+}
+
+/** The numbers 1 to 12, each with a white edge so a hand passing under it never hides it. */
+function drawNumbers(g: G, r: number) {
+  g.font = font(Math.max(8, r * 0.2));
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineJoin = 'round';
+  g.lineWidth = Math.max(2, r * 0.06);
+  g.strokeStyle = C.white;
+  g.fillStyle = C.ink;
+  for (let h = 1; h <= 12; h++) {
+    const a = (h / 12) * Math.PI * 2;
+    const nx = Math.sin(a) * r * 0.55;
+    const ny = -Math.cos(a) * r * 0.55 + r * 0.02;
+    g.strokeText(String(h), nx, ny);
+    g.fillText(String(h), nx, ny);
+  }
+}
+
+/**
  * An analog clock centred on (x, y), radius r, showing `time`: a white face,
  * the numbers 1 to 12, a tick for every minute (longer every 5), a short fat
- * hour hand and a long minute hand. Any size: everything scales with r.
+ * hour hand and a long minute hand. The hands are thick, and the numbers go
+ * on top of them so they always show. Any size: everything scales with r.
  */
 export function drawClock(
   g: G,
@@ -143,40 +236,15 @@ export function drawClock(
   look: ClockLook = {},
 ) {
   const { t = 0, glow = null, numbers = true } = look;
+  // The face and the numbers sit a little past r, for the rim's stroke.
+  const reach = r * 1.06 + 2;
+  stamp(g, `face:${r.toFixed(2)}`, x, y, reach, (lg) => drawFace(lg, r));
+
   g.save();
   g.translate(x, y);
-  circle(g, 0, 0, r);
-  fillStroke(g, C.hotPink, Math.max(2, r * 0.06));
-  circle(g, 0, 0, r * 0.88);
-  fillStroke(g, C.white, Math.max(1.5, r * 0.035));
-
-  // Minute ticks.
-  g.strokeStyle = C.ink;
-  g.lineCap = 'round';
-  for (let i = 0; i < 60; i++) {
-    const a = (i / 60) * Math.PI * 2;
-    const five = i % 5 === 0;
-    const outer = r * 0.82;
-    const inner = r * (five ? 0.7 : 0.76);
-    g.lineWidth = Math.max(1, r * (five ? 0.04 : 0.018));
-    g.beginPath();
-    g.moveTo(Math.sin(a) * inner, -Math.cos(a) * inner);
-    g.lineTo(Math.sin(a) * outer, -Math.cos(a) * outer);
-    g.stroke();
-  }
-  if (numbers) {
-    g.font = font(Math.max(8, r * 0.2));
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillStyle = C.ink;
-    for (let h = 1; h <= 12; h++) {
-      const a = (h / 12) * Math.PI * 2;
-      g.fillText(String(h), Math.sin(a) * r * 0.55, -Math.cos(a) * r * 0.55 + r * 0.02);
-    }
-  }
-
   const { hour, minute } = handAngles(time);
   const hand = (angle: number, length: number, width: number, color: string, lit: boolean) => {
+    g.lineCap = 'round';
     if (lit) {
       g.strokeStyle = `rgba(255, 201, 60, ${0.55 + Math.sin(t * 6) * 0.25})`;
       g.lineWidth = width + r * 0.12;
@@ -185,16 +253,26 @@ export function drawClock(
       g.lineTo(Math.sin(angle) * length, -Math.cos(angle) * length);
       g.stroke();
     }
-    g.strokeStyle = color;
-    g.lineWidth = width;
     g.beginPath();
     g.moveTo(-Math.sin(angle) * r * 0.1, Math.cos(angle) * r * 0.1);
     g.lineTo(Math.sin(angle) * length, -Math.cos(angle) * length);
+    // A thin white edge first, so the hand stands out on the ticks.
+    g.strokeStyle = C.white;
+    g.lineWidth = width + Math.max(1.5, r * 0.03);
+    g.stroke();
+    g.strokeStyle = color;
+    g.lineWidth = width;
     g.stroke();
   };
-  hand(hour, r * 0.45, Math.max(2.5, r * 0.09), C.ink, glow === 'hour');
-  hand(minute, r * 0.74, Math.max(1.8, r * 0.055), C.purple, glow === 'minute');
-  circle(g, 0, 0, Math.max(2, r * 0.07));
+  hand(hour, r * 0.45, Math.max(3.5, r * 0.13), C.ink, glow === 'hour');
+  hand(minute, r * 0.74, Math.max(2.5, r * 0.085), C.purple, glow === 'minute');
+  g.restore();
+
+  if (numbers) stamp(g, `numbers:${r.toFixed(2)}`, x, y, reach, (lg) => drawNumbers(lg, r));
+
+  g.save();
+  g.translate(x, y);
+  circle(g, 0, 0, Math.max(2.5, r * 0.08));
   fillStroke(g, C.hotPink, Math.max(1, r * 0.025));
   g.restore();
 }

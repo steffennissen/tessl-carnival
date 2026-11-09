@@ -185,6 +185,9 @@ export function createSound(): Sound {
     // No speech in this browser.
   }
 
+  /** Whether a tap has started (silent) speech yet, which iOS needs before any other. */
+  let voiceUnlocked = false;
+
   /** Ends the reading being followed, when something else is said over it. */
   let endReading: (() => void) | null = null;
   const now = () => performance.now() / 1000;
@@ -247,11 +250,36 @@ export function createSound(): Sound {
 
   return {
     unlock() {
-      if (ctx) return;
+      // Called inside a tap, where iOS Safari allows sound to start: it only
+      // lets speech and audio play later (from the animation loop) once
+      // they've been started inside a tap. So the first tap speaks a silent
+      // word, and every tap wakes the audio if the system put it to sleep.
+      if (!voiceUnlocked) {
+        voiceUnlocked = true;
+        try {
+          const synth = window.speechSynthesis;
+          const hush = new SpeechSynthesisUtterance(' ');
+          hush.volume = 0;
+          synth.speak(hush);
+        } catch {
+          // No speech in this browser.
+        }
+      }
+      if (ctx) {
+        if (ctx.state !== 'running') {
+          try {
+            void ctx.resume().catch(() => undefined);
+          } catch {
+            // Nothing to wake.
+          }
+        }
+        return;
+      }
       try {
         ctx = new AudioContext();
+        if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined);
         master = ctx.createGain();
-        master.gain.value = 0.8;
+        master.gain.value = muted ? 0 : 0.8;
         master.connect(ctx.destination);
         noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
         const data = noise.getChannelData(0);
