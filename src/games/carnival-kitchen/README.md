@@ -2,7 +2,9 @@
 
 Cook with Chef Bunny. Tap **Tap to cook!** and the kitchen picks a dish at
 random from 16 dishes, from pizza and pancakes to sushi, burgers and an ice
-cream sundae. Each dish is a whole
+cream sundae (and a surprise 17th, once all 16 are in the recipe book).
+Coins buy Chef Bunny hats and aprons and decorations for the kitchen in the
+shop, and chef ranks open new kitchens. Each dish is a whole
 recipe, made step by step, and every round is a little different. It's made
 for young cooks: everything is slow and forgiving, every grade is kind, and a
 voice reads each step out loud for cooks who can't read yet.
@@ -30,13 +32,17 @@ switches between the two. On a computer the game stays in the page as before.
 Tap **Tap to cook!** on the title screen. There's nothing to choose: the dish
 waits under a lid with a "?" on it, and the kitchen picks it when you tap.
 The speaker button in the corner turns sound and the voice off and on. The
-small gear in the bottom corner, "Hold for grown-ups", opens the grown-ups'
-settings when it's held for 1.5 seconds (see "Learning" below).
+gear in the bottom corner, "Hold for grown-ups", opens the grown-ups'
+settings when it's held for 1.5 seconds (see "Learning" below). The title
+screen also has **🛍️ Shop**, with her coins on it (see "The shop"), and her
+chef rank's badge (see "Chef ranks and kitchens"): tap the badge and Chef
+Bunny says her rank and what comes next.
 
 A round goes like this:
 
-1. **Title screen.** Tap **Tap to cook!** for a surprise dish, or **📖 Recipes**
-   to open the recipe book.
+1. **Title screen.** Tap **Tap to cook!** for a surprise dish, **📖 Recipes**
+   to open the recipe book, or **🛍️ Shop**. If her chef rank has gone up,
+   the rank ceremony comes first.
 2. **The dish spinner.** A carnival slot machine with a reel of dish pictures
    spins fast, ticks slower and slower, and lands with a bounce and sparkles on
    the dish that was picked, with its big picture and name, while Chef Bunny
@@ -68,7 +74,8 @@ A round goes like this:
    than its sticker had, a badge says **New sticker!** or **Sticker
    upgraded!** after the stars, and Chef Bunny says so too. After a short
    pause, tap **Cook again!** for another dish, never the same one twice in a
-   row, picked on the spinner again.
+   row, picked on the spinner again (after the rank ceremony, if the round
+   made her rank go up).
 
 While you cook, a badge shows the dish you're making: its finished picture
 and its name. On the page it sits in the strip above the recipe; on a phone
@@ -83,8 +90,10 @@ the buttons and the score when there isn't. Tap it and Chef Bunny says
 Every finished round earns its dish's sticker at the round's stars (1 to 3).
 A sticker only ever keeps its best stars. The recipe book, from the title
 screen's **📖 Recipes** button, shows all the dishes in a grid with a count
-such as "7 of 16 dishes": each cooked dish with its picture, name and best
-stars, and the rest under a little lid with a "?". A dish whose learning moment was answered on her
+such as "7 of 16 dishes · 9 more dishes to unlock a surprise!": each cooked
+dish with its picture, name and best stars, and the rest under a little lid
+with a "?". The last page is a wrapped present (see "The surprise: a
+Birthday Cake"); a tap on it says how many dishes are left. A dish whose learning moment was answered on her
 own also has a purple Smart Chef star (🎓) in its corner. Tap a cooked dish to cook
 it again; tap anywhere else, or the ✕, to go back to the title screen. The
 grid picks as many columns as make the dishes biggest, so it fits a computer,
@@ -92,24 +101,25 @@ a phone held sideways and a phone held upright. Stickers are kept by the
 carnival's shared sticker book (`earnSticker` and `stickersFor` from
 `src/carnival`), not by the game.
 
-| Dish                      | Steps                                                                               |
-| ------------------------- | ----------------------------------------------------------------------------------- |
-| **Pizza**                 | Chop the pepperoni, spread the sauce, add the toppings, bake the pizza              |
-| **Pancakes**              | Crack the eggs, add flour and milk, mix the batter, flip the pancakes               |
-| **Vegetable Soup**        | Chop the carrot, stir the soup, shake the salt                                      |
-| **Mac and Cheese**        | Grate the cheese, pour the milk, stir the cheese sauce, sprinkle the crumbs, bake   |
-| **Cacio e Pepe**          | Grate the cheese, shake the pepper, add pasta water, mix the cheese cream, toss     |
-| **Strawberry Smoothie**   | Chop the strawberry, chop the banana, add milk, blend                               |
-| **Fruit Salad**           | Chop the strawberry, chop the banana, mix the fruit, add blueberries, kiwi and mint |
-| **Lobster Bisque**        | Chop the celery, stir the shells and veggies, add seafood stock, blend, add cream   |
-| **Omurice**               | Chop the onion, stir the rice, crack the eggs, flip the omelettes, draw ketchup     |
-| **Tacos**                 | Chop the tomato, stir the taco meat, shake the spice, add the toppings              |
-| **Spaghetti & Meatballs** | Chop the tomato, stir the sauce, shake the salt, add meatballs and basil            |
-| **Cheeseburger**          | Chop the pickle, flip the patties, stack the burger                                 |
-| **Ice Cream Sundae**      | Scoop the ice cream, stack the scoops, drizzle the chocolate, add the toppings      |
-| **Cupcakes**              | Crack the eggs, add flour and sugar, mix, bake, add the toppings                    |
-| **Sugar Cookies**         | Crack the eggs, mix the dough, roll it out, cut the cookies, bake                   |
-| **Sushi Rolls**           | Chop the cucumber, spread the rice, add the fillings, roll the sushi, chop it       |
+| Dish                         | Steps                                                                               |
+| ---------------------------- | ----------------------------------------------------------------------------------- |
+| **Pizza**                    | Chop the pepperoni, spread the sauce, add the toppings, bake the pizza              |
+| **Pancakes**                 | Crack the eggs, add flour and milk, mix the batter, flip the pancakes               |
+| **Vegetable Soup**           | Chop the carrot, stir the soup, shake the salt                                      |
+| **Mac and Cheese**           | Grate the cheese, pour the milk, stir the cheese sauce, sprinkle the crumbs, bake   |
+| **Cacio e Pepe**             | Grate the cheese, shake the pepper, add pasta water, mix the cheese cream, toss     |
+| **Strawberry Smoothie**      | Chop the strawberry, chop the banana, add milk, blend                               |
+| **Fruit Salad**              | Chop the strawberry, chop the banana, mix the fruit, add blueberries, kiwi and mint |
+| **Lobster Bisque**           | Chop the celery, stir the shells and veggies, add seafood stock, blend, add cream   |
+| **Omurice**                  | Chop the onion, stir the rice, crack the eggs, flip the omelettes, draw ketchup     |
+| **Tacos**                    | Chop the tomato, stir the taco meat, shake the spice, add the toppings              |
+| **Spaghetti & Meatballs**    | Chop the tomato, stir the sauce, shake the salt, add meatballs and basil            |
+| **Cheeseburger**             | Chop the pickle, flip the patties, stack the burger                                 |
+| **Ice Cream Sundae**         | Scoop the ice cream, stack the scoops, drizzle the chocolate, add the toppings      |
+| **Cupcakes**                 | Crack the eggs, add flour and sugar, mix, bake, add the toppings                    |
+| **Sugar Cookies**            | Crack the eggs, mix the dough, roll it out, cut the cookies, bake                   |
+| **Sushi Rolls**              | Chop the cucumber, spread the rice, add the fillings, roll the sushi, chop it       |
+| **Birthday Cake** (surprise) | Crack the eggs, add flour and sugar, mix, bake the cake, add candles and toppings   |
 
 Lobster Bisque is made from the shells Lulu the lobster has grown out of
 (real lobsters shed theirs), so no lobster is ever cooked.
@@ -160,6 +170,100 @@ Nothing is ever wasted:
   hint. Grating and rolling never mind how fast you go.
 - A chop always cuts the nearest dotted line, and scores something whenever
   the knife is close to it.
+
+## The shop
+
+The title screen's **🛍️ Shop** button (with her coins on a little badge)
+opens one page that is both the shop and Chef Bunny's wardrobe. Coins come
+from the carnival's shared wallet (`coinsFor` and `spendCoins` from
+`src/carnival`), which the kitchen's customers fill. At the top are her coins
+and a ✕; at the side Chef Bunny tries on whatever was tapped last, with its
+name and what it needs ("40 coins: tap to buy!", "Save up 12 more coins!",
+"Become a Sous Chef!", "You have it on!"); then four tabs (Hats, Aprons,
+Kitchen, Places) and the things on them.
+
+- **Something she has** is put on (or put up) with a tap, and says "✓ On".
+  One hat, one apron, one wallpaper, one set of flags and one kitchen at a
+  time; the goldfish and the fairy lights come off again with a second tap.
+- **Something she can buy** asks first: a card with its picture, "Buy the
+  Crown?", its price, ✓ and ✕. ✓ spends the coins, coins fly to it, it
+  sparkles with a "Yay!", Chef Bunny jumps for joy and says "You bought the
+  Crown!", and she's wearing it. ✕, or a tap anywhere else, keeps the coins.
+- **Something she can't afford yet** shows its price faded, and a tap on it
+  has Chef Bunny say kindly how many more coins to save up.
+- **Something a chef rank gives** shows 🔒 and the rank, and a tap says which
+  rank to reach.
+
+What she owns is kept as stickers (`own:<item>`, with `earnSticker`), and
+what she wears as preferences (`wear-hat`, `wear-apron`, `wear-wallpaper`,
+`wear-bunting`, `wear-shelf`, `wear-lights` and `wear-kitchen`, with
+`savePreference`), never in local storage directly. Chef Bunny wears her
+outfit everywhere (title, cooking, decorating, the end card), and the
+kitchen shows its decorations behind the cooking in every layout.
+
+| Tab     | Things, and their price in coins                                                                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Hats    | Chef Hat (free), Party Hat 15, Big Bow 20, Flower Crown 30, Pirate Hat 45, Crown 60, Wizard Hat 80, Space Helmet 120; the Star, Ribbon, Golden and Master Chef Hats from ranks |
+| Aprons  | Pink (free), Mint 15, Sky 15, Polka Dot 25, Strawberry 35, Rainbow 50, Starry 65                                                                                               |
+| Kitchen | Wallpaper: Hearts (free), Stars 20, Stripes 25, Dots 25, Flowers 30. Flags: Rainbow (free), Berry 15, Ocean 15, Golden 30. Fairy Lights 40. A Goldfish Bowl on the sill, 50    |
+| Places  | The kitchens: Carnival Tent (free), Candy Castle, Space Station, Under the Sea and Golden Palace, one for each rank                                                            |
+
+On a phone the tabs, the things, ✓, ✕ and the shop button are all at least 60
+CSS pixels. `wardrobe.ts` has the catalog, buying (`buy`), owning (`owns`)
+and wearing (`equip`, `loadOutfit`, `saveOutfit`); `shop.ts` has the page's
+places and what a tap does (`pressShop`); `outfit-art.ts` draws the hats and
+aprons. They're plain functions, tested in `shop.test.ts`.
+
+## Chef ranks and kitchens
+
+Her chef rank comes from **chef points**, worked out from stickers she already
+has (`chefPoints` in `ranks.ts`): each star on a dish's sticker is a point,
+each Smart Chef mark (`smart:<dish>`) 2, and each trophy (`trophy:<boss>`) 3.
+
+| Rank        | Chef points | What it gives                  |
+| ----------- | ----------- | ------------------------------ |
+| Kid Chef    | 0           | The Carnival Tent kitchen      |
+| Junior Chef | 5           | Star Chef Hat, Candy Castle    |
+| Sous Chef   | 14          | Ribbon Chef Hat, Space Station |
+| Head Chef   | 26          | Golden Chef Hat, Under the Sea |
+| Master Chef | 42          | Master Chef Hat, Golden Palace |
+
+So Junior Chef comes in a first sitting, Sous Chef after about six dishes,
+and Master Chef once most of the book is cooked well with a few Smart Chef
+marks: days, not weeks. The title screen's badge shows the rank and a bar to
+the next one.
+
+**The ceremony.** When her rank has gone up, the next **Tap to cook!** or
+**Cook again!** starts a ceremony before the round: a drumroll, then the rank
+on a ribbon ("Sous Chef!"), Chef Bunny bowing as her new hat drops onto her
+head, confetti, and "You're a Sous Chef now!" out loud, then a card with the
+new kitchen. Once it's all shown (about 4.5 seconds), a tap goes on to cook.
+The new hat goes on and the new kitchen goes up straight away; the shop
+changes them back. The last rank celebrated is saved (the `rank-celebrated`
+preference), so each rank's ceremony happens once, and jumping two ranks at
+once is one ceremony, for the higher.
+
+**Kitchens.** Each is drawn around the scene in every layout (`kitchens.ts`):
+its wall, its window and the view out of it, the counter, the cabinets and
+their knobs, and a touch of its own. Walls stay light, so the steps drawn on
+top stay easy to read; the steps' art doesn't change.
+
+| Kitchen       | Window                            | Its touch                                    |
+| ------------- | --------------------------------- | -------------------------------------------- |
+| Carnival Tent | A sunny sky                       | The pink kitchen, with heart knobs           |
+| Candy Castle  | Candy hills and a gumdrop castle  | Icing dripping over the counter, candy knobs |
+| Space Station | A porthole on a ringed planet     | Panels and rivets, a glowing stripe, stars   |
+| Under the Sea | A porthole with Lulu the lobster  | Bubbles, seaweed, a sandy counter, shells    |
+| Golden Palace | An arched window on golden towers | Gold rails, a marble counter, crown knobs    |
+
+**The surprise: a Birthday Cake.** `dishes/birthday-cake.ts` is a `locked`
+dish: it isn't in the random pick or on the spinner's reel, and its page in
+the recipe book is a wrapped present, until every other dish has its sticker
+(`playableDishes` and `surpriseHint` in `ranks.ts`). Then the present bounces
+("Tap me!"), a tap on it cooks the cake, and it joins the random pick. It
+uses the usual steps, with a cake that rises in a round tin
+(`ingredients/birthday-cake.ts`) and candles to put on
+(`ingredients/candle.ts`).
 
 ## Chef Bunny
 
@@ -252,8 +356,9 @@ screen all the time.
 - **The kitchen clock.** An analog clock with the numbers 1 to 12, a tick for
   every minute, a short hour hand and a long minute hand hangs in the kitchen
   in every layout: on the wall at the right on a computer, beside the cooking
-  on a wide screen, and big in the drawers below Chef Bunny on a phone held
-  upright. Each round starts at a real afternoon time (2:00 to 5:30; on the
+  on a wide screen (as big as fits, so its numbers are about 11 CSS pixels on
+  a phone held sideways), and big in the drawers below Chef Bunny on a phone
+  held upright. Each round starts at a real afternoon time (2:00 to 5:30; on the
   hour or half hour at Level 1, any 5 minutes at Level 2) and each step takes
   real minutes. When a step is done, the minute hand sweeps on to the new
   time with a tick every 5 minutes, and the clock grows a little while it
@@ -298,7 +403,8 @@ screen all the time.
 ### The grown-ups' settings
 
 Hold the gear on the title screen for 1.5 seconds (a ring fills round it)
-and a page for grown-ups opens. A quick tap does nothing, so a young cook
+and a page for grown-ups opens. On a phone the gear is 60 CSS pixels across,
+easy to find, but it still has to be held. A quick tap does nothing, so a young cook
 doesn't wander in.
 
 | Setting        | Choices          | Default | What it does                                                                                                  |
@@ -527,7 +633,8 @@ right.
 about 60 CSS pixels: answer buttons, the 🔊 speaker (and the step card's,
 for "Read it myself"), **Let's cook!**, the jars, **Check!**, the coins in
 the bank, the tray's cells (to give a coin back) and the clock's hands (a
-touch near a hand's knob grabs it). So are the 🏠 and sound buttons and the
+touch near a hand's knob grabs it). So are the 🏠 and sound buttons, the grown-ups' gear,
+the shop button, the rank badge, everything in the shop, the
 "Leave the kitchen?" card's ✓ and ✕, the decorating treats and **Done!**, the
 recipe book's and the grown-ups' ✕, and the grown-ups' choices and **Done**. Held
 sideways, the side answers fill the room at the right two to a row; held
@@ -738,6 +845,7 @@ The details:
      id: string; // the file name
      name: string; // "Pizza": the end card, and "You made Pizza!"
      steps: RecipeStep[]; // in cooking order
+     locked?: boolean; // a surprise: only once every other dish has a sticker
      draw(g: G, time: number, state: KitchenState | null): void; // the end card
    }
    ```
@@ -775,31 +883,31 @@ The details:
    In brackets is the art role each ingredient must have (see "Adding an
    ingredient"). The ones there today:
 
-   | Role          | Ingredients                                                                                                                                                                                                                                                                        |
-   | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-   | `chop`        | carrot, pepperoni, strawberry, banana, celery, tomato, onion, cucumber, sushi-roll, pickle                                                                                                                                                                                         |
-   | `crack`       | egg                                                                                                                                                                                                                                                                                |
-   | `pour`        | flour, milk, sugar, pasta-water, sunset-splash, cream                                                                                                                                                                                                                              |
-   | `pourInto`    | pot, blender, pecorino                                                                                                                                                                                                                                                             |
-   | `vessel`      | pot, mixing-bowl, rice-pan, fruit-bowl                                                                                                                                                                                                                                             |
-   | `stirred`     | soup, batter, cupcake-batter, cookie-dough, cheese-sauce, cheese-cream, fruit-salad, lobster-shells, rice, taco-meat, spaghetti-sauce                                                                                                                                              |
-   | `shaker`      | salt, black-pepper, taco-spice                                                                                                                                                                                                                                                     |
-   | `seasoned`    | soup, pecorino, taco-meat, spaghetti-sauce                                                                                                                                                                                                                                         |
-   | `sauceBase`   | pizza, omelette, nori, sundae-glass                                                                                                                                                                                                                                                |
-   | `spread`      | tomato-sauce, ketchup, sushi-rice, chocolate-sauce                                                                                                                                                                                                                                 |
-   | `toppingBase` | pizza, casserole, fruit-bowl, taco-shell, spaghetti-plate, cupcake, sundae-glass, cookie-dough, nori                                                                                                                                                                               |
-   | `topping`     | pepperoni, mushroom, pineapple, olive, pepper, tomato, breadcrumbs, macaroni, blueberry, kiwi, mint, lettuce, shredded-cheese, avocado, meatball, basil, whipped-cream, sprinkles, cherry, candy-heart, star-cutter, heart-cutter, bunny-cutter, cucumber, carrot-stick, egg-strip |
-   | `bake`        | pizza, casserole, cupcake-tray, cookies                                                                                                                                                                                                                                            |
-   | `flip`        | pancake, omelette, patty                                                                                                                                                                                                                                                           |
-   | `grate`       | cheddar, pecorino                                                                                                                                                                                                                                                                  |
-   | `tossed`      | spaghetti                                                                                                                                                                                                                                                                          |
-   | `blender`     | blender                                                                                                                                                                                                                                                                            |
-   | `blended`     | smoothie, bisque                                                                                                                                                                                                                                                                   |
-   | `scoop`       | strawberry-scoop, vanilla-scoop, mint-scoop                                                                                                                                                                                                                                        |
-   | `stack`       | bun, patty, cheese-slice, pickle, lettuce-leaf, tomato-slice, strawberry-scoop, vanilla-scoop, mint-scoop                                                                                                                                                                          |
-   | `stackBase`   | burger-plate, sundae-glass                                                                                                                                                                                                                                                         |
-   | `rollOut`     | cookie-dough                                                                                                                                                                                                                                                                       |
-   | `rollUp`      | sushi-roll                                                                                                                                                                                                                                                                         |
+   | Role          | Ingredients                                                                                                                                                                                                                                                                                |
+   | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | `chop`        | carrot, pepperoni, strawberry, banana, celery, tomato, onion, cucumber, sushi-roll, pickle                                                                                                                                                                                                 |
+   | `crack`       | egg                                                                                                                                                                                                                                                                                        |
+   | `pour`        | flour, milk, sugar, pasta-water, sunset-splash, cream                                                                                                                                                                                                                                      |
+   | `pourInto`    | pot, blender, pecorino                                                                                                                                                                                                                                                                     |
+   | `vessel`      | pot, mixing-bowl, rice-pan, fruit-bowl                                                                                                                                                                                                                                                     |
+   | `stirred`     | soup, batter, cupcake-batter, cookie-dough, cheese-sauce, cheese-cream, fruit-salad, lobster-shells, rice, taco-meat, spaghetti-sauce                                                                                                                                                      |
+   | `shaker`      | salt, black-pepper, taco-spice                                                                                                                                                                                                                                                             |
+   | `seasoned`    | soup, pecorino, taco-meat, spaghetti-sauce                                                                                                                                                                                                                                                 |
+   | `sauceBase`   | pizza, omelette, nori, sundae-glass                                                                                                                                                                                                                                                        |
+   | `spread`      | tomato-sauce, ketchup, sushi-rice, chocolate-sauce                                                                                                                                                                                                                                         |
+   | `toppingBase` | pizza, casserole, fruit-bowl, taco-shell, spaghetti-plate, cupcake, sundae-glass, cookie-dough, nori, birthday-cake                                                                                                                                                                        |
+   | `topping`     | pepperoni, mushroom, pineapple, olive, pepper, tomato, breadcrumbs, macaroni, blueberry, kiwi, mint, lettuce, shredded-cheese, avocado, meatball, basil, whipped-cream, sprinkles, cherry, candy-heart, star-cutter, heart-cutter, bunny-cutter, cucumber, carrot-stick, egg-strip, candle |
+   | `bake`        | pizza, casserole, cupcake-tray, cookies, birthday-cake                                                                                                                                                                                                                                     |
+   | `flip`        | pancake, omelette, patty                                                                                                                                                                                                                                                                   |
+   | `grate`       | cheddar, pecorino                                                                                                                                                                                                                                                                          |
+   | `tossed`      | spaghetti                                                                                                                                                                                                                                                                                  |
+   | `blender`     | blender                                                                                                                                                                                                                                                                                    |
+   | `blended`     | smoothie, bisque                                                                                                                                                                                                                                                                           |
+   | `scoop`       | strawberry-scoop, vanilla-scoop, mint-scoop                                                                                                                                                                                                                                                |
+   | `stack`       | bun, patty, cheese-slice, pickle, lettuce-leaf, tomato-slice, strawberry-scoop, vanilla-scoop, mint-scoop                                                                                                                                                                                  |
+   | `stackBase`   | burger-plate, sundae-glass                                                                                                                                                                                                                                                                 |
+   | `rollOut`     | cookie-dough                                                                                                                                                                                                                                                                               |
+   | `rollUp`      | sushi-roll                                                                                                                                                                                                                                                                                 |
 
    Anything missing (cupcake batter, a taco shell, sprinkles) is a new
    ingredient file: see below. `dishes/pizza.ts` is a good one to copy.
@@ -1081,9 +1189,19 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
 - `dishes/`: one file per dish (its recipe and end card), and `index.ts`.
 - `chef.ts`: Chef Bunny's reactions, lines and their cooldowns, and her idle
   blinks, ear flicks and glances: plain functions, tested in `chef.test.ts`.
-- `bunny.ts`: drawing Chef Bunny in a pose (mood, blink, ear, gaze, lean).
-- `render.ts`: the kitchen, Chef Bunny's place and what she sees, the HUD (with the badge of the dish being made), the card and popups,
-  particles, the title, decorating, end and recipe book screens, and running the dish spinner. It asks the step being cooked to draw
+- `bunny.ts`: drawing Chef Bunny in a pose (mood, blink, ear, gaze, lean,
+  and the ceremony's bow and dropping hat), wearing her hat and apron.
+- `outfit-art.ts`: her hats and aprons, and the shop's pictures of them.
+- `wardrobe.ts`: the shop's catalog, buying, owning and wearing (see "The
+  shop"). `shop.ts`: the shop page's and the title buttons' places, and what
+  a tap does. Both tested in `shop.test.ts`.
+- `ranks.ts`: chef points, ranks, the ceremony's once-a-rank rule, what each
+  rank gives, and the surprise dish's unlock. Tested in `ranks.test.ts`.
+- `kitchens.ts`: the kitchens and their decorations, drawn behind
+  everything. `wardrobe-draw.test.ts` draws every kitchen, hat and apron, the
+  shop and the ceremony in every layout.
+- `render.ts`: painting the kitchen (`kitchens.ts` draws it), Chef Bunny's place and what she sees, the HUD (with the badge of the dish being made), the card and popups,
+  particles, the title, decorating, end, recipe book and shop screens, the rank ceremony, and running the dish spinner. It asks the step being cooked to draw
   itself, and every started step to `observe`.
 - `spinner.ts`: the dish spinner's drawing, and its landing maths as plain
   functions (`spinEnd`, `reelPosition`, `reelIndex`, `holdFor`), which
