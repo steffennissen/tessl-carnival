@@ -821,12 +821,13 @@ checks, Chef Bunny lays out the fewest coins and counts them on.
 
 **Find the ingredient** (`activities/find-word.ts`: phonics and sight
 words) fits dishes that use an ingredient from its word bank for sure.
-Just before the step that uses it, "Tap the CHEESE!": three jars with a word
-on each label and a "?" where the picture goes, so it takes reading, not
-matching pictures. Once she's found it the pictures pop in, and the step
-that uses it comes next ("Grate the cheese!"). The voice only ever says
-"Find the word!" by itself, never the word: tapping 🔊 reads "Tap the
-cheese!", and hearing it counts as help (a right answer then carries on
+Just before the step that uses it, a card shows its picture (🧀) and asks
+"Which jar says this?": three jars with a word on each label and a "?" where
+the picture goes, so it takes reading the words, not matching letters or
+pictures. The word itself is never on the card. Once she's found it the
+pictures pop in, and the step that uses it comes next ("Grate the cheese!").
+The voice only ever says "Which jar says this?" by itself, never the word:
+tapping 🔊 reads "Tap the cheese!", and hearing it counts as help (a right answer then carries on
 without the bonus or the Smart Chef star; nothing is taken away). A wrong
 jar greys out with a hint about the letters ("Look at the letters: find ch
 and ee!").
@@ -960,7 +961,7 @@ An activity is one new file, `activities/<id>.ts`, and usually that's all.
    up), 2 to 4 short `choices` with the `answer`'s index, a two-line `hint`
    for after a wrong try, and the `help` Chef Bunny says when she shows it.
    `layout: 'row'` puts the answers in a row under the question instead of
-   beside a picture (for words, such as "Tap the CHEESE"). An `ask` step's
+   beside a picture (for words, such as the jars to find a word in). An `ask` step's
    picture is the step before it, as it was left; `picture: 'none'` leaves
    it out, and `tag` puts a sticker on it ("+5 🍄").
 4. **A step of its own**, when a question isn't enough: a step file with

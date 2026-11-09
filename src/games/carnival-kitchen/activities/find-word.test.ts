@@ -79,7 +79,10 @@ describe('find the ingredient', () => {
       expect(steps.map((s) => s.kind)).toEqual(['crack', 'pour', 'mix', 'find', 'flip', 'flambe']);
       const find = steps[3] as FindOptions;
       expect(find.word).toBe('pancake');
-      expect(find.question.text).toBe('Tap the PANCAKE!');
+      // The card shows the pancake's picture, never the word.
+      expect(find.question.text).toBe(FIND_SAY);
+      expect(find.question.text.toLowerCase()).not.toContain('pancake');
+      expect(find.picture).toBe(ingredient('pancake').icon);
       expect(find.question.choices[find.question.answer]).toBe('pancake');
       expect(find.pictures[find.question.answer]).toBe(ingredient('pancake').icon);
       expect(find.question.layout).toBe('row');
@@ -194,7 +197,7 @@ describe('the find step', () => {
     }
   });
 
-  it('only ever says "Find the word!" by itself, never the word', () => {
+  it('only ever says "Which jar says this?" by itself, never the word', () => {
     const state = onJars();
     const said: string[] = [];
     const effects = quietEffects();

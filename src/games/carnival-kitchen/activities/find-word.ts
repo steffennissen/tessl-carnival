@@ -10,12 +10,12 @@ import {
   type RecipeStep,
 } from '../kit';
 import { stepOf } from '../steps';
-import type { FindOptions } from '../steps/find';
+import { FIND_SAY, type FindOptions } from '../steps/find';
 
 /**
  * Find the ingredient (phonics and sight words). Just before a step that
- * uses an ingredient, "Tap the CHEESE!": three jars with words on their
- * labels and their pictures hidden. Level 1's jars say three different
+ * uses an ingredient, its picture and "Which jar says this?": three jars
+ * with words on their labels and their pictures hidden. Level 1's jars say three different
  * ingredients that start differently (cheese, rice, pancake); Level 2's say
  * words that sound alike (cheese, chess, cherry), so she has to read past
  * the first sound. Every word to find practises a 2nd-grade spelling
@@ -273,19 +273,17 @@ export function jarWords(
 /** The find step for a target word. */
 export function makeFind(target: FindTarget, level: Level, random: () => number): FindOptions {
   const { word } = target.word;
-  const { words, pictures, answer } = jarWords(
-    target.word,
-    ingredient(target.id).icon,
-    level,
-    random,
-  );
+  const picture = ingredient(target.id).icon;
+  const { words, pictures, answer } = jarWords(target.word, picture, level, random);
   const sounds = target.word.sounds.map((s) => (s === 'silent e' ? 'a silent e' : s));
   return {
     kind: 'find',
     word,
+    picture,
     pictures,
     question: {
-      text: `Tap the ${word.toUpperCase()}!`,
+      // The picture is on the card beside it: the word never is.
+      text: FIND_SAY,
       choices: words,
       answer,
       hint: ['Look at the letters:', `find ${listOf(sounds.slice(0, 2))}!`],
