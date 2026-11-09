@@ -116,7 +116,28 @@ export interface CupLook {
   label?: string;
   /** Seconds, for the star's twinkle. */
   t: number;
+  /** Bigger numbers on the lines, for a small cup on a phone. */
+  big?: boolean;
 }
+
+/** How much a colour stands out from white glass: its WCAG contrast ratio with white (1 to 21). */
+export function contrastWithWhite(hex: string): number {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return 1;
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const v = parseInt(m[1].slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 1.05 / (0.2126 * r + 0.7152 * g + 0.0722 * b + 0.05);
+}
+
+/**
+ * The least contrast with white a measuring cup's fill colours may have
+ * (`CUP_FILL_SURFACE` for its first, at the surface), so ¼ cup of milk is
+ * plain to see on a phone.
+ */
+export const CUP_FILL_LEAST = 1.4;
+export const CUP_FILL_SURFACE = 1.8;
 
 /** Whether a line gets its number on a cup labelled 'some'. */
 export function labelled(value: number, scale: Scale, labels: 'all' | 'some' = 'all'): boolean {
@@ -165,12 +186,30 @@ export function drawMeasuringCup(g: G, look: CupLook): void {
     g.fillRect(x, yOf(target) - h * 0.08, w, h * 0.16);
   }
   if (level > 0) {
-    g.fillStyle = vertical(g, rim, bottom + 10, fill);
-    g.fillRect(x, Math.min(yOf(level), bottom + 10), w, bottom + 10 - yOf(level) + 4);
+    // The gradient runs from the surface down, so even ¼ cup shows its
+    // strongest colour, with a dark line along the top of what's in it.
+    const surface = Math.min(yOf(level), bottom + 10);
+    g.fillStyle = vertical(g, surface, Math.max(surface + 24, bottom + 10), fill);
+    g.fillRect(x, surface, w, bottom + 14 - surface);
+    g.strokeStyle = C.ink;
+    g.lineWidth = 3.5;
+    g.beginPath();
+    g.moveTo(x, surface);
+    g.lineTo(x + w, surface);
+    g.stroke();
+    g.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(x, surface + 4);
+    g.lineTo(x + w, surface + 4);
+    g.stroke();
   }
   g.restore();
   // The lines, each with its number: long for whole cups, short between.
-  const size = Math.max(13, Math.min(18, w * 0.3));
+  // `big` (on a phone) makes the numbers bigger, so they're still easy to read.
+  const size = look.big
+    ? Math.max(20, Math.min(24, w * 0.42))
+    : Math.max(13, Math.min(18, w * 0.3));
   for (const v of scale.marks) {
     const y = yOf(v / scale.capacity);
     const whole = Number.isInteger(v);
@@ -181,11 +220,29 @@ export function drawMeasuringCup(g: G, look: CupLook): void {
     g.lineTo(x + 4 + w * (whole ? 0.38 : 0.26), y);
     g.stroke();
     if (labelled(v, scale, look.labels)) {
-      stickerText(g, fractionText(v), x + w * 0.72, y, size, C.ink, 'center', w * 0.5);
+      stickerText(
+        g,
+        fractionText(v),
+        x + w * 0.72,
+        y,
+        size,
+        C.ink,
+        'center',
+        w * (look.big ? 0.6 : 0.5),
+      );
     }
   }
   // The unit, small, on the glass between the rim and the top line.
-  stickerText(g, unitShort(unit), x + w / 2, rim + 12, 13, C.purple, 'center', w - 8);
+  stickerText(
+    g,
+    unitShort(unit),
+    x + w / 2,
+    rim + 12,
+    look.big ? 18 : 13,
+    C.purple,
+    'center',
+    w - 4,
+  );
   if (target !== null) {
     const ty = yOf(target);
     g.setLineDash([6, 6]);

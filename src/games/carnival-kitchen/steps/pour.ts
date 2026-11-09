@@ -297,6 +297,7 @@ const pour: Step<PourOptions, HoldState, PourFx> = {
         target: targets[index],
         label: amount,
         t,
+        big: view.shape !== 'page',
       });
     } else {
       drawMeter(g, t, s.level, targets[index], art.meter, amount);

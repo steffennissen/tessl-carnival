@@ -24,7 +24,7 @@ const sunsetSplash: Ingredient = {
   pour: {
     stream: 'rgba(255, 207, 74, 0.95)',
     grains: SUN.light,
-    meter: [SUN.coral, SUN.gold, SUN.light],
+    meter: [SUN.coral, SUN.amber, SUN.gold],
     color: SUN.gold,
     liquid: true,
     /** A round golden bottle with a pink stopper, glittering, with a face. */

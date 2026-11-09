@@ -11,8 +11,11 @@ voice reads each step out loud for cooks who can't read yet.
 
 On a phone or tablet (a device whose main input is a finger, or an iPad,
 even with a keyboard or trackpad attached), or in a window narrower than
-600 px, the kitchen fills the whole screen, and a 🏠 button next to the
-speaker goes back to the midway. On a phone or tablet the first tap also
+600 px, the kitchen fills the whole screen, with a 🏠 button in the top left
+corner, well apart from the speaker. A tap on 🏠 doesn't leave straight away:
+a little card asks "Leave the kitchen?" (and says it), and only ✓ goes back to
+the midway; ✕, or a tap anywhere else, stays, so a stray tap never ends a
+round. The round waits while the card is up. On a phone or tablet the first tap also
 asks the browser for real full screen, hiding its bars where it allows that
 (an iPad or an Android phone; an iPhone keeps its bars). If she leaves full
 screen, it isn't asked for again until the game starts again, and leaving the
@@ -51,7 +54,9 @@ A round goes like this:
    Drag a treat onto the dish, or tap a treat and then tap the dish to add as
    many as you like. Drag one on the dish to move it, or back to the tray to
    take it off. A treat let go anywhere above the tray lands on the dish, so
-   nothing can go wrong, and decorating scores nothing. Tap **Done!**, or leave
+   nothing can go wrong, and decorating scores nothing. On a phone the treats
+   and **Done!** are at least 60 CSS pixels (held sideways **Done!** waits at
+   the cloth's top right). Tap **Done!**, or leave
    it 20 seconds without a touch, to move on. A tap in the first moment does
    nothing, so a last excited tap from the final step doesn't skip it. Up to 30
    treats fit on a dish; another one replaces the oldest. Decorations start
@@ -275,7 +280,12 @@ screen all the time.
   star exactly on the recipe's amount: 1 cup fills a 2 cup jug to the 1
   line. `measureScale` in `kit/measure.ts` picks the smallest cup the amount
   fills no more than 0.8 of the way, so the star always sits between 0.4 and
-  0.8, like other meters, and scoring is unchanged. Chef Bunny's bubble says
+  0.8, like other meters, and scoring is unchanged. What's in the cup is
+  coloured from its surface down, with a dark line along the top, in its
+  ingredient's `meter` colours, which must stand out from the white glass
+  (milk is soft blue, flour tan, sugar pink; `kit/cup-fill.test.ts` checks
+  every pour's contrast), so even ¼ cup is plain to see. On a phone the
+  cup's numbers are bigger. Chef Bunny's bubble says
   each pour's amount ("1½ cups of flour,"), and says the next one out loud.
 - **Baking time.** A bake step's hint says its minutes ("Bake for 10
   minutes!"), and the oven's meter has a numbered line every 5 minutes with
@@ -301,10 +311,11 @@ They're saved with the carnival's shared preferences (`savePreference`), so
 they're remembered between visits. `grownups.ts` has the page's layout and
 hit testing as plain functions, tested in `grownups.test.ts`.
 
-**Read it myself.** Step cards grow to show the hint too and stay up for 6
-seconds (a tap on the card after a moment moves on), with a 🔊 button: tap it
-and the voice reads the card, each word lighting up as it's said (and the
-card waits until it's done). Questions and tickets show their words with a
+**Read it myself.** Step cards grow to show the hint too and stay up until
+she taps (a tap on the card after a moment moves on), however long she takes
+to read, with a 🔊 button: tap it and the voice reads the card, each word
+lighting up as it's said, and the card closes by itself a moment
+(`CARD_HOLD`, 1 second) after the reading ends, unless she taps first. Questions and tickets show their words with a
 🔊 too, and nothing reads itself. With it off, everything is read out as
 before, and questions light up their words as they're read too. Chef Bunny's
 cheers and the end card still speak.
@@ -474,7 +485,12 @@ right.
 **On a phone**, everything a finger taps in a learning moment is at least
 about 60 CSS pixels: answer buttons, the 🔊 speaker (and the step card's,
 for "Read it myself"), **Let's cook!**, the jars, **Check!**, the coins in
-the bank and the clock's hands (a touch near a hand's knob grabs it). Held
+the bank and the clock's hands (a touch near a hand's knob grabs it). So are
+the 🏠 and sound buttons and the "Leave the kitchen?" card's ✓ and ✕, the
+decorating treats and **Done!**, the recipe book's and the grown-ups' ✕, and
+the grown-ups' choices and **Done**. The coins already in the paying tray
+are the exception: two rows of eight have to fit across the screen, so they
+are about 35 CSS pixels. Held
 sideways, the side answers fill the room at the right two to a row; held
 upright, the question spans the screen with the picture under it and the
 answers beside it. Setting the clock, the clock is as big as fits: held
@@ -1039,7 +1055,23 @@ Every step draws on an **800×500 scene** (scene units, (0, 0) top left).
 - `art.ts`: the drawing kit: palette, shapes, faces, text.
 - `sound.ts`: sound effects made with Web Audio (no files to load) and the
   voice that reads each step out loud, plus `chatter` for Chef Bunny's own
-  lines, which only speaks when the voice is free.
+  lines, which only speaks when the voice is free. `unlock()` runs inside
+  every tap: the first one speaks a silent word and every one wakes the
+  audio, because iOS Safari only lets speech and sound started later (from
+  the animation loop) play once they've been started inside a tap. The
+  renderer holds Chef Bunny's chatter to the end of the frame and drops it
+  if an instruction was said in the meantime, so she never starts a line
+  that's cut off at once; only cheers show in her bubble, so after "Not
+  yet!" or while holding, the bubble keeps the step's instruction.
+- **Fingers and the canvas.** One finger at a time: while one is down, a
+  second finger's taps, moves and lifts are ignored. A gesture the browser
+  takes away (`pointercancel`, such as a system swipe) stops a pour, shake
+  or bake without scoring it (`cancel` in `game.ts`); anything else lets go
+  as usual. The canvas has an `aria-label` describing the game. It's drawn at
+  most 2 canvas pixels per CSS pixel (`MOST_PIXELS`), so a 3× phone paints
+  less than half the pixels for the same look, and the clocks' faces and
+  numbers are drawn once into small canvases of their own and stamped every
+  frame (`drawClock` in `kit/clock.ts`).
 - `decorate.ts`: decorating the finished dish: the treats, where the dish,
   tray and **Done!** go for each layout, and plain functions for pressing,
   dragging and letting go. `decorate.test.ts` tests it.
