@@ -86,6 +86,8 @@ export interface PayOptions extends StepBasics {
    * has to know them, and their values appear after a wrong check, as help.
    */
   values?: boolean;
+  /** Who's paying, when a customer at the stand bought it: "Benny Bear". */
+  from?: string;
 }
 
 declare module '../kit/types' {
@@ -393,7 +395,7 @@ const pay: Step<PayOptions, PayState, PayFx> = {
   learning: true,
   uses: () => [],
   start: () => startPay(),
-  title: () => 'A customer is here!',
+  title: ({ from }) => (from ? `${from} is paying!` : 'A customer is here!'),
   hint: () => ['Tap the coins', 'to pay!'],
   icon: () => '🪙',
   progress: ({ state }) => [1, state.done ? 1 : 0],
