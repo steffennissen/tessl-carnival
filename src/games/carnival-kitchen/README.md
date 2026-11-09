@@ -94,8 +94,8 @@ carnival's shared sticker book (`earnSticker` and `stickersFor` from
 
 | Dish                      | Steps                                                                               |
 | ------------------------- | ----------------------------------------------------------------------------------- |
-| **Pizza**                 | Chop the pepperoni, spread the sauce, add the toppings, bake the pizza              |
-| **Pancakes**              | Crack the eggs, add flour and milk, mix the batter, flip the pancakes               |
+| **Pizza**                 | Chop the pepperoni, toss the dough, spread the sauce, add the toppings, bake        |
+| **Pancakes**              | Crack the eggs, add flour and milk, mix the batter, flip the pancakes, flambé       |
 | **Vegetable Soup**        | Chop the carrot, stir the soup, shake the salt                                      |
 | **Mac and Cheese**        | Grate the cheese, pour the milk, stir the cheese sauce, sprinkle the crumbs, bake   |
 | **Cacio e Pepe**          | Grate the cheese, shake the pepper, add pasta water, mix the cheese cream, toss     |
@@ -106,33 +106,42 @@ carnival's shared sticker book (`earnSticker` and `stickersFor` from
 | **Tacos**                 | Chop the tomato, stir the taco meat, shake the spice, add the toppings              |
 | **Spaghetti & Meatballs** | Chop the tomato, stir the sauce, shake the salt, add meatballs and basil            |
 | **Cheeseburger**          | Chop the pickle, flip the patties, stack the burger                                 |
-| **Ice Cream Sundae**      | Scoop the ice cream, stack the scoops, drizzle the chocolate, add the toppings      |
-| **Cupcakes**              | Crack the eggs, add flour and sugar, mix, bake, add the toppings                    |
+| **Ice Cream Sundae**      | Scoop the ice cream, drizzle the chocolate, add the toppings, build a tower         |
+| **Cupcakes**              | Crack the eggs, add flour and sugar, mix, bake, add the toppings, party time        |
 | **Sugar Cookies**         | Crack the eggs, mix the dough, roll it out, cut the cookies, bake                   |
 | **Sushi Rolls**           | Chop the cucumber, spread the rice, add the fillings, roll the sushi, chop it       |
+
+Four dishes have a show-off move, an **epic finisher**: the pizza dough is
+spun high in the air, the pancakes get pretend flames, the sundae becomes a
+ten-scoop tower, and the cupcakes end with candles and a party. Each is
+short, big and hard to get wrong.
 
 Lobster Bisque is made from the shells Lulu the lobster has grown out of
 (real lobsters shed theirs), so no lobster is ever cooked.
 
 Each step is one of these:
 
-| Step            | What to do                                                                                                           |
-| --------------- | -------------------------------------------------------------------------------------------------------------------- |
-| **Chop**        | A knife glides along the food. Tap when it's over a dotted line. 4 or 5 chops.                                       |
-| **Crack**       | An egg floats across. Tap when it's over the bowl. 3 eggs, each a little faster.                                     |
-| **Pour**        | Hold to pour into the bowl, pot or blender, and let go when the meter reaches the star. One pour per ingredient.     |
-| **Mix or stir** | Hold and draw circles in the bowl or pot. 3 turns in 15 seconds.                                                     |
-| **Sauce**       | Hold and draw circles to spread it (sauce, ketchup, rice, chocolate). 3 turns in 15 seconds.                         |
-| **Season**      | Hold to shake, and let go when the meter reaches the star. 3 shakes.                                                 |
-| **Toppings**    | A topping floats across. Tap when it's over its sparkly spot. Each one a little faster.                              |
-| **Bake**        | Hold to bake, and let go when the meter reaches the star and the food looks golden.                                  |
-| **Flip**        | Tap when the heart is in the gold. Each one a little faster.                                                         |
-| **Grate**       | Hold the cheese and rub it left and right across the grater. 8 strokes in 20 seconds.                                |
-| **Toss**        | Hold the pan and swipe left and right. Tossing warms the thermometer, resting cools it. 10 tosses.                   |
-| **Blend**       | Hold to whirr the blender, and let go when the smoothness meter reaches the star.                                    |
-| **Scoop**       | Hold in the tub and the ball grows. Let go when the meter reaches the star. One scoop per flavour.                   |
-| **Stack**       | Each layer swings over the plate. Tap to drop it; the closer to the middle, the better. It always sticks.            |
-| **Roll**        | Hold and drag the rolling pin until the dough reaches the dotted line, or push the mat up to roll sushi. 20 seconds. |
+| Step            | What to do                                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Chop**        | A knife glides along the food. Tap when it's over a dotted line. 4 or 5 chops.                                        |
+| **Crack**       | An egg floats across. Tap when it's over the bowl. 3 eggs, each a little faster.                                      |
+| **Pour**        | Hold to pour into the bowl, pot or blender, and let go when the meter reaches the star. One pour per ingredient.      |
+| **Mix or stir** | Hold and draw circles in the bowl or pot. 3 turns in 15 seconds.                                                      |
+| **Sauce**       | Hold and draw circles to spread it (sauce, ketchup, rice, chocolate). 3 turns in 15 seconds.                          |
+| **Season**      | Hold to shake, and let go when the meter reaches the star. 3 shakes.                                                  |
+| **Toppings**    | A topping floats across. Tap when it's over its sparkly spot. Each one a little faster.                               |
+| **Bake**        | Hold to bake, and let go when the meter reaches the star and the food looks golden.                                   |
+| **Flip**        | Tap when the heart is in the gold. Each one a little faster.                                                          |
+| **Grate**       | Hold the cheese and rub it left and right across the grater. 8 strokes in 20 seconds.                                 |
+| **Toss**        | Hold the pan and swipe left and right. Tossing warms the thermometer, resting cools it. 10 tosses.                    |
+| **Blend**       | Hold to whirr the blender, and let go when the smoothness meter reaches the star.                                     |
+| **Scoop**       | Hold in the tub and the ball grows. Let go when the meter reaches the star. One scoop per flavour.                    |
+| **Stack**       | Each layer swings over the plate. Tap to drop it; the closer to the middle, the better. It always sticks.             |
+| **Roll**        | Hold and drag the rolling pin until the dough reaches the dotted line, or push the mat up to roll sushi. 20 seconds.  |
+| **Dough toss**  | Swipe up to spin the dough into the air, and tap to catch it when it's back in the gold ring. 3 tosses, each higher.  |
+| **Flambé**      | Hold the pan: whoosh, pretend flames! Let go when the meter reaches the star, for fireworks. 3 goes.                  |
+| **Tower**       | A scoop swings over the sundae. Tap when it's over the top to stack it. The tower wobbles more as it grows. 7 scoops. |
+| **Party**       | Tap each candle to light it, then hold **Blow!** (or tap it) to blow them out. Friends pop up and sing.               |
 
 Every round is different:
 
@@ -158,6 +167,17 @@ Nothing is ever wasted:
 - A stacked layer always sticks, however far off: it just leans a little.
 - Tossing too hot only makes a few cartoon cheese lumps and a "Not too hot!"
   hint. Grating and rolling never mind how fast you go.
+- A dough toss that isn't caught flops softly onto the board, still scoring a
+  little, and the next toss is ready. A tap while it's still going up is
+  "Not yet!".
+- The flambé's fire is only ever pretend, and Chef Bunny says so ("Ta-da!
+  Pretend fire!", and at the end "Real fire is just for grown-ups!"). Letting
+  go too soon is "Not yet!" and the flames keep their height.
+- The scoop tower never falls: when it leans too far, Chef Bunny reaches in
+  with a paw and holds it steady.
+- Any tap lights the nearest unlit candle (a tap right on its wick is
+  perfect), and blowing never fails. There's no microphone: the **Blow!**
+  button needs no permission and works on every device.
 - A chop always cuts the nearest dotted line, and scores something whenever
   the knife is close to it.
 
@@ -206,6 +226,14 @@ shows in her bubble.
   and nothing from 0.4 off; letting go below 0.5 is "Not yet!". The blend
   scores the same way, against its star. Scoops score like pours. Stacked
   layers score in full within 20 px of the middle, and nothing from 130 px.
+- **The finishers** score like any step, up to 100. A dough toss caught
+  within 28 px of the ring scores its third in full, nothing from 130 px; a
+  dropped one gets 30% of it. A flambé scores within 0.1 of the star in
+  full, nothing from 0.5 off. A tower scoop scores within 26 px of the
+  tower's top in full, nothing from 140 px. The party's candles are worth 60
+  (15 each, 9 for a far tap) and blowing them out 40. Each finisher shows
+  off for a moment (fireworks, a "Pizza pro!", the whole tower, the party
+  song) before the step ends.
 - **Circles** (stirring, sauce and batter) score 50 for finishing, plus up to
   50 for time left. If time runs out you get up to 50 for the turns you made.
   Circles count in either direction, but wiggling back and forth cancels out.
@@ -229,7 +257,7 @@ shows in her bubble.
 The score in the corner counts up as you earn points. Your final score is the
 step points plus the combo bonus, and it's saved to the carnival's score board
 once, when the round ends (before decorating, which doesn't change it), along
-with the dish's sticker. Dishes have three to five cooking steps, so stars and Chef
+with the dish's sticker. Dishes have three to six cooking steps, so stars and Chef
 Bunny's verdict go by your share of what the dish could score (100 a cooking
 step, before bonuses):
 
@@ -747,24 +775,28 @@ The details:
    override its card, such as a `title` of "Shake the pepper!" on a season
    step that shakes a pepper mill.
 
-   | Kind     | Options                                                                                                                                     | Card it makes               |
-   | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-   | `chop`   | `item` (chop)                                                                                                                               | Chop the `item`!            |
-   | `crack`  | `item` (crack), `count?` = 3                                                                                                                | Crack the `item`s!          |
-   | `pour`   | `pours`: ids (pour), one pour each, in order; `into?` (pourInto), the mixing bowl if left out; `inside?` (blended); `targets?`: [low, high] | Add flour and milk!         |
-   | `mix`    | `vessel` (vessel), `contents` (stirred)                                                                                                     | Mix the `contents`!         |
-   | `stir`   | `vessel` (vessel), `contents` (stirred)                                                                                                     | Stir the `contents`!        |
-   | `season` | `shaker` (shaker), `food` (seasoned), `shakes?` = 3                                                                                         | Shake the `shaker`!         |
-   | `sauce`  | `base` (sauceBase), `sauce` (spread)                                                                                                        | Spread the `sauce`!         |
-   | `top`    | `base` (toppingBase), `always?`: ids, `extras`: ids (topping), `count`                                                                      | Add the toppings!           |
-   | `bake`   | `item` (bake)                                                                                                                               | Bake the `item`!            |
-   | `flip`   | `item` (flip), `count?` = 4                                                                                                                 | Flip the `item`s!           |
-   | `grate`  | `item` (grate), `strokes?` = 8                                                                                                              | Grate the `item`!           |
-   | `toss`   | `item` (tossed), `tosses?` = 10                                                                                                             | Toss the `item`!            |
-   | `blend`  | `blender` (blender), `contents` (blended), `blends?` = 1                                                                                    | Blend the `contents`!       |
-   | `scoop`  | `flavours`: ids (scoop), one scoop each                                                                                                     | Scoop the ice cream!        |
-   | `stack`  | `base` (stackBase), `layers`: ids (stack), bottom first                                                                                     | Stack it up!                |
-   | `roll`   | `how`: 'dough' or 'mat', `item` (rollOut or rollUp)                                                                                         | Roll out / Roll the `item`! |
+   | Kind         | Options                                                                                                                                     | Card it makes               |
+   | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+   | `chop`       | `item` (chop)                                                                                                                               | Chop the `item`!            |
+   | `crack`      | `item` (crack), `count?` = 3                                                                                                                | Crack the `item`s!          |
+   | `pour`       | `pours`: ids (pour), one pour each, in order; `into?` (pourInto), the mixing bowl if left out; `inside?` (blended); `targets?`: [low, high] | Add flour and milk!         |
+   | `mix`        | `vessel` (vessel), `contents` (stirred)                                                                                                     | Mix the `contents`!         |
+   | `stir`       | `vessel` (vessel), `contents` (stirred)                                                                                                     | Stir the `contents`!        |
+   | `season`     | `shaker` (shaker), `food` (seasoned), `shakes?` = 3                                                                                         | Shake the `shaker`!         |
+   | `sauce`      | `base` (sauceBase), `sauce` (spread)                                                                                                        | Spread the `sauce`!         |
+   | `top`        | `base` (toppingBase), `always?`: ids, `extras`: ids (topping), `count`                                                                      | Add the toppings!           |
+   | `bake`       | `item` (bake)                                                                                                                               | Bake the `item`!            |
+   | `flip`       | `item` (flip), `count?` = 4                                                                                                                 | Flip the `item`s!           |
+   | `grate`      | `item` (grate), `strokes?` = 8                                                                                                              | Grate the `item`!           |
+   | `toss`       | `item` (tossed), `tosses?` = 10                                                                                                             | Toss the `item`!            |
+   | `blend`      | `blender` (blender), `contents` (blended), `blends?` = 1                                                                                    | Blend the `contents`!       |
+   | `scoop`      | `flavours`: ids (scoop), one scoop each                                                                                                     | Scoop the ice cream!        |
+   | `stack`      | `base` (stackBase), `layers`: ids (stack), bottom first                                                                                     | Stack it up!                |
+   | `roll`       | `how`: 'dough' or 'mat', `item` (rollOut or rollUp)                                                                                         | Roll out / Roll the `item`! |
+   | `dough-toss` | `tosses?` = 3                                                                                                                               | Toss the dough!             |
+   | `flambe`     | `item` (flip), drawn in the pan; `goes?` = 3                                                                                                | Flambé the `item`s!         |
+   | `tower`      | `base` (towerBase), `scoops`: ids (stack), bottom first, one per tap                                                                        | Build a tower!              |
+   | `party`      | `cake` (partyCake), `candles?` = 4                                                                                                          | Party time!                 |
 
    Every step can also take `minutes` (on the kitchen clock), a pour
    `amounts` (one per pour: "1 cup") and a season step `amount` ("¼
@@ -800,6 +832,8 @@ The details:
    | `stackBase`   | burger-plate, sundae-glass                                                                                                                                                                                                                                                         |
    | `rollOut`     | cookie-dough                                                                                                                                                                                                                                                                       |
    | `rollUp`      | sushi-roll                                                                                                                                                                                                                                                                         |
+   | `towerBase`   | sundae-glass                                                                                                                                                                                                                                                                       |
+   | `partyCake`   | cupcake                                                                                                                                                                                                                                                                            |
 
    Anything missing (cupcake batter, a taco shell, sprinkles) is a new
    ingredient file: see below. `dishes/pizza.ts` is a good one to copy.
@@ -847,31 +881,33 @@ export default sprinkles;
 Each role's shape is declared in the step file that uses it, and type-checked
 here. What each one draws (all in scene units, see "The scene" below):
 
-| Role (declared in)             | What it draws                                                                                                                                                                                                                                             |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `chop` (`steps/chop.ts`)       | `draw(g, { bounds, cy, x0, x1 })`: lying along the board at height cy, x0 222 to x1 592, about 70 tall, in pieces between `bounds` ([x0, ...cuts, x1]).                                                                                                   |
-| `crack` (`steps/crack.ts`)     | `draw(g, mood)`: whole, at the origin, ~52×60, with a face. `drawCracked(g, x, y)`: open in the bowl.                                                                                                                                                     |
-| `pour` (`steps/pour.ts`)       | `drawContainer(g, pouring)`: its bag or jug at the origin, ~80×100, upright (the step tips it). `drawInBowl(g, amount)`: 0 to 1 of it in the mixing bowl. `stream`, `grains?`, `meter` colours, `color` (in a pot or blender), `liquid`.                  |
-| `pourInto` (`steps/pour.ts`)   | `mouth`: where the stream lands in its opening (below y 200, `POUR_TOP`; the jug tips just above and left). `draw(g, { t, round, inside, poured })`: on the counter, side on, with `inside` (blended art and `smooth`) and each `{ art, amount }` poured. |
-| `vessel` (`kit/circles.ts`)    | `draw(g, x, y, radius)`: a pot or bowl from above, empty. `inset`: where its contents start.                                                                                                                                                              |
-| `stirred` (`kit/circles.ts`)   | `draw(g, { x, y, r, swirl, done, t })`: what's in the pot filling radius r; `done` 0 to 1 as the turns are made. `spoon`: the spoon's colour.                                                                                                             |
-| `shaker` (`steps/season.ts`)   | `draw(g, left, shaking)`: upright at the origin, ~66×110, with a face; `left` is how full, 0 to 1. Its `colors[0]` is the grains'.                                                                                                                        |
-| `seasoned` (`steps/season.ts`) | `draw(g, { x, t, specks, speck })`: the food on the counter centred on x, about 260 wide (y 240 to 420), with `specks` grains on top.                                                                                                                     |
-| `spread` (`steps/sauce.ts`)    | Colours only: `light`, `main`, `dark` (baked past golden) and `swirl`.                                                                                                                                                                                    |
-| `sauceBase` (`steps/sauce.ts`) | `draw(g, { x, y, r, cover, swirl, spread })`: the base from above on its board, up to r across, `cover` (0 to 1) of it spread with `spread`.                                                                                                              |
-| `toppingBase` (`steps/top.ts`) | `area`: where it sits ({ x, y, rx, ry }; spots are picked inside). `draw(g, { toppings, t, round })`: at `area`, with these `{ id, x, y }` toppings on. `splash`: landing colours.                                                                        |
-| `topping` (`steps/top.ts`)     | `draw(g)`: one piece at the origin, about 26 across. `faceY?`: where the face goes when it floats; `ring?`: a ring (the face goes on a sign).                                                                                                             |
-| `bake` (`steps/bake.ts`)       | `draw(g, { x, y, level, baking, t, round })`: on the oven rack centred on (x, y), ~200×70 (the window is 270×150). `level`: 0 raw, `GOLDEN` (0.7) just right, 1 crispy.                                                                                   |
-| `grate` (`steps/grate.ts`)     | `drawBlock(g, left, rubbing)`: the block, ~110×70, bottom-centre on the origin. `shreds`: [light, main] colours for the pile.                                                                                                                             |
-| `tossed` (`steps/toss.ts`)     | `draw(g, { x, y, r, t, lumps, tossing })`: the food in the pan; `lumps` cartoon lumps when too hot.                                                                                                                                                       |
-| `blender` (`steps/blend.ts`)   | `jar { bottom, top, height }`, `drawBase(g, { whirr, t, done })`, `drawJar(g, { whirr, t, open? })` (`open`: no lid).                                                                                                                                     |
-| `blended` (`steps/blend.ts`)   | Colours only: `chunks[]`, `chunky`, `smooth`, `light`.                                                                                                                                                                                                    |
-| `scoop` (`steps/scoop.ts`)     | `drawBall(g, r, mood)`: the scoop, radius r. `tub`, `top`, `meter` colours. `drawScoopBall` helps.                                                                                                                                                        |
-| `stack` (`steps/stack.ts`)     | `size(top)`: `{ w, h }`. `draw(g, { top, mood, t })`: bottom-centre on the origin; `top` for the last layer.                                                                                                                                              |
-| `stackBase` (`steps/stack.ts`) | `top`: height of the first layer. `draw(g, t)`, and `drawFront?(g, t)` for a glass rim in front.                                                                                                                                                          |
-| `rollOut` (`steps/roll.ts`)    | The dough, drawn growing toward its dotted outline.                                                                                                                                                                                                       |
-| `rollUp` (`steps/roll.ts`)     | The filling and roll, drawn rolling up the mat.                                                                                                                                                                                                           |
-| `flip` (`steps/flip.ts`)       | `drawInPan(g, { up, flipping })`: at the origin, ~200×90 (the step squashes it to turn it). `drawOnPlate(g, x, y, share)`: one on the stack, 15 apart. `garnish?(g, x, y)`.                                                                               |
+| Role (declared in)             | What it draws                                                                                                                                                                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `chop` (`steps/chop.ts`)       | `draw(g, { bounds, cy, x0, x1 })`: lying along the board at height cy, x0 222 to x1 592, about 70 tall, in pieces between `bounds` ([x0, ...cuts, x1]).                                                                                                                  |
+| `crack` (`steps/crack.ts`)     | `draw(g, mood)`: whole, at the origin, ~52×60, with a face. `drawCracked(g, x, y)`: open in the bowl.                                                                                                                                                                    |
+| `pour` (`steps/pour.ts`)       | `drawContainer(g, pouring)`: its bag or jug at the origin, ~80×100, upright (the step tips it). `drawInBowl(g, amount)`: 0 to 1 of it in the mixing bowl. `stream`, `grains?`, `meter` colours, `color` (in a pot or blender), `liquid`.                                 |
+| `pourInto` (`steps/pour.ts`)   | `mouth`: where the stream lands in its opening (below y 200, `POUR_TOP`; the jug tips just above and left). `draw(g, { t, round, inside, poured })`: on the counter, side on, with `inside` (blended art and `smooth`) and each `{ art, amount }` poured.                |
+| `vessel` (`kit/circles.ts`)    | `draw(g, x, y, radius)`: a pot or bowl from above, empty. `inset`: where its contents start.                                                                                                                                                                             |
+| `stirred` (`kit/circles.ts`)   | `draw(g, { x, y, r, swirl, done, t })`: what's in the pot filling radius r; `done` 0 to 1 as the turns are made. `spoon`: the spoon's colour.                                                                                                                            |
+| `shaker` (`steps/season.ts`)   | `draw(g, left, shaking)`: upright at the origin, ~66×110, with a face; `left` is how full, 0 to 1. Its `colors[0]` is the grains'.                                                                                                                                       |
+| `seasoned` (`steps/season.ts`) | `draw(g, { x, t, specks, speck })`: the food on the counter centred on x, about 260 wide (y 240 to 420), with `specks` grains on top.                                                                                                                                    |
+| `spread` (`steps/sauce.ts`)    | Colours only: `light`, `main`, `dark` (baked past golden) and `swirl`.                                                                                                                                                                                                   |
+| `sauceBase` (`steps/sauce.ts`) | `draw(g, { x, y, r, cover, swirl, spread })`: the base from above on its board, up to r across, `cover` (0 to 1) of it spread with `spread`.                                                                                                                             |
+| `toppingBase` (`steps/top.ts`) | `area`: where it sits ({ x, y, rx, ry }; spots are picked inside). `draw(g, { toppings, t, round })`: at `area`, with these `{ id, x, y }` toppings on. `splash`: landing colours.                                                                                       |
+| `topping` (`steps/top.ts`)     | `draw(g)`: one piece at the origin, about 26 across. `faceY?`: where the face goes when it floats; `ring?`: a ring (the face goes on a sign).                                                                                                                            |
+| `bake` (`steps/bake.ts`)       | `draw(g, { x, y, level, baking, t, round })`: on the oven rack centred on (x, y), ~200×70 (the window is 270×150). `level`: 0 raw, `GOLDEN` (0.7) just right, 1 crispy.                                                                                                  |
+| `grate` (`steps/grate.ts`)     | `drawBlock(g, left, rubbing)`: the block, ~110×70, bottom-centre on the origin. `shreds`: [light, main] colours for the pile.                                                                                                                                            |
+| `tossed` (`steps/toss.ts`)     | `draw(g, { x, y, r, t, lumps, tossing })`: the food in the pan; `lumps` cartoon lumps when too hot.                                                                                                                                                                      |
+| `blender` (`steps/blend.ts`)   | `jar { bottom, top, height }`, `drawBase(g, { whirr, t, done })`, `drawJar(g, { whirr, t, open? })` (`open`: no lid).                                                                                                                                                    |
+| `blended` (`steps/blend.ts`)   | Colours only: `chunks[]`, `chunky`, `smooth`, `light`.                                                                                                                                                                                                                   |
+| `scoop` (`steps/scoop.ts`)     | `drawBall(g, r, mood)`: the scoop, radius r. `tub`, `top`, `meter` colours. `drawScoopBall` helps.                                                                                                                                                                       |
+| `stack` (`steps/stack.ts`)     | `size(top)`: `{ w, h }`. `draw(g, { top, mood, t })`: bottom-centre on the origin; `top` for the last layer.                                                                                                                                                             |
+| `stackBase` (`steps/stack.ts`) | `top`: height of the first layer. `draw(g, t)`, and `drawFront?(g, t)` for a glass rim in front.                                                                                                                                                                         |
+| `rollOut` (`steps/roll.ts`)    | The dough, drawn growing toward its dotted outline.                                                                                                                                                                                                                      |
+| `rollUp` (`steps/roll.ts`)     | The filling and roll, drawn rolling up the mat.                                                                                                                                                                                                                          |
+| `towerBase` (`steps/tower.ts`) | The finished dish a tower grows on, its foot's middle at the origin: `height(round)` to the top of what's there, `draw(g, { t, round })` without its finishing touch, `drawCap?(g, { t, round })` that rides on top of the tower, and `count?(round)` scoops already on. |
+| `partyCake` (`steps/party.ts`) | `draw(g, { t, round })`: the finished cake in the scene, with the round's toppings. `candles(count)`: where each candle's bottom stands, in scene units.                                                                                                                 |
+| `flip` (`steps/flip.ts`)       | `drawInPan(g, { up, flipping })`: at the origin, ~200×90 (the step squashes it to turn it). `drawOnPlate(g, x, y, share)`: one on the stack, 15 apart. `garnish?(g, x, y)`.                                                                                              |
 
 Things to know:
 

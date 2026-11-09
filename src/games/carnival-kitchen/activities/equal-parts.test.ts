@@ -68,7 +68,15 @@ describe('equal parts', () => {
       random: seeded(),
       start: 900,
     });
-    expect(steps.map((s) => s.kind)).toEqual(['chop', 'sauce', 'top', 'bake', 'cut', 'ask']);
+    expect(steps.map((s) => s.kind)).toEqual([
+      'chop',
+      'dough-toss',
+      'sauce',
+      'top',
+      'bake',
+      'cut',
+      'ask',
+    ]);
   });
 
   it('draws honest pieces: equal ones really are equal, unequal ones really are not', () => {

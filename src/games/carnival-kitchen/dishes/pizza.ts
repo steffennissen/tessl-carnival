@@ -19,6 +19,8 @@ const pizza: Dish = {
   steps: [
     // There's no pepperoni emoji, so the card shows the knife.
     { kind: 'chop', item: 'pepperoni', icon: '🔪' },
+    // The show-off move: spin the dough high in the air before the sauce goes on.
+    { kind: 'dough-toss', minutes: 2 },
     { kind: 'sauce', base: 'pizza', sauce: 'tomato-sauce' },
     // The pepperoni you chopped always goes on, with four others picked at random.
     {

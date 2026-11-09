@@ -7,6 +7,7 @@ import {
   currentKind,
   liveScore,
   maxScore,
+  move,
   pickDish,
   press,
   ratingFor,
@@ -36,6 +37,8 @@ import {
 import { BAKE_SPEED, BAKE_TARGET } from './steps/bake';
 import type { ChopState } from './steps/chop';
 import type { CrackState } from './steps/crack';
+import { DOUGH_FINALE, DOUGH_REST, type DoughTossState } from './steps/dough-toss';
+import { FLAMBE_FINALE, FLAMBE_SPEED, type FlambeState } from './steps/flambe';
 import type { FlipState } from './steps/flip';
 import type { TopState } from './steps/top';
 import { hintOf, iconOf, stepOf, titleOf } from './steps';
@@ -108,6 +111,7 @@ describe('carnival kitchen', () => {
         createState(dish, seeded()).steps.map((run) => [titleOf(run), iconOf(run)]);
       expect(cards(pizza)).toEqual([
         ['Chop the pepperoni!', '🔪'],
+        ['Toss the dough!', '🍕'],
         ['Spread the sauce!', '🍅'],
         ['Add the toppings!', '🍄'],
         ['Bake the pizza!', '🔥'],
@@ -117,6 +121,7 @@ describe('carnival kitchen', () => {
         ['Add flour and milk!', '🥛'],
         ['Mix the batter!', '🥣'],
         ['Flip the pancakes!', '🥞'],
+        ['Flambé the pancakes!', '🔥'],
       ]);
       expect(cards(soup)).toEqual([
         ['Chop the carrot!', '🥕'],
@@ -130,7 +135,7 @@ describe('carnival kitchen', () => {
         ['Hold to shake,', 'let go at the star!'],
       ]);
       expect(hints(pancakes)[2]).toEqual(['Hold and draw', 'circles in the bowl!']);
-      expect(hints(pizza)[1]).toEqual(['Hold and draw', 'circles on the pizza!']);
+      expect(hints(pizza)[2]).toEqual(['Hold and draw', 'circles on the pizza!']);
     });
 
     it('finds the latest step of a kind cooked so far, not a later repeat', () => {
@@ -220,7 +225,7 @@ describe('carnival kitchen', () => {
 
     it('judges the score against what the dish could score, with at least one star', () => {
       expect(maxScore(createState(soup))).toBe(300);
-      expect(maxScore(createState(pizza))).toBe(400);
+      expect(maxScore(createState(pizza))).toBe(500);
       expect(ratingFor(300, 300)).toBe('You are a Master Chef!');
       expect(ratingFor(240, 400)).toBe('Super yummy!');
       expect(ratingFor(100, 300)).toBe('Yummy!');
@@ -392,13 +397,33 @@ describe('carnival kitchen', () => {
         pan.needle = go.target;
         press(state, 0, 0);
       }
+      nextStep(state);
+      const flames = current<FlambeState>(state);
+      for (const target of flames.targets) {
+        press(state, 400, 300);
+        tick(state, target / FLAMBE_SPEED);
+        release(state);
+      }
+      tick(state, FLAMBE_FINALE);
       expect(state.phase).toBe('over');
-      expect(state.scores).toEqual([100, 100, 100, 100]);
+      expect(state.scores).toEqual([100, 100, 100, 100, 100]);
     });
 
     it('makes pizza', () => {
       const state = ready(pizza);
       chopPerfectly(state);
+      nextStep(state);
+      // Swipe the dough up, and catch it as it comes back down to the ring.
+      for (const go of current<DoughTossState>(state).goes) {
+        press(state, 400, 300);
+        move(state, 400, 240);
+        release(state);
+        tick(state, go.time);
+        expect(press(state, 400, 300)).toBe(true);
+        release(state);
+        tick(state, DOUGH_REST);
+      }
+      tick(state, DOUGH_FINALE);
       nextStep(state);
       circleTurnsOf(state, CIRCLE_TURNS);
       nextStep(state);
@@ -412,7 +437,7 @@ describe('carnival kitchen', () => {
       tick(state, BAKE_TARGET / BAKE_SPEED);
       release(state);
       expect(state.phase).toBe('over');
-      expect(state.scores).toEqual([100, 100, 100, 100]);
+      expect(state.scores).toEqual([100, 100, 100, 100, 100]);
       expect(liveScore(state)).toBe(totalScore(state));
     });
   });
