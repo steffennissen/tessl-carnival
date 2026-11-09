@@ -35,7 +35,32 @@ import {
 } from './chef';
 import { surpriseBubble } from './chaos';
 import { createShow, showSurprise, surpriseTilt } from './chaos/show';
-import { type Box, bookButtonFor, bookPlaces, countLine, smartOf, starsOf, twoLines } from './book';
+import {
+  type Box,
+  bookButtonFor,
+  bookPlaces,
+  countLine,
+  smartOf,
+  starsOf,
+  trophyShelf,
+  twoLines,
+} from './book';
+import {
+  BOSSES,
+  TROPHY_COINS,
+  bossOrder,
+  dishCount,
+  greeting,
+  progressLine,
+  serveLine,
+  title,
+  trophiesOf,
+  trophyCoins,
+  visitDish,
+  type CoinDrop,
+  type RoundCoins,
+  type Visit,
+} from './customers';
 import {
   DECORATIONS,
   type DecorState,
@@ -80,6 +105,42 @@ import {
 import { type Layout, type Shape, layoutFor } from './layout';
 import { NOTE, type Reading, type Sound } from './sound';
 import { SPINNER_DISH, SPIN_TIME, drawSpinner, reelPosition, spinEnd, spinTime } from './spinner';
+import {
+  ARRIVE,
+  ARRIVE_PLACES,
+  ARRIVE_SPEAKER,
+  arriveEnd,
+  guestReach,
+  onStageX,
+  BOSS_PLACES,
+  ENTRANCE,
+  GUEST,
+  PROGRESS,
+  SERVE,
+  SERVE_PLACES,
+  TROPHY,
+  TROPHY_PLACES,
+  coinArc,
+  coinsLanded,
+  countedSoFar,
+  drawRibbon,
+  drawCoinDrop,
+  drawGuest,
+  drawJar,
+  drawOrderCard,
+  drawSaying,
+  drawTag,
+  drawTrophy,
+  drawTrophyShadow,
+  drawWallet,
+  guestSpot,
+  serveTimes,
+  stageSpot,
+  trophyIcon,
+  trophyTimes,
+  walletSpot,
+  type GuestPose,
+} from './stand';
 import { hintOf, iconOf, stepOf, titleOf } from './steps';
 import { type KitchenLook, drawDecorIcon, drawKitchen, sameKitchen } from './kitchens';
 import { drawApron, drawHatIcon } from './outfit-art';
@@ -318,7 +379,23 @@ export interface RoundEnd {
   sticker: StickerNews;
   /** Whether the round earned its dish's Smart Chef star. */
   smart: boolean;
+  /** The food stand: who the dish is for, and the coins it brought in. */
+  stand?: StandEnd;
 }
+
+/** The food stand's side of a round (see customers.ts). */
+export interface StandEnd {
+  visit: Visit;
+  /** The coins the dish brought in, once the round has ended. */
+  coins: RoundCoins | null;
+  /** The coins in the jar before this dish's. */
+  before: number;
+  /** After this dish: the boss's next dish, their trophy, or the end of the visit. */
+  next: 'next dish' | 'trophy' | 'done';
+}
+
+/** A scene of the food stand that comes between rounds (see `startStage`). */
+export type StageKind = 'arrive' | 'entrance' | 'progress' | 'trophy';
 
 /**
  * A plate under a shiny lid with a big "?" on it, for the title screen. The
@@ -684,6 +761,12 @@ export function createRenderer(ctx: G, voice: Sound) {
     /** The time the kitchen clock shows: it sweeps on to the round's time. */
     clock: null as number | null,
     smartShown: false,
+    /** The customer at the stand: how they feel, and since when. */
+    guest: { mood: 'idle' as GuestPose['mood'], age: 9 },
+    /** Seconds since serving started, or -1 before it. */
+    serveAge: -1,
+    /** Coins that have landed in the jar while serving. */
+    serveLanded: 0,
   });
   let fx = fresh();
 
@@ -818,6 +901,10 @@ export function createRenderer(ctx: G, voice: Sound) {
       feedback.grade === 'Nice try!' ? ['heart'] : ['star', 'heart', 'star', 'dot'];
     burst(x, y, counts[feedback.grade], shapes, CONFETTI);
     chefReacts({ kind: 'hit', grade: feedback.grade, combo: feedback.combo }, x, y);
+    // The customer waiting at the stand is happy too, now and then hopping.
+    if (feedback.grade === 'Perfect!' || feedback.grade === 'Great!') {
+      fx.guest = { mood: 'happy', age: 0 };
+    }
   }
 
   /** What steps can set off: sounds, sparkles, and Chef Bunny's mood. */
@@ -901,7 +988,12 @@ export function createRenderer(ctx: G, voice: Sound) {
       fx.decorAge += dt;
     }
 
-    if (state.phase === 'over' && end.decor.done) {
+    // Then she serves the dish to the customer, and the coins go in the jar.
+    if (state.phase === 'over' && end.decor.done && end.stand && !served(end)) {
+      observeServe(state, end.stand, dt);
+    }
+
+    if (state.phase === 'over' && end.decor.done && served(end)) {
       if (fx.overAge < 0) {
         fx.overAge = 0;
         sound.fanfare();
@@ -914,8 +1006,10 @@ export function createRenderer(ctx: G, voice: Sound) {
               : '';
         const times = ` You started at ${clockText(state.start)} and finished at ${clockText(roundTime(state))}!`;
         const smartLine = end.smart ? ' You are a Smart Chef!' : '';
+        const coins = end.stand?.coins;
+        const coinLine = coins ? ` You earned ${coins.total} coins!` : '';
         sound.say(
-          `${ratingFor(totalScore(state), maxScore(state))} You made ${dish}!${times}${news}${smartLine}`,
+          `${ratingFor(totalScore(state), maxScore(state))} You made ${dish}!${times}${news}${smartLine}${coinLine}`,
         );
       }
       fx.overAge += dt;
@@ -965,6 +1059,8 @@ export function createRenderer(ctx: G, voice: Sound) {
       if (fx.said.age > SAID_TIME) fx.said = null;
     }
     badgeAge += dt;
+    jarBump += dt;
+    fx.guest.age += dt;
     if (fx.notYet) fx.notYet.age += dt;
     for (const p of fx.particles) {
       p.vy += p.gravity * dt;
@@ -1372,7 +1468,24 @@ export function createRenderer(ctx: G, voice: Sound) {
       plainText(g, `${label} ${clockText(time)}`, x, 8, 15, C.purple);
       drawClock(g, x, 58, 38, time, { t });
     }
-    plainText(g, `⭐ ${score} points`, 0, 178, 20, C.purple);
+    // The coins the dish brought in, and how many are in the jar now.
+    const stand = end.stand;
+    fitted(
+      stand?.coins
+        ? `⭐ ${score} points  ·  🪙 +${stand.coins.total}  ·  Jar: ${stand.before + stand.coins.total}`
+        : `⭐ ${score} points`,
+      0,
+      178,
+      20,
+      C.purple,
+      440,
+    );
+    const again =
+      stand?.next === 'next dish'
+        ? 'Next dish! 🍽️'
+        : stand?.next === 'trophy'
+          ? 'Trophy time! 🏆'
+          : 'Cook again! 🔁';
 
     const pulse = 1 + Math.sin(t * 4) * 0.04;
     g.save();
@@ -1380,7 +1493,7 @@ export function createRenderer(ctx: G, voice: Sound) {
     g.scale(pulse, pulse);
     rounded(g, -118, -26, 236, 52, 26);
     fillStroke(g, vertical(g, -26, 26, [C.cabinetLight, C.mint]));
-    plainText(g, 'Cook again! 🔁', 0, 1, 24, C.ink);
+    plainText(g, again, 0, 1, 24, C.ink);
     g.restore();
 
     // The sticker news pops on after the stars.
@@ -1584,6 +1697,7 @@ export function createRenderer(ctx: G, voice: Sound) {
     const t = fx.time;
     const dishes = bookDishes();
     const b = bookPlaces(layout, dishes.length);
+    const shelf = trophyShelf(layout, BOSSES.length);
     const tall = layout.shape === 'tall';
     const unwrapped = surpriseUnlocked(stickers);
     dim(0.3);
@@ -1604,17 +1718,25 @@ export function createRenderer(ctx: G, voice: Sound) {
       tall ? 44 : 36,
       vertical(g, b.title.y - 22, b.title.y + 22, [C.hotPink, C.purple]),
       'center',
-      b.page.w - 2 * (b.close.r + 50),
+      tall
+        ? b.page.w - 2 * (b.close.r + 50)
+        : Math.min(
+            b.page.w - 2 * (b.close.r + 50),
+            layout.width - 2 * (shelf.box.x + shelf.box.w + 12),
+          ),
     );
     // How many dishes, and how many more until the surprise.
     const hint = surpriseHint(stickers);
+    // Beside the trophy shelf (at the top left, except on a phone held upright).
+    const countLeft = tall ? b.page.x + b.close.r + 30 : shelf.box.x + shelf.box.w + 12;
+    const countRight = b.close.x - b.close.r - 12;
     fitted(
       `📖 ${countLine(stickers, openDishes())}${hint ? ` · ${hint}` : ' · 🎂 Surprise unlocked!'}`,
-      b.count.x,
+      tall ? b.count.x : (countLeft + countRight) / 2,
       b.count.y,
       tall ? 26 : 20,
       C.purple,
-      b.page.w - 2 * (b.close.r + 30),
+      tall ? b.page.w - 2 * (b.close.r + 30) : countRight - countLeft,
     );
 
     // Close: or tap anywhere that isn't a dish you've cooked.
@@ -1671,6 +1793,33 @@ export function createRenderer(ctx: G, voice: Sound) {
       for (let k = 0; k < 3; k++) {
         starPath(g, cx + (k - 1) * 20 * s, cell.y + 124 * s, 8 * s);
         fillStroke(g, k < level ? C.gold : C.white, 2, k < level ? C.ink : C.starEdge);
+      }
+    });
+
+    // The trophy shelf: a golden trophy for each boss she has cooked for.
+    const wins = trophiesOf(stickers);
+    const { box } = shelf;
+    rounded(g, box.x, box.y, box.w, box.h, 18);
+    fillStroke(g, 'rgba(255, 255, 255, 0.7)', 3, C.lavender);
+    plainText(
+      g,
+      '🏆 Trophies',
+      box.x + box.w / 2,
+      box.y + shelf.label / 2 + 5,
+      shelf.label - 2,
+      C.purple,
+    );
+    BOSSES.forEach((boss, i) => {
+      const slot = shelf.slots[i];
+      const scale = Math.min(slot.w / 150, (slot.h - 6) / 175);
+      const x = slot.x + slot.w / 2;
+      const y = slot.y + slot.h / 2 + 4 * scale;
+      const won = wins[boss.id];
+      if (won > 0) {
+        drawTrophy(g, x, y, scale, trophyIcon(boss.kind), t);
+        if (won > 1) stickerText(g, `×${won}`, x + slot.w * 0.3, slot.y + 12, 16, C.hotPink);
+      } else {
+        drawTrophyShadow(g, x, y, scale);
       }
     });
   }
@@ -1806,6 +1955,445 @@ export function createRenderer(ctx: G, voice: Sound) {
     rounded(g, d.x, d.y, d.w, d.h, d.h / 2);
     fillStroke(g, vertical(g, d.y, d.y + d.h, [C.cabinetLight, C.mint]), 4);
     plainText(g, 'Done', d.x + d.w / 2, d.y + d.h / 2 + 1, 26, C.ink);
+  }
+
+  // -------------------------------------------------------------------------
+  // The food stand: customers arriving, waiting, being served, and bosses
+
+  /** Where the stand's scenes go on the canvas (see `stageSpot`). */
+  function stageAt() {
+    return stageSpot(layout, places);
+  }
+
+  /** Draws on the stage: 440 by 500 stage units round (400, 250). */
+  function onStage(paint: () => void) {
+    const at = stageAt();
+    onCanvas(() => {
+      ctx.translate(at.x, at.y);
+      ctx.scale(at.scale, at.scale);
+      ctx.translate(-400, -250);
+      paint();
+    });
+  }
+
+  /** A stage point in scene units, for sparkles. */
+  function stageToScene(x: number, y: number) {
+    const at = stageAt();
+    return {
+      x: at.x + (x - 400) * at.scale - layout.sceneX,
+      y: at.y + (y - 250) * at.scale - layout.sceneY,
+    };
+  }
+
+  /** A coin clinking into the jar. */
+  function clink(i: number) {
+    sound.tone(2350 + (i % 4) * 120, 0.12, { type: 'triangle', volume: 0.14 });
+    sound.tone(3150, 0.18, { type: 'sine', volume: 0.08, delay: 0.05 });
+  }
+
+  /** Seconds since the jar last took a coin, for the wallet's little bump. */
+  let jarBump = 9;
+
+  /** The coins in the jar, small in the HUD. */
+  function drawWalletHud(amount: number) {
+    onCanvas(() =>
+      drawWallet(ctx, walletSpot(layout, places), amount, clamp01(1 - jarBump / 0.25)),
+    );
+  }
+
+  /** The customer, small, waiting at the stand while she cooks. */
+  function drawWaitingGuest(stand: StandEnd, state: KitchenState) {
+    const spot = guestSpot(layout, places, guestReach(stand.visit.guest.kind));
+    const decorating = state.phase === 'over';
+    const pose: GuestPose = {
+      t: fx.time,
+      mood: decorating ? 'wow' : fx.guest.mood,
+      age: decorating ? fx.time % 2 : fx.guest.age,
+      walk: 0,
+      wave: false,
+    };
+    onCanvas(() => drawGuest(ctx, stand.visit.guest, spot.x, spot.y, spot.scale, pose));
+  }
+
+  /** How long serving takes this round (no stand: none). */
+  function serveEnd(end: RoundEnd): number {
+    const stand = end.stand;
+    if (!stand) return 0;
+    return serveTimes(stand.coins?.drops.length ?? 0, stand.visit.guest.boss).end;
+  }
+
+  /** Whether the dish has been served, so the end card can show. */
+  function served(end: RoundEnd): boolean {
+    return !end.stand || fx.serveAge >= serveEnd(end);
+  }
+
+  /** Serving: the dish slides over, they're delighted, and the coins drop into the jar. */
+  function observeServe(state: KitchenState, stand: StandEnd, dt: number) {
+    if (fx.serveAge < 0) {
+      fx.serveAge = 0;
+      sound.whoosh();
+      fx.guest = { mood: 'wow', age: 0 };
+      return;
+    }
+    const before = fx.serveAge;
+    fx.serveAge += dt;
+    const age = fx.serveAge;
+    if (before < SERVE.slide && age >= SERVE.slide) {
+      // They get the dish: always happy, more so with more stars.
+      const stars = starsFor(totalScore(state), maxScore(state));
+      fx.guest = { mood: 'happy', age: 0 };
+      fx.chef.mood = 'cheer';
+      fx.chef.moodAge = 0;
+      const at = stageToScene(SERVE_PLACES.guest.x, SERVE_PLACES.guest.y - 150);
+      burst(
+        at.x,
+        at.y,
+        8 + stars * 8,
+        ['heart', 'star', 'heart', 'dot'],
+        CONFETTI,
+        160 + stars * 70,
+      );
+      const notes = [NOTE.C6, NOTE.E6, NOTE.G6, NOTE.C7].slice(0, stars + 1);
+      sound.chime(notes, 0.09, 0.16);
+      sound.say(serveLine(stars, state.dish));
+    }
+    const drops = stand.coins?.drops ?? [];
+    const landed = coinsLanded(age, drops.length, SERVE.coins, SERVE.gap, SERVE.fly);
+    while (fx.serveLanded < landed) {
+      clink(fx.serveLanded);
+      fx.serveLanded += 1;
+      jarBump = 0;
+      const jar = stageToScene(SERVE_PLACES.jar.x, SERVE_PLACES.jar.y - 112);
+      burst(jar.x, jar.y, 5, ['star', 'dot'], [C.gold, C.butter, C.white], 140);
+    }
+    const leave = serveTimes(drops.length, stand.visit.guest.boss).leave;
+    if (!stand.visit.guest.boss && before < leave && age >= leave) {
+      sound.chime([NOTE.G6, NOTE.E6], 0.12, 0.1);
+    }
+  }
+
+  function drawServe(state: KitchenState, end: RoundEnd, stand: StandEnd) {
+    const P = SERVE_PLACES;
+    const age = Math.max(0, fx.serveAge);
+    const drops = stand.coins?.drops ?? [];
+    const times = serveTimes(drops.length, stand.visit.guest.boss);
+    const landed = coinsLanded(age, drops.length, SERVE.coins, SERVE.gap, SERVE.fly);
+    const counted = countedSoFar(drops, landed);
+    const stars = starsFor(totalScore(state), maxScore(state));
+    const leaving = stand.visit.guest.boss ? 0 : Math.max(0, age - times.leave);
+    const gx = onStageX(P.guest.x, stand.visit.guest.kind, P.guest.scale) + leaving * 320;
+    dim(0.22 * clamp01(age / 0.3));
+    onStage(() => {
+      const g = ctx;
+      drawJar(g, P.jar.x, P.jar.y, P.jar.scale, (stand.before + counted) / 400, fx.time);
+      if (counted > 0) {
+        stickerText(g, `+${counted}`, P.jar.x, P.jar.y - 154, 36, C.gold);
+      }
+      drawGuest(g, stand.visit.guest, gx, P.guest.y, P.guest.scale, {
+        t: fx.time,
+        mood: fx.guest.mood,
+        age: fx.guest.age,
+        walk: leaving > 0 ? fx.time : 0,
+        wave: leaving > 0,
+      });
+      // The dish slides over to them, and goes with them when they leave.
+      const p = clamp01(age / SERVE.slide);
+      const ease = 1 - Math.pow(1 - p, 3);
+      const dx = P.dishFrom.x + (P.dishTo.x - P.dishFrom.x) * ease + leaving * 320;
+      g.save();
+      g.translate(dx, P.dishTo.y);
+      g.scale(P.dishScale, P.dishScale);
+      state.dish.draw(g, fx.time, state);
+      drawDecorations(g, end.decor.placed);
+      g.restore();
+      // The coins in the air, from their paw to the jar.
+      drops.forEach((drop, i) => {
+        const q = (age - SERVE.coins - i * SERVE.gap) / SERVE.fly;
+        if (q < 0 || q >= 1) return;
+        const from = { x: gx - 46, y: P.guest.y - 110 };
+        const at = coinArc(from, { x: P.jar.x, y: P.jar.y - 118 }, q);
+        drawCoinDrop(g, drop, at.x, at.y, drop.kind === 'carnival' ? 22 : 24);
+      });
+      if (age >= SERVE.slide) {
+        const pop = easeOutBack(clamp01((age - SERVE.slide) / 0.35));
+        const b = P.bubble;
+        g.save();
+        g.translate(b.x + b.w / 2, b.y + b.h / 2);
+        g.scale(pop, pop);
+        g.translate(-(b.x + b.w / 2), -(b.y + b.h / 2));
+        const lines =
+          stars >= 3 ? [serveLine(stars, state.dish), '⭐⭐⭐'] : [serveLine(stars, state.dish)];
+        drawSaying(g, b, lines, gx - 10, P.guest.y - GUEST.h * P.guest.scale);
+        g.restore();
+      }
+    });
+    drawWalletHud(stand.before + counted);
+  }
+
+  /** A stand scene between rounds, while it shows. */
+  let stage: {
+    kind: StageKind;
+    visit: Visit;
+    age: number;
+    /** Tapped to move on (the trophy waits for a tap). */
+    finished: boolean;
+    /** "Read it myself": the arrival waits for a tap, and its 🔊 reads it out. */
+    reader: boolean;
+    reading: Reading | null;
+    /** The coins in the jar before the trophy's bonus. */
+    before: number;
+    landed: number;
+    drum: number;
+  } | null = null;
+
+  /** Seconds until a stage scene ends by itself, and before a tap can skip it. */
+  function stageTimes(kind: StageKind, reader = false) {
+    if (kind === 'arrive') return { skip: ARRIVE.skip, end: arriveEnd(reader) };
+    if (kind === 'entrance') return { skip: ENTRANCE.skip, end: ENTRANCE.end };
+    if (kind === 'progress') return { skip: PROGRESS.skip, end: PROGRESS.end };
+    return { skip: TROPHY.skip, end: Infinity };
+  }
+
+  /** A drumroll, a frame at a time, getting louder up to `until`. */
+  function drumroll(age: number, until: number) {
+    if (!stage || age >= until) return;
+    stage.drum += fx.dt;
+    if (stage.drum < 0.06) return;
+    stage.drum = 0;
+    const loud = 0.06 + 0.1 * clamp01(age / until);
+    sound.hiss(0.06, { volume: loud, from: 380, filter: 'lowpass' });
+    sound.tone(96 + Math.random() * 20, 0.06, { type: 'triangle', volume: loud * 0.8 });
+  }
+
+  /** The room goes dark but for a spotlight round (x, y) on the stage, `r` across. */
+  function spotlight(x: number, y: number, r: number, dark: number) {
+    const at = stageAt();
+    const cx = at.x + (x - 400) * at.scale;
+    const cy = at.y + (y - 250) * at.scale;
+    const radius = r * at.scale;
+    onCanvas(() => {
+      const light = ctx.createRadialGradient(cx, cy, radius * 0.75, cx, cy, radius * 1.25);
+      light.addColorStop(0, 'rgba(91, 59, 79, 0)');
+      light.addColorStop(1, `rgba(91, 59, 79, ${dark})`);
+      ctx.fillStyle = light;
+      ctx.fillRect(0, 0, layout.width, layout.height);
+      ctx.fillStyle = `rgba(255, 245, 200, ${0.18 * (dark / 0.7)})`;
+      circle(ctx, cx, cy, radius);
+      ctx.fill();
+    });
+  }
+
+  /** Confetti falling from the top, like the end card's. */
+  function confettiRain() {
+    if (Math.random() >= 0.6) return;
+    fx.particles.push({
+      x: Math.random() * W,
+      y: -10 - layout.sceneY,
+      vx: (Math.random() - 0.5) * 60,
+      vy: 90 + Math.random() * 80,
+      gravity: 40,
+      life: 6,
+      max: 6,
+      size: 9,
+      color: CONFETTI[Math.floor(Math.random() * CONFETTI.length)],
+      shape: 'confetti',
+      rot: Math.random() * Math.PI,
+      spin: (Math.random() - 0.5) * 10,
+    });
+  }
+
+  function drawArrive(visit: Visit, age: number, dt: number, reader: boolean) {
+    const P = ARRIVE_PLACES;
+    const dish = visitDish(visit);
+    const before = age - dt;
+    if (before < ARRIVE.walk && age >= ARRIVE.walk) {
+      // Read it myself: the words wait on screen, and the 🔊 reads them.
+      if (!reader) sound.say(greeting(visit.guest, dish).join(' '));
+      fx.chef.mood = 'cheer';
+      fx.chef.moodAge = 0;
+    }
+    const p = clamp01(age / ARRIVE.walk);
+    const x = 700 + (P.guest.x - 700) * (1 - Math.pow(1 - p, 2));
+    dim(0.2);
+    onStage(() => {
+      const g = ctx;
+      const talking = age >= ARRIVE.walk;
+      drawGuest(g, visit.guest, x, P.guest.y, P.guest.scale, {
+        t: fx.time,
+        mood: 'idle',
+        age: 9,
+        walk: p < 1 ? fx.time : 0,
+        wave: talking && age < ARRIVE.walk + 2,
+      });
+      if (!talking) return;
+      const pop = easeOutBack(clamp01((age - ARRIVE.walk) / 0.35));
+      g.save();
+      g.translate(400, 100);
+      g.scale(pop, pop);
+      g.translate(-400, -100);
+      const top = P.guest.y - GUEST.h * P.guest.scale;
+      drawSaying(g, P.bubble, greeting(visit.guest, dish), P.guest.x, top);
+      // What they'd like, in a little thought cloud.
+      circle(g, 548, 300, 54);
+      fillStroke(g, C.white, 3.5);
+      circle(g, 506, 352, 9);
+      fillStroke(g, C.white, 3);
+      g.save();
+      g.translate(548, 302);
+      g.scale(0.38, 0.38);
+      dish.draw(g, fx.time, null);
+      g.restore();
+      g.restore();
+      drawTag(g, P.tag.x, P.tag.y, title(visit.guest));
+      if (reader) {
+        const reading = stage?.reading;
+        const S = ARRIVE_SPEAKER;
+        drawSpeaker(g, S.x, S.y, S.r, !!reading && !reading.done(), fx.time);
+      }
+      g.font = font(17);
+      const lineW = g.measureText(visit.guest.line).width + 28;
+      rounded(g, P.line.x - lineW / 2, P.line.y - 15, lineW, 30, 15);
+      g.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      g.fill();
+      plainText(g, visit.guest.line, P.line.x, P.line.y, 17, C.purple);
+    });
+  }
+
+  function drawBoss(visit: Visit, age: number, kind: 'entrance' | 'progress') {
+    const P = BOSS_PLACES;
+    const reveal = kind === 'entrance' ? ENTRANCE.drum : 0;
+    const before = age - fx.dt;
+    if (kind === 'entrance') {
+      drumroll(age, reveal);
+      if (before < reveal && age >= reveal) {
+        sound.fanfare();
+        sound.say(bossOrder(visit.guest, visit.dishes));
+        const at = stageToScene(P.guest.x, P.guest.y - 120);
+        burst(at.x, at.y, 30, ['star', 'confetti', 'heart'], CONFETTI, 420);
+        fx.chef.mood = 'party';
+        fx.chef.moodAge = 0;
+      }
+      if (age >= reveal && age < reveal + 3) confettiRain();
+    } else if (before <= 0) {
+      sound.chime([NOTE.C6, NOTE.E6, NOTE.G6], 0.1, 0.14);
+      sound.say(progressLine(visit));
+      fx.chef.mood = 'cheer';
+      fx.chef.moodAge = 0;
+    }
+    if (age < reveal) {
+      // In the dark, a spotlight sweeps about, looking for someone.
+      spotlight(400 + Math.sin(age * 4.5) * 150, 220 + Math.cos(age * 3.1) * 50, 80, 0.72);
+      return;
+    }
+    spotlight(P.guest.x, P.guest.y - 90, 130, kind === 'entrance' ? 0.55 : 0.3);
+    const pop = easeOutBack(clamp01((age - reveal) / 0.5));
+    onStage(() => {
+      const g = ctx;
+      const banner = kind === 'entrance' ? '⭐ A VIP is here! ⭐' : `⭐ ${dishCount(visit)} ⭐`;
+      drawRibbon(g, P.banner, banner);
+      g.save();
+      g.translate(onStageX(P.guest.x, visit.guest.kind, P.guest.scale), P.guest.y);
+      g.scale(pop, pop);
+      drawGuest(g, visit.guest, 0, 0, P.guest.scale, {
+        t: fx.time,
+        mood: age - reveal < 1.2 ? 'wow' : 'idle',
+        age: age - reveal,
+        walk: 0,
+        wave: true,
+      });
+      g.restore();
+      drawTag(g, P.tag.x, P.tag.y, title(visit.guest), 300);
+      const slide = easeOutBack(clamp01((age - reveal - 0.4) / 0.5));
+      g.save();
+      g.translate(0, (1 - slide) * 220);
+      drawOrderCard(g, P.card, visit.dishes, visit.index, visit.index, fx.time);
+      g.restore();
+    });
+  }
+
+  function drawTrophyScene(visit: Visit, age: number, before: number) {
+    const P = TROPHY_PLACES;
+    const coins = trophyCoins();
+    const times = trophyTimes(coins.drops.length);
+    const was = age - fx.dt;
+    drumroll(age, TROPHY.rise);
+    if (was < TROPHY.rise && age >= TROPHY.rise) {
+      sound.fanfare();
+      sound.say(
+        `You won ${visit.guest.name}'s golden trophy! Here are ${TROPHY_COINS} bonus coins!`,
+      );
+      const at = stageToScene(P.trophy.x, P.trophy.y);
+      burst(at.x, at.y, 34, ['star', 'confetti', 'heart'], CONFETTI, 460);
+      fx.chef.mood = 'party';
+      fx.chef.moodAge = 0;
+    }
+    if (age >= TROPHY.rise && age < TROPHY.rise + 3.5) confettiRain();
+    const landed = coinsLanded(age, coins.drops.length, TROPHY.coins, TROPHY.gap, TROPHY.fly);
+    if (stage && landed > stage.landed) {
+      clink(stage.landed);
+      stage.landed = landed;
+      jarBump = 0;
+    }
+    const counted = countedSoFar(coins.drops, landed);
+    spotlight(P.trophy.x, P.trophy.y, 120, age < TROPHY.rise ? 0.7 : 0.35);
+    onStage(() => {
+      const g = ctx;
+      if (age >= TROPHY.rise) {
+        const pop = easeOutBack(clamp01((age - TROPHY.rise) / 0.6));
+        drawRibbon(g, P.banner, '🏆 You won the trophy! 🏆');
+        g.save();
+        g.translate(P.trophy.x, P.trophy.y + (1 - pop) * 60);
+        g.scale(pop, pop);
+        drawTrophy(
+          g,
+          0,
+          0,
+          P.trophy.scale,
+          trophyIcon(visit.guest.kind),
+          fx.time,
+          (fx.time * 0.5) % 1.6,
+        );
+        g.restore();
+        stickerText(
+          g,
+          `${title(visit.guest)}'s Trophy`,
+          P.name.x,
+          P.name.y,
+          28,
+          C.hotPink,
+          'center',
+          420,
+        );
+        const gx = onStageX(P.guest.x, visit.guest.kind, P.guest.scale);
+        drawGuest(g, visit.guest, gx, P.guest.y, P.guest.scale, {
+          t: fx.time,
+          mood: 'happy',
+          age: (age - TROPHY.rise) % 1.4,
+          walk: 0,
+          wave: false,
+        });
+      }
+      drawJar(g, P.jar.x, P.jar.y, P.jar.scale, (before + counted) / 400, fx.time);
+      if (counted > 0) stickerText(g, `+${counted}`, P.jar.x, P.jar.y - 124, 30, C.gold);
+      coins.drops.forEach((drop: CoinDrop, i) => {
+        const q = (age - TROPHY.coins - i * TROPHY.gap) / TROPHY.fly;
+        if (q < 0 || q >= 1) return;
+        const at = coinArc(P.trophy, { x: P.jar.x, y: P.jar.y - 100 }, q);
+        drawCoinDrop(g, drop, at.x, at.y, 22);
+      });
+      if (age >= times.coinsEnd) {
+        const b = P.button;
+        const pulse = 1 + Math.sin(fx.time * 4) * 0.04;
+        g.save();
+        g.translate(b.x, b.y);
+        g.scale(pulse, pulse);
+        rounded(g, -b.w / 2, -b.h / 2, b.w, b.h, b.h / 2);
+        fillStroke(g, vertical(g, -b.h / 2, b.h / 2, [C.cabinetLight, C.mint]), 4);
+        plainText(g, 'Cook again! 🔁', 0, 1, 24, C.ink);
+        g.restore();
+      }
+    });
+    drawWalletHud(before + counted);
   }
 
   // -------------------------------------------------------------------------
@@ -2334,6 +2922,102 @@ export function createRenderer(ctx: G, voice: Sound) {
   }
 
   return {
+    /**
+     * Starts a stand scene: a customer arriving ('arrive'), a boss's
+     * fanfare entrance with their order ('entrance'), "Dish 2 of 3" between
+     * a boss's dishes ('progress'), or the boss's trophy ('trophy'). `before`
+     * is the coins in the jar before the trophy's bonus.
+     */
+    startStage(kind: StageKind, visit: Visit, before = 0, readMyself = false) {
+      stage = {
+        kind,
+        visit,
+        age: 0,
+        finished: false,
+        reader: readMyself && kind === 'arrive',
+        reading: null,
+        before,
+        landed: 0,
+        drum: 9,
+      };
+      if (kind === 'arrive') sound.chime([NOTE.E6, NOTE.C6], 0.22, 0.14);
+      if (kind === 'entrance' || kind === 'trophy') sound.whoosh();
+    },
+
+    /** Whether the stand scene is over, so the round (or the next visit) can start. */
+    stageDone() {
+      return !stage || stage.finished || stage.age >= stageTimes(stage.kind, stage.reader).end;
+    },
+
+    /** Whether a canvas point is on the arrival's 🔊 ("Read it myself"). */
+    hitStageSpeaker(x: number, y: number) {
+      if (!stage?.reader || stage.age < ARRIVE.walk) return false;
+      const at = stageAt();
+      const S = ARRIVE_SPEAKER;
+      const sx = at.x + (S.x - 400) * at.scale;
+      const sy = at.y + (S.y - 250) * at.scale;
+      return Math.hypot(x - sx, y - sy) <= (S.r + 8) * at.scale;
+    },
+
+    /** Reads the customer's order out loud (the arrival's 🔊). */
+    readStage() {
+      if (!stage) return;
+      sound.pop();
+      stage.reading = sound.read(greeting(stage.visit.guest, visitDish(stage.visit)).join(' '));
+    },
+
+    /**
+     * A tap during a stand scene: once it has shown a moment, it skips the
+     * rest. The trophy first finishes dropping its coins, then the next tap
+     * moves on.
+     */
+    skipStage() {
+      if (!stage) return;
+      const times = stageTimes(stage.kind, stage.reader);
+      if (stage.age < times.skip) return;
+      if (stage.kind === 'trophy') {
+        const end = trophyTimes(trophyCoins().drops.length).coinsEnd;
+        if (stage.age < end) stage.age = end;
+        else stage.finished = true;
+        return;
+      }
+      stage.finished = true;
+    },
+
+    /** Draws a frame of the stand scene. */
+    drawStage(dt: number) {
+      update(dt);
+      begin();
+      const s = stage;
+      if (s) {
+        s.age += dt;
+        bunny();
+        if (s.kind === 'arrive') drawArrive(s.visit, s.age, dt, s.reader);
+        else if (s.kind === 'trophy') drawTrophyScene(s.visit, s.age, s.before);
+        else drawBoss(s.visit, s.age, s.kind);
+      }
+      drawButtons();
+      drawParticles();
+      drawLeave(dt);
+    },
+
+    /** Whether a tap on the book's trophy shelf: says whose trophy it is. */
+    sayTrophy(index: number, wins: number) {
+      const boss = BOSSES[index] as (typeof BOSSES)[number] | undefined;
+      if (!boss) return;
+      sound.pop();
+      sound.say(
+        wins > 0
+          ? `${title(boss)}'s trophy! You won it ${wins === 1 ? 'once' : `${wins} times`}!`
+          : `Cook for ${boss.name} to win this trophy!`,
+      );
+    },
+
+    /** A tap while serving: once it has started a moment ago, on to the end card. */
+    skipServe(end: RoundEnd) {
+      if (fx.serveAge >= SERVE.skip) fx.serveAge = Math.max(fx.serveAge, serveEnd(end));
+    },
+
     reset() {
       const keep = fx.particles;
       fx = fresh();
@@ -2341,6 +3025,7 @@ export function createRenderer(ctx: G, voice: Sound) {
       spin = null;
       announced = null;
       waiting = null;
+      stage = null;
     },
 
     /**
@@ -2716,9 +3401,14 @@ export function createRenderer(ctx: G, voice: Sound) {
 
       begin();
       if (state.phase === 'playing') drawWallClock(state, dt);
+      // The customer waits at the stand while she cooks and decorates.
+      if (end.stand && (state.phase === 'playing' || !end.decor.done)) {
+        drawWaitingGuest(end.stand, state);
+      }
 
-      // The step being cooked draws itself on the scene (tilted by a wobbly table).
+      // The step being cooked draws itself on the scene (not while serving; tilted by a wobbly table).
       const run = currentRun(state);
+      const serving = state.phase === 'over' && end.decor.done && !served(end);
       const tilt = surpriseTilt(state, fx.time);
       ctx.save();
       if (tilt) {
@@ -2726,7 +3416,7 @@ export function createRenderer(ctx: G, voice: Sound) {
         ctx.rotate(tilt.angle);
         ctx.translate(-tilt.x, -tilt.y);
       }
-      stepOf(run.kind).draw(viewFor(state, run, pointer, dt));
+      if (!serving) stepOf(run.kind).draw(viewFor(state, run, pointer, dt));
       ctx.restore();
       if (state.phase === 'playing') drawSurprise(state, pointer, dt);
 
@@ -2744,6 +3434,17 @@ export function createRenderer(ctx: G, voice: Sound) {
         return;
       }
 
+      // Then she serves it, before the end card.
+      if (state.phase === 'over' && end.stand && !served(end)) {
+        drawServe(state, end, end.stand);
+        bunny();
+        drawButtons();
+        drawParticles();
+        drawLeave(dt);
+        flushChatter();
+        return;
+      }
+
       bunny();
       if (state.phase === 'playing' && state.banner === 0) {
         const said = fx.said;
@@ -2752,6 +3453,7 @@ export function createRenderer(ctx: G, voice: Sound) {
         onCanvas(() => drawSpeech(ctx, said ? [said.text] : lines, places.speech));
       }
       drawHud(state);
+      if (end.stand && state.phase === 'playing') drawWalletHud(end.stand.before);
       if (state.phase === 'playing') drawParticles();
       // The last action's popup floats above the next step's card.
       if (state.phase === 'playing' && state.banner > 0) drawBanner(state);

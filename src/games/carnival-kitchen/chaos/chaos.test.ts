@@ -293,6 +293,9 @@ describe('kitchen surprises', () => {
       expect(state.phase).toBe('over');
       expect(run.phase).toBe('over');
       expect(run.paid).toBe(CHAOS_BONUS);
+      // Already in the round's score when it's saved (and its coins counted).
+      expect(totalScore(state)).toBe(state.scores.reduce((a, b) => a + b, 0) + state.bonus);
+      expect(state.bonus).toBeGreaterThanOrEqual(CHAOS_BONUS);
     });
   });
 
