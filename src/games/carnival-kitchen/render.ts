@@ -2733,6 +2733,8 @@ export function createRenderer(ctx: G, voice: Sound) {
       // The finished dish, waiting to be decorated before the stars.
       if (state.phase === 'over' && !end.decor.done) {
         drawDecorate(state, end.decor);
+        // A surprise that ended with the last step still shows its "+5".
+        drawSurprise(state, pointer, dt);
         bunny();
         onCanvas(() => drawSpeech(ctx, ['Drag a treat', 'onto your dish!'], places.speech));
         drawButtons();

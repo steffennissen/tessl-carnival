@@ -322,7 +322,8 @@ Nothing is ever lost:
   own state, the score and the streak aren't touched.
 - The flashlight doesn't stop anything: she cooks on in its light.
 - Finishing a surprise adds 5 points (`CHAOS_BONUS`), once, with a "+5"
-  and sparkles.
+  and sparkles. A flashlight that ends with the last step shows its "+5"
+  on the decorate screen.
 
 Chef Bunny reacts: raised brows and a big smile, and "Oh no, the lights! Use your
 flashlight!" as it starts, her bubble saying what to do while it's on ("A

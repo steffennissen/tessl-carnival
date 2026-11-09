@@ -82,7 +82,8 @@ export function showSurprise(
   }
   if (run.phase === 'over' && show.phase === 'on') {
     show.endAge = 0;
-    show.line = { text: event.says.end, age: 0 };
+    // Once the round is over (decorating), the kitchen's own voice comes first.
+    show.line = round.phase === 'playing' ? { text: event.says.end, age: 0 } : null;
     news = { kind: 'end', line: event.says.end };
     if (run.paid > 0) {
       effects.sound.chime([NOTE.C6, NOTE.E6, NOTE.G6, NOTE.C7], 0.08, 0.1);

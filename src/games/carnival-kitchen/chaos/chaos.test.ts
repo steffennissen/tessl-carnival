@@ -257,6 +257,31 @@ describe('kitchen surprises', () => {
       expect(run.paid).toBe(CHAOS_BONUS);
     });
 
+    it('still shows its "+5" on the decorate screen when it ends with the round', () => {
+      const state = withSurprise('soup', 'season', 'flashlight');
+      const show = createShow();
+      const context = {
+        g: fakeCanvas(),
+        t: 1,
+        dt: 1 / 20,
+        pointer: { x: 400, y: 250, down: false },
+        shape: 'page' as const,
+        screen: { x: 0, y: 0, w: 800, h: 500 },
+        effects: quietEffects(),
+      };
+      startIt(state);
+      expect(showSurprise(show, state, context)?.kind).toBe('start');
+      for (let go = 0; go < 20 && state.phase === 'playing'; go++) {
+        press(state, 0, 0);
+        tick(state, 2);
+        release(state);
+      }
+      expect(state.phase).toBe('over');
+      expect(showSurprise(show, state, context)?.kind).toBe('end');
+      expect(show.endAge).toBeGreaterThan(0);
+      expect(show.line).toBeNull();
+    });
+
     it('ends, with its bonus, when its step does', () => {
       const state = withSurprise('soup', 'season', 'flashlight');
       const run = startIt(state);
