@@ -1,5 +1,6 @@
-import { C, type G, circle, fillStroke, heartPath, oval, rounded, starPath } from './art';
+import { C, type G, circle, fillStroke, oval, starPath } from './art';
 import type { BunnyMood } from './chef';
+import { drawApron, drawHat } from './outfit-art';
 
 /**
  * Drawing Chef Bunny. What she feels and when is in chef.ts; this only draws
@@ -20,7 +21,19 @@ export interface BunnyPose {
   look: { x: number; y: number };
   /** How far she leans in to look, -1 (left) to 1 (right). */
   lean: number;
+  /** How far into a bow she is, 0 (standing) to 1 (head down): the rank ceremony. */
+  bow?: number;
+  /** How far above her head her hat floats, as it drops on at the ceremony. */
+  hatLift?: number;
 }
+
+/** What she wears (wardrobe.ts): a hat ('' for none) and an apron. */
+export interface BunnyLook {
+  hat: string;
+  apron: string;
+}
+
+export const PLAIN_LOOK: BunnyLook = { hat: 'chef-hat', apron: 'pink-apron' };
 
 /** A still, happy pose: for the title screen's first frame and the end card. */
 export function calmPose(t: number, mood: BunnyMood = 'idle', age = 9): BunnyPose {
@@ -118,8 +131,14 @@ function drawFace(g: G, pose: BunnyPose) {
 }
 
 /** Chef Bunny, with her head at (x, y). */
-export function drawBunny(g: G, at: { x: number; y: number }, pose: BunnyPose) {
+export function drawBunny(
+  g: G,
+  at: { x: number; y: number },
+  pose: BunnyPose,
+  look: BunnyLook = PLAIN_LOOK,
+) {
   const { mood, age, t } = pose;
+  const bow = Math.max(0, Math.min(1, pose.bow ?? 0));
   const cheering = mood === 'cheer';
   const partying = mood === 'party';
   // Two big jumps for a party, little hops for a cheer, breathing otherwise.
@@ -134,7 +153,8 @@ export function drawBunny(g: G, at: { x: number; y: number }, pose: BunnyPose) {
   // A twirl of the head mid-party.
   const twirl = partying && age < 1.4 ? Math.sin((age / 1.4) * Math.PI * 2) * 0.1 : 0;
   const x = at.x;
-  const y = at.y + hop;
+  // Bowing, her head dips toward you.
+  const y = at.y + hop + bow * 16;
 
   g.save();
   // Leaning in, from her feet.
@@ -155,17 +175,16 @@ export function drawBunny(g: G, at: { x: number; y: number }, pose: BunnyPose) {
     g.globalAlpha = 1;
   }
 
-  // Body and apron.
-  oval(g, x, y + 82, 50, 46);
+  // Body and apron (the body stays put while she bows).
+  const body = at.y + hop;
+  oval(g, x, body + 82, 50, 46);
   fillStroke(g, C.white);
-  rounded(g, x - 28, y + 54, 56, 60, 16);
-  fillStroke(g, C.pink, 3.5);
-  heartPath(g, x, y + 76, 9);
-  fillStroke(g, C.white, 2.5);
+  drawApron(g, look.apron, x - 28, body + 54);
 
   g.save();
   g.translate(x, y);
-  g.rotate(nod + tilt + twirl + pose.lean * 0.06);
+  g.rotate(nod + tilt + twirl + pose.lean * 0.06 + bow * 0.18);
+  if (bow > 0) g.scale(1, 1 - bow * 0.08);
 
   // Ears, splayed out from under the hat.
   for (const side of [-1, 1]) {
@@ -184,22 +203,22 @@ export function drawBunny(g: G, at: { x: number; y: number }, pose: BunnyPose) {
   circle(g, 0, 0, 42);
   fillStroke(g, C.white);
 
-  // Chef's hat.
-  for (const [hx, hy, r] of [
-    [-18, -60, 15],
-    [18, -60, 15],
-    [0, -70, 19],
-  ]) {
-    circle(g, hx, hy, r);
-    fillStroke(g, C.white, 3.5);
-  }
-  rounded(g, -24, -52, 48, 16, 6);
-  fillStroke(g, C.white, 3.5);
+  // Her hat, floating down onto her head at the ceremony.
+  const lift = pose.hatLift ?? 0;
+  g.save();
+  g.translate(0, -lift);
+  drawHat(g, look.hat, false, t);
+  g.restore();
 
-  drawFace(g, pose);
+  // Eyes shut while she bows.
+  drawFace(g, bow > 0.4 ? { ...pose, blink: true, mood: 'idle', lean: 0 } : pose);
   g.fillStyle = C.hotPink;
   oval(g, 0, 2, 3.4, 2.4);
   g.fill();
+  g.save();
+  g.translate(0, -lift);
+  drawHat(g, look.hat, true, t);
+  g.restore();
   g.restore();
 
   // Paws: up and waving for a cheer or a party, one raised in a cheery fist
@@ -218,6 +237,10 @@ export function drawBunny(g: G, at: { x: number; y: number }, pose: BunnyPose) {
     } else if (peeking) {
       px = x + side * 22 + pose.lean * 8;
       py = y + 40;
+    } else if (bow > 0) {
+      // A bow: paws together over her tummy.
+      px = x + side * (32 - bow * 18);
+      py = body + 46 + bow * 22;
     }
     circle(g, px, py, 12);
     fillStroke(g, C.white, 3.5);

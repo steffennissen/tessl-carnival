@@ -112,6 +112,12 @@ export interface Dish {
    */
   either?: number[][];
   /**
+   * A surprise dish: it isn't picked at random, and its page in the recipe
+   * book stays wrapped, until every other dish has its sticker
+   * (`playableDishes` in ranks.ts). The Birthday Cake is one.
+   */
+  locked?: boolean;
+  /**
    * Draws the finished dish, centred on the origin, about 240 wide and 160
    * tall, for the end card. `state` is the round that made it, or null for a
    * dish nobody has cooked yet. `time` is in seconds, for steam and wobbles.
